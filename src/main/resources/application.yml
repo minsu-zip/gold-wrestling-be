@@ -1,0 +1,73 @@
+spring:
+  application:
+    name: gold-wrestling-be
+
+  # 로컬 개발용 .env 를 properties 로 읽어들인다(파일이 없으면 무시).
+  # 배포 환경에서는 .env 없이 OS 환경변수로 동일한 키를 주입한다.
+  config:
+    import: optional:file:.env[.properties]
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:gold_wrestling}
+    username: ${DB_USERNAME:gold}
+    password: ${DB_PASSWORD:}
+    hikari:
+      pool-name: gold-wrestling-pool
+
+  jpa:
+    # 스키마는 Flyway 가 유일한 주체. Hibernate 는 매핑 검증만 한다.
+    hibernate:
+      ddl-auto: validate
+    # 뷰 렌더링 시점까지 커넥션·트랜잭션을 붙잡지 않도록 명시적으로 끈다.
+    open-in-view: false
+    properties:
+      hibernate:
+        # timestamp 를 JDBC 로 주고받을 때 사용할 시간대
+        jdbc.time_zone: ${TZ:Asia/Seoul}
+        format_sql: true
+        # N+1 을 조용히 넘기지 않도록 컬렉션 페치 배치 사이즈 지정
+        default_batch_fetch_size: 100
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # 빈 DB 에서 시작하므로 baseline 불필요. 히스토리 불일치는 즉시 실패시킨다.
+    baseline-on-migrate: false
+    validate-on-migrate: true
+
+  jackson:
+    time-zone: ${TZ:Asia/Seoul}
+
+server:
+  port: ${SERVER_PORT:8080}
+  # 에러 응답은 전역 예외 핸들러가 담당한다. 기본 에러 페이지에 내부 정보를 흘리지 않는다.
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+
+logging:
+  level:
+    org.hibernate.orm.jdbc.bind: info
+
+goldwrestling:
+  cors:
+    # FE dev 서버는 5180 / preview 5181 고정 (decisions.md D-012)
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5180,http://localhost:5181}
