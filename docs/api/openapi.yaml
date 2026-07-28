@@ -1,0 +1,36 @@
+openapi: 3.1.0
+info:
+  title: 골드레슬링 API
+  description: 골드레슬링 체육관 회원 관리·예약 시스템 백엔드 API
+  version: v0.0.1
+servers:
+- url: /
+tags:
+- name: system
+  description: 서버 상태·환경 확인
+paths:
+  /api/system/health:
+    get:
+      tags:
+      - system
+      summary: 서버 기동 및 기준 시간대 확인
+      operationId: health
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        serverTime:
+          type: string
+          format: date-time
+        timeZone:
+          type: string
