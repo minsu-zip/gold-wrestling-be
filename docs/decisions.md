@@ -1,0 +1,220 @@
+# 의사결정 기록 (decisions.md)
+
+> 설계·기술 결정을 할 때마다 아래 형식으로 추가한다. 포트폴리오·면접 대비 원천 자료.
+> 형식: 번호. 제목 / 날짜 / 결정 / 이유 / 대안과 기각 사유
+
+## D-001. 차감 시점: 예약 즉시 차감
+
+- 2026-07 / **예약 성공 시 즉시 차감, 취소 시 즉시 복구**
+- 이유: 회원이 보는 잔여 횟수가 항상 실제와 일치해야 함. 당일 취소 불가 정책 덕분에 노쇼 처리도 자동 해결
+- 기각 대안: 수업 종료 후 배치 차감 — 잔여 횟수 표시가 실제와 어긋나 회원 혼란 유발
+
+## D-002. 배치의 역할 분리
+
+- 2026-07 / 예약 관련 차감 = 실시간 트랜잭션, 정책성 차감(2주 미사용, 유효기간 만료) = 매일 새벽 멱등 배치
+
+## D-003. 레포 구조: 2개 멀티레포
+
+- 2026-07 / `gold-wrestling-be`(docs, docker-compose 포함) + `gold-wrestling-fe`
+- 이유: 1인 개발에서 4개 레포는 관리 오버헤드. docs는 BE 내 폴더로 충분 (openapi.yaml 생성 주체가 BE)
+- 기각 대안: docs/infra 별도 레포(과함), 모노레포(레포별 독립 CI/CD 학습 목표와 상충)
+
+## D-004. 프론트: React CSR (Vite)
+
+- 2026-07 / 로그인 기반 서비스라 SEO 불필요. SSR(Next)은 인프라 복잡도만 추가 — 학습 초점(BE/인프라)과 상충
+
+## D-005. JDK 21
+
+- 2026-07 / 강의(김영한) 및 생태계 호환, 국내 실무 표준. JDK 25는 라이브러리 지원 성숙 후 업그레이드 경험 삼아 고려
+
+## D-006. 인프라: AWS 통일
+
+- 2026-07 / EC2(BE+DB, Docker) + S3/CloudFront(FE) + GitHub Actions. 프리티어 12개월 후 Lightsail/Oracle 재검토
+- 기각 대안: Oracle Always Free(더 좋은 무료 사양이나 낯선 플랫폼 학습 비용), Cloudflare Pages(간편하나 AWS 학습 목표와 상충)
+
+## D-007. 관리자 실시간 인지: 인앱 알림센터 + 주간 보드
+
+- 2026-07 / 폴링(30초)으로 시작 → SSE 업그레이드. 푸시(FCM/PWA)는 v2
+- 주간 보드는 라이브러리 대신 커스텀 그리드 (고정 슬롯 구조라 범용 캘린더가 과함)
+
+## D-008. FE 패키지 매니저: pnpm
+
+- 2026-07 / **pnpm 고정 (npm/yarn 금지)**
+- 이유: 설치 속도, 디스크 효율(전역 저장+심링크), 엄격한 node_modules로 유령 의존성 차단 — 선언 안 한 패키지 import 시 즉시 에러가 나서 AI 작업 시 의존성 위생이 강제됨
+- 기각 대안: npm(느림, 유령 의존성 허용), yarn classic(레거시), yarn berry(PnP 호환 마찰)
+- 후속: GitHub Actions 워크플로우 작성 시(M7) pnpm/action-setup + setup-node cache: 'pnpm' 적용 필요
+
+## D-009. FE TypeScript 버전: 6.0 고정 (7.0 보류)
+
+- 2026-07 / **TypeScript 6.0.x 고정**. 7.0(Go 네이티브 포팅)은 생태계 성숙 후 재검토
+- 이유: 7.0은 2026-07 출시로 아직 3주차. 우리가 쓰는 도구가 지원하지 않는다 —
+  typescript-eslint는 peer가 `<6.1.0`, openapi-typescript는 `^5.x`.
+  린팅(D-010)과 API 타입 생성(D-013)은 둘 다 이 프로젝트의 필수 경로라 여기서 막히면 안 된다
+- 참고: openapi-typescript는 peer 범위만 낡았을 뿐 TS 6에서 생성이 정상 동작함을 확인.
+  pnpm.peerDependencyRules로 경고만 억제했다
+- 기각 대안: TS 7 선행 도입(툴체인 절반이 동작 불가), TS 5.9 유지(불필요하게 2세대 뒤처짐)
+
+## D-010. FE 린터: ESLint + typescript-eslint
+
+- 2026-07 / **ESLint 10 + typescript-eslint 8 (타입 정보 기반 규칙 활성화)**
+- 이유: 예약·취소가 전부 비동기라 `no-floating-promises`(await 누락),
+  `no-misused-promises` 같은 **타입 정보 없이는 잡을 수 없는** 규칙이 중요하다.
+  실제로 전환 직후 `import.meta.env` 접근이 any로 새는 것과 E2E의 DOM 타입 누락을 잡아냈다
+- 기각 대안: oxlint (현 Vite 공식 템플릿 기본값, 50~100배 빠름).
+  타입 정보를 쓰지 않아 위 부류를 못 잡고, 린트가 몇 초 빨라지는 것보다
+  런타임 버그 하나 막는 게 낫다고 판단
+- 유의: typescript-eslint peer가 `<6.1.0`이라 TS 6.1/7 업그레이드 시
+  typescript-eslint 지원을 기다려야 한다 (D-009와 함께 봐야 함)
+
+## D-011. FE 폰트: Pretendard Variable, 동적 서브셋 self-host
+
+- 2026-07 / **Pretendard Variable 단일 패밀리로 통일**, npm `pretendard` 패키지로 self-host
+- 이유: 한글·영문을 한 패밀리로 통일. 가변 폰트라 `@font-face` 한 선언
+  (`font-weight: 45 920`)으로 Thin~Black 전 굵기를 커버해 굵기별 파일 선언이 필요 없다.
+  동적 서브셋 버전은 unicode-range로 92개 조각으로 나뉘어 실제 쓰인 글자 범위만 내려받는다
+- 기각 대안:
+  - Geist(shadcn 프리셋 기본) — 한글 글리프가 없어 한글이 시스템 폰트로 떨어진다
+  - `@fontsource/pretendard` — 서브셋 없이 굵기당 전체 한글 폰트 1개라 4굵기면 수 MB
+  - 전체 variable woff2 한 덩어리(2MB) — 첫 로딩에 전부 받는다
+  - CDN 링크 — S3/CloudFront 배포와 외부 의존을 섞고 싶지 않다
+
+## D-012. FE dev 서버 포트 5180 고정
+
+- 2026-07 / **dev 5180 / preview 5181, `strictPort: true`**
+- 이유: Vite 기본 5173은 다른 프로젝트와 충돌하기 쉽다. 기본 동작은 점유 시 조용히
+  다음 포트로 옮겨가는데, 이때 Playwright가 `reuseExistingServer`로 5173의
+  **엉뚱한 서버**를 붙잡아 E2E가 통째로 실패한다 (실제로 겪음).
+  strictPort로 조용한 이동 대신 즉시 실패시킨다
+
+## D-013. 생성된 API 타입은 커밋한다
+
+- 2026-07 / `pnpm api:types`로 만든 `src/api/schema.d.ts`를 커밋 대상에 포함
+- 이유: FE 빌드/CI가 BE 레포 체크아웃 없이 독립적으로 돌아야 한다 (멀티레포 구조, D-003)
+- 기각 대안: gitignore 후 빌드 시 생성 — CI에서 BE 레포를 함께 체크아웃해야 해 결합도가 올라간다
+
+## D-014. BE 프레임워크: Spring Boot 4.1.x 채택
+
+- 2026-07 / **Spring Boot 4.1.0 (Spring Framework 7)**, JDK 21 유지
+- 이유: Boot 3.5의 OSS 지원이 **2026-06-30 종료**되어(이후 보안 패치는 상용 구독) 신규·실서비스 프로젝트에 부적합.
+  4.0은 2026-12-31 지원 종료라 5개월 뒤 재업그레이드가 필요하므로 **4.1**(2027-07-31까지 지원) 선택.
+  Java baseline이 4.x에서도 17이라 JDK 21 결정(D-005)에 영향 없음
+- 기각 대안: 3.5.16(보안 패치 종료), 4.0(단기간 내 재업그레이드 필요)
+- 유의: 학습 자료(강의)가 3.x 기준이므로 설정 키·패키지·의존성 차이는 **4.x 공식 문서 기준으로 해소**한다.
+  실제 확인된 차이 — 스타터명 `spring-boot-starter-web`→`-webmvc`, Flyway/모듈별 `-test` 스타터 분리,
+  Jackson 3(`tools.jackson`), Testcontainers 2.x(`testcontainers-postgresql`),
+  `@AutoConfigureMockMvc`→`org.springframework.boot.webmvc.test.autoconfigure`, springdoc은 3.x 라인
+  (`spring.datasource`/`spring.jpa`/`spring.flyway`/`spring.jackson` 설정 키는 3.x와 동일함을 메타데이터로 확인)
+
+## D-015. 로컬 시크릿 주입: application.yml이 .env를 직접 import
+
+- 2026-07 / `spring.config.import: optional:file:.env[.properties]` 로 `.env`를 읽고, 배포는 동일 키를 OS 환경변수로 주입
+- 이유: `.env` 하나를 docker-compose와 애플리케이션이 공유해 로컬 셋업이 `cp .env.example .env` 한 번으로 끝난다.
+  `optional:`이라 `.env` 없는 배포 환경에서도 그대로 뜬다
+- 기각 대안: dotenv 라이브러리 추가(의존성 증가), IDE 실행 구성에 환경변수 등록(팀·CI 재현 불가)
+- 유의: `.env`는 properties 포맷으로 파싱된다 — 값에 `#`(주석), `\`(이스케이프) 사용 금지, 따옴표로 감싸지 말 것
+
+## D-016. 횟수 표현: DECIMAL(4,1) + BigDecimal
+
+- 2026-07 / DB는 `DECIMAL(4,1)`, 코드는 `BigDecimal`. 0.5를 그대로 0.5로 저장한다
+- 이유: 0.5 단위가 정책 전반(저녁반 0.5회 차감, "잔여 0.5회로는 1회 예약 불가")에 그대로 노출된다.
+  정수 스케일(0.5=1)은 저장은 단순하지만 표시·입력·검증·이력 모든 지점에 ×2 ÷2 변환이 붙어
+  변환 누락이 곧 횟수 오류가 된다. 감사 대상 데이터라 DB 값을 눈으로 읽어 검증할 수 있어야 한다
+- 기각 대안: 정수 스케일(변환 지점마다 버그 위험), `Double`/`Float`(부동소수 오차 — 잔여 0 판정이 깨진다)
+- 유의: `BigDecimal`은 `equals`가 스케일까지 비교해 `0.5 != 0.50` 이다.
+  **잔여 횟수 비교는 반드시 `compareTo`** 를 쓴다 (conventions.md에 규약으로 명시)
+
+## D-017. 에러 응답: RFC 9457 ProblemDetail
+
+- 2026-07 / Spring 내장 `ProblemDetail`(`application/problem+json`)을 전역 예외 핸들러에서 반환.
+  도메인 에러는 `type`에 에러코드 URI, 부가 정보는 `properties`에 담는다
+- 이유: FE가 `openapi.yaml`로 타입을 생성한다(D-013). 표준 스키마라 생성기가 그대로 처리한다.
+  직접 만든 `ApiResponse<T>` 래퍼는 모든 성공 응답까지 한 겹 감싸서 FE가 매번 벗겨야 하고,
+  스프링이 내부적으로 발생시키는 에러(400/404/405)와 우리 에러의 형태가 갈라진다
+- 기각 대안: 커스텀 `ApiResponse<T>` 공통 래퍼(비표준·FE 부담), 예외별 즉석 응답(형태 불일치)
+
+## D-018. 패키지 구조: 기능별 패키지
+
+- 2026-07 / `com.goldwrestling.<기능>` 아래에 계층을 둔다 (`member`, `pass`, `reservation`, `schedule`, `notice`, `admin`)
+- 이유: 예약이 이용권 차감·정원·휴강과 얽혀 있어 도메인 경계를 눈에 보이게 유지해야 한다.
+  계층별 최상위 구조(`controller/`, `service/`)는 한 기능을 수정할 때 파일이 여러 폴더로 흩어진다
+- 기각 대안: 계층별 패키지(전통적이지만 응집도 낮음), 완전한 헥사고날/멀티모듈(1인 MVP에 과함)
+
+## D-019. DTO 경계: 엔티티를 컨트롤러 밖으로 내보내지 않는다
+
+- 2026-07 / 요청·응답 전용 DTO를 기능 패키지의 `dto`에 두고, 엔티티는 서비스 계층 안에서만 다룬다
+- 이유: `openapi.yaml`이 FE와의 유일한 계약이다. 엔티티를 그대로 반환하면 필드 추가가 곧 API 변경이 되고,
+  지연 로딩 프로퍼티가 직렬화 시점에 터진다(open-in-view=false와 함께 보면 명확하다)
+- 기각 대안: 엔티티 직접 반환(계약 오염), `Map<String, Any>` 반환(스펙 생성 불가)
+
+## D-020. 트랜잭션 경계: 서비스 메서드 = 트랜잭션 단위
+
+- 2026-07 / 서비스 클래스에 `@Transactional(readOnly = true)` 기본, 변경 메서드에만 `@Transactional` 오버라이드.
+  컨트롤러·리포지토리에는 `@Transactional`을 붙이지 않는다
+- 이유: 차감과 예약 생성은 한 트랜잭션에서 원자적으로 끝나야 한다(D-001 즉시 차감).
+  경계가 컨트롤러로 올라가면 외부 호출·응답 직렬화가 트랜잭션 안에 들어와 커넥션을 오래 잡는다
+- 기각 대안: 컨트롤러 트랜잭션(경계 과다 확장), 리포지토리 트랜잭션(여러 저장이 원자성을 잃음)
+
+## D-021. 동시성: DB 제약 + 조건부 갱신 우선, 락은 필요한 곳에만
+
+- 2026-07 / 1:1 레슨은 (session_id) 유니크 제약, 예약제 정원은 조건부 갱신/삽입으로 먼저 막고,
+  그것으로 부족한 지점에만 비관적 락(`SELECT ... FOR UPDATE`)을 쓴다. 각 지점은 동시성 테스트로 검증
+- 이유: 초과 예약 0건은 애플리케이션 조건문으로 보장할 수 없다(조회-판단-저장 사이에 다른 트랜잭션이 끼어든다).
+  DB 제약은 코드 경로가 몇 개든 마지막 방어선이 된다
+- 기각 대안: 낙관적 락 `@Version`(충돌 시 재시도 로직이 필요, 마지막 자리 경쟁에서 재시도 폭증),
+  애플리케이션 레벨 동기화(다중 인스턴스에서 무효)
+- 유의: 정원 방식은 예약 phase에서 실측 비교 후 확정하고 이 항목을 갱신한다
+
+## D-022. FE 재사용 규약: 만들기 전에 찾고, 확장은 하위호환으로
+
+- 2026-07 / **탐색 → 재사용 → 확장** 순서를 규약화. 확장 시 기존 시그니처·동작을 바꾸지 않는다
+- 이유: AI가 페이즈마다 작업하면 같은 일을 하는 함수·컴포넌트가 이름만 다르게 계속 생긴다.
+  더 위험한 건 기존 것을 "개선"하다 이미 쓰고 있는 화면을 조용히 깨뜨리는 것 —
+  타입 체크가 못 잡는 변경(문자열 출력, 렌더 결과)일수록 그렇다
+- 구체: 새 인자·prop은 optional + 기본값(기본값일 때 동작은 기존과 동일).
+  동작 자체를 바꿔야 하면 새로 만든다. 정말 바꿔야 하면
+  기존 동작을 테스트로 고정 → 호출부 전수 검색 → 한 커밋에서 함께 수정
+- 컴포넌트 안에 헬퍼 함수를 두지 않는다 — 판정은 `features/*/rules.ts`,
+  표시 포맷은 `features/*/format.ts`, 도메인 무관 유틸은 `src/lib/`.
+  그래야 Vitest로 검증할 수 있다
+- 승격은 **두 번째 사용처가 생겼을 때**. 미리 공용화하면 맞는 인터페이스를 알 수 없다
+- 문서: `gold-wrestling-fe/.claude/skills/fe-architecture/rules/reuse.md`
+
+## D-023. FE 검증 규약: 변경에는 검증이 따라온다 + Storybook 도입
+
+- 2026-07 / **순수 함수 → Vitest, 컴포넌트·기능·페이지 → Storybook, 주요 플로우 → Playwright**를
+  같은 커밋에 함께 넣는다
+- 이유: 나중에 로직을 고치거나 확장할 때 무엇이 깨졌는지 판단할 근거가 필요하다.
+  특히 정책 변경(policies.md)이 잦을 도메인이라 경계값 테스트가 회귀 방어선이 된다
+- **Storybook 채택 (10.5.x)**: BE API가 아직 없고, 정원 마감·휴강·잔여 0.5회 같은 상태는
+  실제 데이터로 재현하기 번거롭다. 스토리북이 그 상태들을 고정해두는 곳이 된다.
+  `Default` 하나로 끝내지 않고 `Empty`/`Loading`/`Error` + 도메인 상태를 각각 만든다
+- `@storybook/addon-vitest`를 함께 쓴다 — **스토리가 곧 렌더 회귀 테스트**가 되어
+  `pnpm test`가 모든 스토리를 검증한다. 스토리 작성 비용이 테스트 비용을 겸한다
+- 호환 확인: Storybook 10.5.5가 Vite 8 / React 19 / TS 6을 모두 지원 (peer 확인)
+- 기각 대안: 스토리북 없이 E2E만 — 데이터 없는 상태·에러 상태를 재현하려면
+  목 서버가 필요해 비용이 더 크다
+- 설치 시점: 첫 컴포넌트 페이즈 (환경 세팅 단계에서는 미설치)
+- 문서: `gold-wrestling-fe/.claude/skills/fe-architecture/rules/testing.md`
+
+## D-024. BE 코틀린 포맷터: ktlint (스타일 `ktlint_official`)
+
+- 2026-07 / **ktlint-gradle 14.2.0 + ktlint 1.8.0**. 스타일은 `.editorconfig` 의 `ktlint_code_style = ktlint_official`.
+  `ktlintCheck` 는 플러그인 기본대로 `check` 에 묶여 `./gradlew build` 가 포맷 위반 시 실패한다
+- 이유: phase 가 독립 컨텍스트에서 실행되므로 "스타일을 통일하라"를 문서에 적어도 지켜지지 않는다.
+  코드가 5개 파일인 지금 넣어야 나중에 "전 파일 포맷 커밋"이 `git blame` 을 오염시키는 일을 피한다.
+  FE 의 Prettier 자리 — 코드 품질이 아니라 모양만 담당한다 (D-010 의 ESLint 는 detekt 에 대응)
+- 스타일 선택 근거: 실제 코드에 두 스타일을 돌려 비교 → `ktlint_official` 은 **변경 0줄**,
+  `intellij_idea` 는 69줄 변경. 또 official 은 생성자·함수 파라미터를 한 줄씩 + 끝쉼표로 두어
+  **파라미터 추가 시 diff 가 "1줄 추가"** 로 끝난다 (한 줄로 몰면 그 줄 전체가 수정으로 잡힌다)
+- 기각 대안:
+  - `intellij_idea` 스타일 — 기존 코드 69줄 즉시 재작성 + 끝쉼표 제거로 이후 diff 가 더러워진다
+  - **detekt 는 지금 도입하지 않는다** — 코드 냄새(함수 길이·복잡도) 검사는 규칙 튜닝·오탐 억제 비용이 크고,
+    FE 에서 ESLint 가 잡던 것 중 상당수(널 접근, 타입 누출, 미정의 참조)는 **코틀린 컴파일러가 이미 막는다**.
+    코드가 쌓여 "이 서비스가 너무 커졌다"는 판단이 생기면 그때 재검토
+  - spotless — 여러 언어를 한 번에 다루는 대신 코틀린 전용 규칙 제어가 ktlint 보다 간접적
+- 유의: 스타일 규칙의 단일 출처는 `.editorconfig` 다. `build.gradle.kts` 에 규칙을 중복 정의하지 않는다.
+  `ij_kotlin_allow_trailing_comma*` 를 켠 것은 IntelliJ 자동 포맷 결과를 ktlint 와 일치시키기 위한 것
+
+## D-025. (예시 — 다음 결정을 여기에 추가)
+
+- 날짜 / 결정 / 이유 / 기각 대안
