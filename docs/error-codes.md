@@ -1,0 +1,17 @@
+# 에러코드 레지스트리 (error-codes.md)
+
+> 이 표가 **FE 분기의 유일한 계약**이다. FE는 `code` 필드 값으로만 에러를 분기하고, `type`/`title`/`detail`은 사람이 읽는 보조 정보로만 취급한다.
+> 새 에러코드를 추가하면 **같은 PR에서 이 표에 행을 추가한다** (`src/main/kotlin/com/goldwrestling/common/error/ErrorCode.kt`의 enum과 항상 1:1로 맞춘다).
+
+## 공통 코드 (Phase 1)
+
+| 코드 | HTTP 상태 | 의미 | 발생 지점 |
+|---|---|---|---|
+| `VALIDATION_FAILED` | 400 | 요청 값 형식 검증 실패 (`@Valid`, 파라미터 제약) | `MethodArgumentNotValidException`, `HandlerMethodValidationException` |
+| `MALFORMED_REQUEST` | 400 | 본문 파싱 실패, 타입 불일치, 필수 파라미터 누락 | `HttpMessageNotReadableException`, `MethodArgumentTypeMismatchException`, `MissingServletRequestParameterException` |
+| `RESOURCE_NOT_FOUND` | 404 | 매핑되지 않은 경로 또는 대상 리소스 없음 | `NoResourceFoundException`, `NoHandlerFoundException` |
+| `METHOD_NOT_ALLOWED` | 405 | 해당 경로가 지원하지 않는 HTTP 메서드 | `HttpRequestMethodNotSupportedException` |
+| `UNSUPPORTED_MEDIA_TYPE` | 415 | 지원하지 않는 Content-Type | `HttpMediaTypeNotSupportedException` |
+| `INTERNAL_ERROR` | 500 | 예상하지 못한 서버 오류 (응답 본문에 원인 노출 없음, 서버 로그에만 기록) | 포괄 `Exception` 핸들러 |
+
+도메인 코드(예: `RESERVATION_FULL`, `INSUFFICIENT_PASS_COUNT`)는 해당 도메인이 생기는 이후 phase에서 이 표에 추가된다.
