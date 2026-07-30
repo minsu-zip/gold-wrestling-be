@@ -108,7 +108,8 @@ if (pass.remainingCount.signum() == 0) { ... }
 - 컨트롤러는 DTO만 주고받는다. 엔티티를 반환하거나 파라미터로 받지 않는다
 - 요청 DTO에 `jakarta.validation` 애노테이션으로 형식 검증(`@NotNull`, `@Positive`)을 걸고, **도메인 규칙 검증은 서비스·엔티티에서** 한다 (정원, 잔여 횟수, 당일 취소 불가는 DTO의 일이 아니다)
 - 응답 DTO는 엔티티 → DTO 변환 함수를 DTO 쪽 `companion object`에 둔다 (`ReservationResponse.from(reservation)`)
-- **API를 추가·변경하면 `docs/api/openapi.yaml`을 재생성해 같은 커밋에 포함한다** (CLAUDE.md 규칙 3)
+- **API를 추가·변경하면 `docs/api/openapi.yaml`을 재생성해 같은 커밋에 포함한다** (CLAUDE.md 규칙 3).
+  재생성은 `docker compose up -d` 후 `./gradlew generateApiDocs` 한 명령(D-029) — 앱 기동을 포함해 최대 1분가량 걸린다
 - `@Operation`/`@Schema`로 요약을 붙인다. FE가 이 스펙만 보고 작업한다
 
 ## 7. 서비스와 트랜잭션 (D-020)

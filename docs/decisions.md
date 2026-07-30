@@ -257,6 +257,22 @@
   처리(응답에 `code` 유무가 섞임), `type` URI를 분기 키로 사용(FE가 URI 문자열을 파싱해야 함),
   `openapi.yaml`에 에러 스키마를 전 엔드포인트에 수동 주석(반복 비용이 큼)
 
-## D-029. (예시 — 다음 결정을 여기에 추가)
+## D-029. openapi.yaml 재생성: 커스텀 Gradle 태스크 체인 (springdoc gradle 플러그인 미사용)
+
+- 2026-07 / `springdoc-openapi-gradle-plugin` 대신 커스텀 Gradle 태스크 체인(`generateApiDocs`)으로
+  `docs/api/openapi.yaml`을 재생성한다. 로컬 `docker compose` Postgres 기동을 전제한다(D-03)
+- 이유: 플러그인 최신 1.9.0이 2024-06 이후 릴리스가 없고, 최신 Boot Gradle 플러그인과의
+  `BootRun_Decorated` 캐스트 충돌·configuration cache 비호환 이슈가 미해결이라 Boot 4.1에서
+  실패 위험이 크다. 대신 앱을 백그라운드로 기동(8099) → `/actuator/health` 폴링 →
+  `/v3/api-docs.yaml` 다운로드 → 프로세스 정리를 `Exec` 태스크 5개(`dependsOn`/`finalizedBy`)로
+  직접 구현해 동일 효과를 낸다
+- 기각 대안: 플러그인 채택(위 이유로 위험), 수동 `bootRun` + `curl`(사람이 한 번만 빠뜨려도
+  커밋된 계약과 실제 API가 조용히 어긋난다), `openapi.yaml` 수작업 편집(필연적 드리프트)
+- 이연: CI에서 재생성 결과를 코드와 대조하는 검증은 배포 단계(M7)로 미룬다 — 이번 스코프는
+  로컬 실행 보장까지다
+- 트레이드오프: 재생성이 앱 기동을 포함해 최대 1분가량 걸린다 — 매번 실행되게 만들어 계약
+  드리프트를 막는 대신 속도를 포기했다(계약 파일을 항상 최신으로 유지하는 정확성이 우선)
+
+## D-030. (예시 — 다음 결정을 여기에 추가)
 
 - 날짜 / 결정 / 이유 / 기각 대안

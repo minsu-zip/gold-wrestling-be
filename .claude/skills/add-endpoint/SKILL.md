@@ -62,9 +62,11 @@ DTO 필드만 추가한 변경이면 테스트가 필요 없다 — 대신 **완
 
 ```bash
 docker compose up -d
-./gradlew bootRun &                                    # 기동 완료 대기
-curl -s http://localhost:8080/v3/api-docs.yaml -o docs/api/openapi.yaml
+./gradlew generateApiDocs
 ```
+
+앱을 따로 띄우거나 포트를 신경 쓸 필요가 없다(태스크가 8099에서 기동·정리한다).
+이 명령은 앱 기동을 포함하므로 최대 1분가량 걸린다 — 정상이다.
 
 - [ ] `git diff docs/api/openapi.yaml` 로 의도한 변경만 들어갔는지 확인
 - [ ] `servers:`가 `/` 로 유지되는지 확인 (환경 정보가 박히면 안 된다)
