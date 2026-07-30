@@ -28,7 +28,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException
  * `ResponseEntityExceptionHandler`를 상속하면 Boot가 자동 등록하는 `ProblemDetailsExceptionHandler`
  * (`@ConditionalOnMissingBean(ResponseEntityExceptionHandler::class)`)가 비활성화되고, 스프링 내장 예외
  * (검증 실패·404·405·415 등)까지 전부 이 클래스의 [handleExceptionInternal]을 거친다 — 그래서 도메인 예외와
- * 내장 예외가 예외 없이 같은 모양(+`code`)으로 응답한다 (D-06).
+ * 내장 예외가 예외 없이 같은 모양(+`code`)으로 응답한다 (D-028).
  *
  * 개별 `@ExceptionHandler`를 나열해 자동 빈과 공존시키면 응답에 `code`가 있는 것과 없는 것이 섞인다
  * (RESEARCH Pitfall 1) — 그래서 상속 하나로 통일한다.

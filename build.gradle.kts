@@ -101,13 +101,13 @@ tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
 }
 
 // ---------------------------------------------------------------------------
-// openapi.yaml 재생성 파이프라인 (FOUND-03, D-01/D-02)
+// openapi.yaml 재생성 파이프라인 (FOUND-03, docs/decisions.md D-029)
 //
 // springdoc은 런타임 introspection으로 스펙을 만든다 — 앱을 띄우지 않으면 스펙이 나오지 않는다.
-// springdoc-openapi-gradle-plugin은 쓰지 않는다(D-01 — 최근 릴리스 없음 + Boot 4 Gradle 플러그인과
+// springdoc-openapi-gradle-plugin은 쓰지 않는다(D-029 — 최근 릴리스 없음 + Boot 4 Gradle 플러그인과
 // BootRun_Decorated 캐스트 충돌·configuration cache 비호환 이슈 미해결). 대신 앱을 백그라운드로
 // 기동 → /actuator/health 폴링으로 대기 → /v3/api-docs.yaml 다운로드 → 프로세스 정리를 커스텀
-// Exec 태스크 체인으로 구현한다(D-02). 로컬 docker compose Postgres 기동이 전제다(D-03).
+// Exec 태스크 체인으로 구현한다. 로컬 docker compose Postgres 기동이 전제다 (상세는 D-029).
 // ---------------------------------------------------------------------------
 val apiDocsPort = 8099 // bootRun(8080)과 충돌하지 않도록 별도 포트
 val apiDocsDir = layout.buildDirectory.dir("apiDocs")

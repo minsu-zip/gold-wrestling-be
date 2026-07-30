@@ -3,7 +3,7 @@ package com.goldwrestling.common.error
 import org.springframework.http.HttpStatus
 
 /**
- * 이 프로젝트의 모든 에러 응답에 붙는 `code` 필드 값이다 (D-06).
+ * 이 프로젝트의 모든 에러 응답에 붙는 `code` 필드 값이다 (D-028).
  *
  * **FE 분기는 이 값(enum `name`)으로만 한다.** `ProblemDetail.type` URI는 형식만 갖춘 값이며 분기 키가 아니다.
  *

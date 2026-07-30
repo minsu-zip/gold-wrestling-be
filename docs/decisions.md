@@ -260,7 +260,7 @@
 ## D-029. openapi.yaml 재생성: 커스텀 Gradle 태스크 체인 (springdoc gradle 플러그인 미사용)
 
 - 2026-07 / `springdoc-openapi-gradle-plugin` 대신 커스텀 Gradle 태스크 체인(`generateApiDocs`)으로
-  `docs/api/openapi.yaml`을 재생성한다. 로컬 `docker compose` Postgres 기동을 전제한다(D-03)
+  `docs/api/openapi.yaml`을 재생성한다. 로컬 `docker compose` Postgres 기동을 전제한다
 - 이유: 플러그인 최신 1.9.0이 2024-06 이후 릴리스가 없고, 최신 Boot Gradle 플러그인과의
   `BootRun_Decorated` 캐스트 충돌·configuration cache 비호환 이슈가 미해결이라 Boot 4.1에서
   실패 위험이 크다. 대신 앱을 백그라운드로 기동(8099) → `/actuator/health` 폴링 →
@@ -273,6 +273,26 @@
 - 트레이드오프: 재생성이 앱 기동을 포함해 최대 1분가량 걸린다 — 매번 실행되게 만들어 계약
   드리프트를 막는 대신 속도를 포기했다(계약 파일을 항상 최신으로 유지하는 정확성이 우선)
 
-## D-030. (예시 — 다음 결정을 여기에 추가)
+## D-030. 초기 스키마: 최소 스키마 원칙 (Phase 1)
+
+- 2026-07 / Phase 1 스키마(V2)는 **확실한 정체성 컬럼만** 만든다. 카카오 식별자·관리자 로그인
+  자격(ID/PW)·역할 컬럼 등 인증 관련 컬럼은 인증 설계가 확정되는 Phase 2에서 V3 이후 마이그레이션으로 추가한다
+- 이유: 커밋된 마이그레이션은 수정 금지(conventions §9)라, 확정되지 않은 설계를 추측으로 굳히면
+  잘못된 컬럼이 스키마 이력에 영구히 남는다. 컬럼 추가는 싸고 제거·변경은 비싸다
+- 기각 대안: 인증 컬럼 선반영(추측 설계가 이력에 고정됨), 전부 nullable 로 미리 파두기(무의미한 널 컬럼이 계약을 흐림)
+- 유의: `V2__create_branch_member_admin.sql` 주석의 "D-04"는 phase 1 계획 문서
+  (`.planning/phases/01-foundation/01-CONTEXT.md`)의 로컬 ID로, 이 항목을 가리킨다
+  (커밋된 마이그레이션은 수정 금지라 표기를 그대로 남겨 둔다)
+
+## D-031. Branch 시드: Flyway 시드 마이그레이션으로 주입
+
+- 2026-07 / 송파점 1건을 V2 마이그레이션의 `INSERT`로 주입한다. 지점 관리 API는 v1 스코프 밖이라
+  마이그레이션이 유일한 데이터 주입 경로다. `id`는 명시하지 않는다(identity 시퀀스 어긋남 방지)
+- 이유: Testcontainers가 빈 DB에서 마이그레이션을 전부 재생하므로 로컬·테스트·운영이 같은 시드를 보장받는다
+- 기각 대안: 앱 기동 시 시드(`ApplicationRunner` — 환경·중복 실행 조건 분기가 필요),
+  `data.sql`(Flyway와 주입 경로가 이원화되어 실행 순서 보장이 어긋남)
+- 유의: `V2__create_branch_member_admin.sql` 주석의 "D-09"는 phase 1 계획 문서의 로컬 ID로, 이 항목을 가리킨다
+
+## D-032. (예시 — 다음 결정을 여기에 추가)
 
 - 날짜 / 결정 / 이유 / 기각 대안

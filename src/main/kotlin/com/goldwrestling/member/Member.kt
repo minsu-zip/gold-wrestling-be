@@ -17,7 +17,7 @@ import jakarta.persistence.Table
  * 회원 (카카오 로그인 사용자).
  *
  * [name]·[phoneNumber]는 온보딩(Phase 2, policies §5.1) 전에는 값이 없다 — 온보딩 완료 판정은
- * 이 두 필드의 입력 여부로 한다(D-05). 컬럼 nullable과 Kotlin 타입 nullable을 함께 맞춘다 —
+ * 이 두 필드의 입력 여부로 한다(D-025). 컬럼 nullable과 Kotlin 타입 nullable을 함께 맞춘다 —
  * 불일치는 `ddl-auto=validate`가 잡지 못하는 종류의 버그다(conventions §3).
  *
  * `created_at`은 이 엔티티에 매핑하지 않는다 — 값은 DB `DEFAULT now()`가 소유하고,
