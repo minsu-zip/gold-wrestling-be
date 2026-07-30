@@ -11,6 +11,7 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
+import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.test.web.servlet.MockMvc
@@ -19,10 +20,13 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.server.ResponseStatusException
 
 /**
  * FOUND-01: 스프링 내장 예외(404/405/400/415)와 도메인 예외가 전부 같은 모양
@@ -104,6 +108,32 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    fun `응답할 수 없는 Accept 헤더 요청은 406 으로 응답하고 code 는 NOT_ACCEPTABLE 다`() {
+        mockMvc
+            .perform(get("/api/system/health").accept(MediaType.APPLICATION_XML))
+            .andExpect(status().isNotAcceptable)
+            .andExpect(jsonPath("$.code").value("NOT_ACCEPTABLE"))
+    }
+
+    @Test
+    fun `필수 헤더 누락은 400 problem+json 으로 응답하고 code 는 MALFORMED_REQUEST 다`() {
+        mockMvc
+            .perform(get("/internal-test/required-header"))
+            .andExpect(status().isBadRequest)
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"))
+    }
+
+    @Test
+    fun `매핑되지 않은 4xx 예외는 INTERNAL_ERROR 가 아니라 MALFORMED_REQUEST 로 응답된다`() {
+        mockMvc
+            .perform(post("/internal-test/unmapped-conflict"))
+            .andExpect(status().isConflict)
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"))
+    }
+
+    @Test
     fun `예상하지 못한 예외는 500 problem+json 으로 응답하고 code 는 INTERNAL_ERROR 이며 본문에 내부 정보가 없다`() {
         val result =
             mockMvc
@@ -150,6 +180,15 @@ class GlobalExceptionHandlerTest {
         fun validate(
             @Valid @RequestBody request: SampleRequest,
         ): ResponseEntity<Void> = ResponseEntity.ok().build()
+
+        @GetMapping("/required-header")
+        fun requiredHeader(
+            @RequestHeader("X-Required-Header") value: String,
+        ): ResponseEntity<Void> = ResponseEntity.ok().build()
+
+        /** `resolveErrorCode` 의 `when` 에 매핑되지 않은 4xx 예외의 폴백 경로를 재현한다. */
+        @PostMapping("/unmapped-conflict")
+        fun unmappedConflict(): Nothing = throw ResponseStatusException(HttpStatus.CONFLICT, "테스트 전용 충돌")
 
         @PostMapping("/boom")
         fun boom(): Nothing = throw IllegalStateException("internal-leak-marker")

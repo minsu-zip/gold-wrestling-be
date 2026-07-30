@@ -5,10 +5,12 @@ import org.springframework.http.HttpStatusCode
 import org.springframework.http.ProblemDetail
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
+import org.springframework.web.HttpMediaTypeNotAcceptableException
 import org.springframework.web.HttpMediaTypeNotSupportedException
 import org.springframework.web.HttpRequestMethodNotSupportedException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.MissingServletRequestParameterException
+import org.springframework.web.bind.ServletRequestBindingException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.context.request.WebRequest
@@ -94,6 +96,7 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
             is HttpMessageNotReadableException,
             is MethodArgumentTypeMismatchException,
             is MissingServletRequestParameterException,
+            is ServletRequestBindingException,
             -> {
                 ErrorCode.MALFORMED_REQUEST
             }
@@ -110,12 +113,19 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
                 ErrorCode.UNSUPPORTED_MEDIA_TYPE
             }
 
+            is HttpMediaTypeNotAcceptableException -> {
+                ErrorCode.NOT_ACCEPTABLE
+            }
+
             else -> {
-                if (statusCode.is5xxServerError) {
-                    ErrorCode.INTERNAL_ERROR
+                // 매핑되지 않은 예외에서 상태값으로 코드를 "추측"하지 않는다 — enum 선언 순서에 따라
+                // 결과가 조용히 달라지고, 매칭 실패 시 4xx 상태에 INTERNAL_ERROR(계약상 500)가 실려
+                // code↔상태가 갈라진다. 4xx는 요청 문제이므로 MALFORMED_REQUEST 로 고정하고,
+                // 나머지는 INTERNAL_ERROR 다. 새 예외를 특정 코드로 구분해야 하면 위에 명시 매핑을 추가한다.
+                if (statusCode.is4xxClientError) {
+                    ErrorCode.MALFORMED_REQUEST
                 } else {
-                    ErrorCode.entries.firstOrNull { it.defaultStatus.value() == statusCode.value() }
-                        ?: ErrorCode.INTERNAL_ERROR
+                    ErrorCode.INTERNAL_ERROR
                 }
             }
         }

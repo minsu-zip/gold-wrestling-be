@@ -8,10 +8,15 @@
 | 코드 | HTTP 상태 | 의미 | 발생 지점 |
 |---|---|---|---|
 | `VALIDATION_FAILED` | 400 | 요청 값 형식 검증 실패 (`@Valid`, 파라미터 제약) | `MethodArgumentNotValidException`, `HandlerMethodValidationException` |
-| `MALFORMED_REQUEST` | 400 | 본문 파싱 실패, 타입 불일치, 필수 파라미터 누락 | `HttpMessageNotReadableException`, `MethodArgumentTypeMismatchException`, `MissingServletRequestParameterException` |
+| `MALFORMED_REQUEST` | 400 | 본문 파싱 실패, 타입 불일치, 필수 파라미터·헤더 누락 | `HttpMessageNotReadableException`, `MethodArgumentTypeMismatchException`, `MissingServletRequestParameterException`, `ServletRequestBindingException`(필수 헤더 누락 등) |
 | `RESOURCE_NOT_FOUND` | 404 | 매핑되지 않은 경로 또는 대상 리소스 없음 | `NoResourceFoundException`, `NoHandlerFoundException` |
 | `METHOD_NOT_ALLOWED` | 405 | 해당 경로가 지원하지 않는 HTTP 메서드 | `HttpRequestMethodNotSupportedException` |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | 지원하지 않는 Content-Type | `HttpMediaTypeNotSupportedException` |
+| `NOT_ACCEPTABLE` | 406 | Accept 헤더가 요구하는 미디어 타입으로 응답을 만들 수 없음 | `HttpMediaTypeNotAcceptableException` |
 | `INTERNAL_ERROR` | 500 | 예상하지 못한 서버 오류 (응답 본문에 원인 노출 없음, 서버 로그에만 기록) | 포괄 `Exception` 핸들러 |
+
+**폴백 규칙** — 위 표에 매핑되지 않은 예외는 상태값으로 코드를 추측하지 않고 다음으로 고정된다:
+4xx → `MALFORMED_REQUEST`, 그 외 → `INTERNAL_ERROR`. (이때 HTTP 상태는 예외가 정한 값이 그대로 나가므로,
+FE가 특정 코드로 구분해야 하는 에러가 생기면 이 표와 핸들러에 명시 매핑을 추가한다.)
 
 도메인 코드(예: `RESERVATION_FULL`, `INSUFFICIENT_PASS_COUNT`)는 해당 도메인이 생기는 이후 phase에서 이 표에 추가된다.

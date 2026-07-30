@@ -7,7 +7,7 @@ import org.springframework.http.HttpStatus
  *
  * **FE 분기는 이 값(enum `name`)으로만 한다.** `ProblemDetail.type` URI는 형식만 갖춘 값이며 분기 키가 아니다.
  *
- * 여기 정의된 6개는 이번 phase에 실제로 발생 가능한 **공통** 코드만 담는다 — 스프링 내장 예외(404/405/400/415)와
+ * 여기 정의된 7개는 이번 phase에 실제로 발생 가능한 **공통** 코드만 담는다 — 스프링 내장 예외(404/405/400/406/415)와
  * 예상하지 못한 서버 오류(500)에 대응한다. 도메인 코드(예: `RESERVATION_FULL`, `INSUFFICIENT_PASS_COUNT`)는
  * 해당 도메인이 생기는 이후 phase에서 이 enum에 추가하고, 같은 PR에서 `docs/error-codes.md` 표도 함께 갱신한다.
  *
@@ -30,6 +30,9 @@ enum class ErrorCode(
 
     /** 지원하지 않는 Content-Type */
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
+
+    /** Accept 헤더가 요구하는 미디어 타입으로 응답을 만들 수 없음 */
+    NOT_ACCEPTABLE(HttpStatus.NOT_ACCEPTABLE),
 
     /** 예상하지 못한 서버 오류 */
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR),
