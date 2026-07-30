@@ -5,6 +5,8 @@ import org.springframework.http.HttpStatusCode
 import org.springframework.http.ProblemDetail
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
+import org.springframework.security.access.AccessDeniedException
+import org.springframework.security.core.AuthenticationException
 import org.springframework.web.HttpMediaTypeNotAcceptableException
 import org.springframework.web.HttpMediaTypeNotSupportedException
 import org.springframework.web.HttpRequestMethodNotSupportedException
@@ -50,12 +52,22 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
      * 예상하지 못한 모든 예외의 최종 방어선. 응답 `detail`은 고정 문구만 채우고 원인 예외 정보
      * (메시지·클래스명·스택트레이스)는 절대 응답 본문에 넣지 않는다 — 원인은 서버 로그에만 남긴다
      * (T-01-01, conventions.md §8).
+     *
+     * **시큐리티 예외는 여기서 처리하지 않고 되던진다.** 메서드 시큐리티(`@PreAuthorize` 등)의
+     * `AuthorizationDeniedException`([AccessDeniedException] 하위)은 컨트롤러·서비스 안에서 던져져
+     * 필터가 아니라 이 advice 에 먼저 잡히는데, 여기서 500 으로 감싸면 401/403 이어야 할 응답이
+     * `INTERNAL_ERROR` 로 둔갑한다. 되던지면 스프링 MVC 가 원래 예외를 서블릿 스택으로 전파해
+     * `ExceptionTranslationFilter` 가 401/403 으로 처리한다. (인증 phase 에서 문제 형식의
+     * 401/403 응답이 필요해지면 별도 `AuthenticationEntryPoint`/`AccessDeniedHandler` 로 다룬다.)
      */
     @ExceptionHandler(Exception::class)
     fun handleUnexpectedException(
         ex: Exception,
         request: WebRequest,
     ): ResponseEntity<Any> {
+        if (ex is AccessDeniedException || ex is AuthenticationException) {
+            throw ex
+        }
         logger.error("예상하지 못한 예외가 발생했습니다.", ex)
         val problem = ProblemDetail.forStatusAndDetail(ErrorCode.INTERNAL_ERROR.defaultStatus, "서버 오류가 발생했습니다.")
         return handleExceptionInternal(ex, problem, HttpHeaders(), ErrorCode.INTERNAL_ERROR.defaultStatus, request)

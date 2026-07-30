@@ -160,6 +160,15 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    fun `컨트롤러 안에서 던져진 시큐리티 인가 예외는 500 으로 삼켜지지 않고 403 으로 처리된다`() {
+        // 포괄 Exception 핸들러가 AccessDeniedException 을 잡아 500+INTERNAL_ERROR 로 감싸면 안 된다 —
+        // 되던져진 예외는 ExceptionTranslationFilter 가 받아 403 으로 변환한다.
+        mockMvc
+            .perform(post("/internal-test/access-denied"))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
     fun `모든 에러 응답 본문에는 trace 와 exception 필드가 없다`() {
         mockMvc
             .perform(post("/internal-test/boom"))
@@ -192,6 +201,12 @@ class GlobalExceptionHandlerTest {
 
         @PostMapping("/boom")
         fun boom(): Nothing = throw IllegalStateException("internal-leak-marker")
+
+        /** 인증 phase 에서 `@PreAuthorize` 가 컨트롤러·서비스 안에서 던지게 될 인가 예외를 재현한다. */
+        @PostMapping("/access-denied")
+        fun accessDenied(): Nothing =
+            throw org.springframework.security.access
+                .AccessDeniedException("테스트 전용 접근 거부")
 
         @PostMapping("/domain-error")
         fun domainError(): Nothing = throw SampleDomainException()
