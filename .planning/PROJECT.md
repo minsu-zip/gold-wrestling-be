@@ -41,7 +41,7 @@ Kotlin + Spring Boot 4.1.x + JPA + PostgreSQL, FE(React)와는 `docs/api/openapi
 <!-- 이번 로드맵(M1~M6). 상세는 REQUIREMENTS.md -->
 
 - [ ] **M1 기반**: 공통 에러 포맷(RFC 9457 ProblemDetail 전역 핸들러), 초기 스키마(Branch/Member/Admin), openapi.yaml 재생성 파이프라인 정비
-- [ ] **M2 인증·회원**: 카카오 OAuth 로그인, JWT(access/refresh), 가입 승인 플로우, 회원 상태 4단계, 관리자 인증
+- [ ] **M2 인증·회원**: 카카오 OAuth 로그인(인증 수단만), 온보딩(실명·전화번호 필수 입력), JWT(access/refresh), 가입 승인 플로우, 회원 상태 4단계, 관리자 ID/PW 인증(D-026)
 - [ ] **M3 이용권**: Pass 3종 등록, PassTransaction 이력, 관리자 수동 가감·기간 수정, 본인 이용권/이력 조회
 - [ ] **M4 시간표·예약**: ClassSchedule/ClassSession, 예약 생성·취소·변경 + 즉시 차감/복구, 정원·1:1 슬롯 동시성 보장(+동시성 테스트), 관리자 대리 취소/변경, 휴강 처리
 - [ ] **M5 배치**: 2주 미사용 차감(휴회 정지 포함), 유효기간 만료 — 멱등 설계
