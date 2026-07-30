@@ -32,7 +32,7 @@
   2. `Branch`, `Member`, `Admin`, `AdminBranch`(다대다) 테이블이 Flyway 마이그레이션으로 생성되어 있고, 이후 도메인 확장을 전제로 핵심 테이블에 `branch_id`를 둘 수 있는 구조다
   3. 한 번의 명령으로 `docs/api/openapi.yaml`이 재생성되어 커밋 가능한 상태가 된다 (springdoc 기반)
 **Plans**: 3 plans (D-10에 따라 순차 실행 — 플랜 단위 브랜치 → dev PR → 머지 → 다음 플랜)
-- [ ] 01-01-PLAN.md — 전역 ProblemDetail 에러 응답 + ErrorCode 레지스트리 (FOUND-01)
+- [x] 01-01-PLAN.md — 전역 ProblemDetail 에러 응답 + ErrorCode 레지스트리 (FOUND-01)
 - [ ] 01-02-PLAN.md — V2 초기 스키마(Branch/Member/Admin/AdminBranch) + JPA 엔티티 (FOUND-02)
 - [ ] 01-03-PLAN.md — openapi.yaml 재생성 파이프라인 `./gradlew generateApiDocs` (FOUND-03)
 
@@ -108,7 +108,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. 기반 | 0/3 | Planned | - |
+| 1. 기반 | 1/3 | In Progress|  |
 | 2. 인증·회원 | 0/TBD | Not started | - |
 | 3. 이용권 | 0/TBD | Not started | - |
 | 4. 시간표·예약 | 0/TBD | Not started | - |
