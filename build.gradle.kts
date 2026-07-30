@@ -99,3 +99,96 @@ tasks.withType<Test> {
 tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
     systemProperty("user.timezone", "Asia/Seoul")
 }
+
+// ---------------------------------------------------------------------------
+// openapi.yaml 재생성 파이프라인 (FOUND-03, D-01/D-02)
+//
+// springdoc은 런타임 introspection으로 스펙을 만든다 — 앱을 띄우지 않으면 스펙이 나오지 않는다.
+// springdoc-openapi-gradle-plugin은 쓰지 않는다(D-01 — 최근 릴리스 없음 + Boot 4 Gradle 플러그인과
+// BootRun_Decorated 캐스트 충돌·configuration cache 비호환 이슈 미해결). 대신 앱을 백그라운드로
+// 기동 → /actuator/health 폴링으로 대기 → /v3/api-docs.yaml 다운로드 → 프로세스 정리를 커스텀
+// Exec 태스크 체인으로 구현한다(D-02). 로컬 docker compose Postgres 기동이 전제다(D-03).
+// ---------------------------------------------------------------------------
+val apiDocsPort = 8099 // bootRun(8080)과 충돌하지 않도록 별도 포트
+val apiDocsDir = layout.buildDirectory.dir("apiDocs")
+val apiDocsPidFile = layout.buildDirectory.file("apiDocs/app.pid")
+val apiDocsLogFile = layout.buildDirectory.file("apiDocs/app.log")
+val apiDocsJarFile =
+    tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar").flatMap { it.archiveFile }
+
+tasks.register<Exec>("startApiDocsApp") {
+    group = "documentation"
+    description = "openapi 재생성용 앱을 백그라운드로 기동한다 (포트 $apiDocsPort)"
+    dependsOn("bootJar")
+    doFirst {
+        apiDocsDir.get().asFile.mkdirs()
+    }
+    commandLine(
+        "bash", "-c",
+        """
+        nohup java -Duser.timezone=Asia/Seoul -jar "${apiDocsJarFile.get().asFile}" \
+          --server.port=$apiDocsPort > "${apiDocsLogFile.get().asFile}" 2>&1 &
+        echo ${'$'}! > "${apiDocsPidFile.get().asFile}"
+        """.trimIndent(),
+    )
+}
+
+tasks.register<Exec>("waitApiDocsApp") {
+    group = "documentation"
+    description = "openapi 재생성용 앱의 /actuator/health 를 폴링해 기동 완료를 기다린다"
+    dependsOn("startApiDocsApp")
+    finalizedBy("stopApiDocsApp")
+    commandLine(
+        "bash", "-c",
+        """
+        for i in {1..60}; do
+          curl -sf "http://localhost:$apiDocsPort/actuator/health" > /dev/null && exit 0
+          sleep 1
+        done
+        echo "openapi 재생성용 앱이 60초 안에 기동하지 않음 — app.log 마지막 20줄:" >&2
+        tail -n 20 "${apiDocsLogFile.get().asFile}" >&2
+        exit 1
+        """.trimIndent(),
+    )
+}
+
+tasks.register<Exec>("downloadApiDocs") {
+    group = "documentation"
+    description = "실행 중인 앱에서 /v3/api-docs.yaml 을 내려받아 docs/api/openapi.yaml 을 갱신한다"
+    dependsOn("waitApiDocsApp")
+    finalizedBy("stopApiDocsApp")
+    // docs/api/openapi.yaml 을 outputs 로 선언하지 않는다 — UP-TO-DATE 로 건너뛰면
+    // "항상 최신 스펙"이라는 계약이 깨진다. 매번 실행되는 것이 의도된 동작이다.
+    commandLine(
+        "bash", "-c",
+        "curl -sf \"http://localhost:$apiDocsPort/v3/api-docs.yaml\" -o docs/api/openapi.yaml",
+    )
+}
+
+tasks.register<Exec>("stopApiDocsApp") {
+    group = "documentation"
+    description = "openapi 재생성용 백그라운드 앱을 종료하고 PID 파일을 정리한다 (멱등 — 여러 번 걸려도 안전)"
+    isIgnoreExitValue = true
+    commandLine(
+        "bash", "-c",
+        """
+        if [ -f "${apiDocsPidFile.get().asFile}" ]; then
+          kill ${'$'}(cat "${apiDocsPidFile.get().asFile}") 2>/dev/null || true
+          rm -f "${apiDocsPidFile.get().asFile}"
+        fi
+        true
+        """.trimIndent(),
+    )
+}
+
+tasks.register("generateApiDocs") {
+    group = "documentation"
+    description =
+        "docs/api/openapi.yaml 을 재생성한다. 로컬 docker compose Postgres 기동 필요. " +
+            "앱 기동을 포함해 최대 1분가량 걸린다"
+    dependsOn("downloadApiDocs")
+    // 파이널라이저는 완료된(성공이든 실패든) 태스크 뒤에 실행되므로, 의존 체인의 세 지점
+    // (waitApiDocsApp·downloadApiDocs·generateApiDocs)에 모두 걸어 어느 단계에서 실패해도
+    // 프로세스가 정리되게 한다. stopApiDocsApp은 멱등해 여러 번 실행돼도 부작용이 없다.
+    finalizedBy("stopApiDocsApp")
+}
