@@ -12,7 +12,7 @@
 
 - [x] **FOUND-01**: 모든 에러 응답이 RFC 9457 ProblemDetail(`application/problem+json`)로 반환된다 — 전역 예외 핸들러, 스프링 내장 에러(400/404/405) 포함 (D-017)
 - [x] **FOUND-02**: Flyway 초기 스키마 — `Branch`, `Member`, `Admin`, `AdminBranch`(다대다 매핑) 테이블. 모든 핵심 엔티티에 `branch_id` 확장 전제 반영
-- [ ] **FOUND-03**: API 변경 시 `docs/api/openapi.yaml`을 재생성·커밋하는 파이프라인이 한 명령으로 동작한다 (springdoc 기반, FE 타입 생성의 원천)
+- [x] **FOUND-03**: API 변경 시 `docs/api/openapi.yaml`을 재생성·커밋하는 파이프라인이 한 명령으로 동작한다 (springdoc 기반, FE 타입 생성의 원천)
 
 ### 인증·회원 (M2) — AUTH / MEMBER
 
@@ -103,7 +103,7 @@
 |-------------|-------|--------|
 | FOUND-01 | Phase 1 | Complete |
 | FOUND-02 | Phase 1 | Complete |
-| FOUND-03 | Phase 1 | Pending |
+| FOUND-03 | Phase 1 | Complete |
 | AUTH-01 | Phase 2 | Pending |
 | AUTH-02 | Phase 2 | Pending |
 | AUTH-03 | Phase 2 | Pending |

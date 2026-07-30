@@ -14,7 +14,7 @@
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (마감 후 `/gsd:phase insert`로 생성)
 
-- [ ] **Phase 1: 기반** - 공통 에러 포맷(ProblemDetail), 초기 스키마(Branch/Member/Admin/AdminBranch), openapi.yaml 재생성 파이프라인
+- [x] **Phase 1: 기반** - 공통 에러 포맷(ProblemDetail), 초기 스키마(Branch/Member/Admin/AdminBranch), openapi.yaml 재생성 파이프라인 (completed 2026-07-30)
 - [ ] **Phase 2: 인증·회원** - 카카오 로그인, 온보딩, JWT, 관리자 ID/PW 인증, 가입 승인, 회원 관리
 - [ ] **Phase 3: 이용권** - Pass 3종 등록, PassTransaction 이력, 수동 가감·기간 수정, 본인 조회
 - [ ] **Phase 4: 시간표·예약** - ClassSchedule/ClassSession, 예약 생성·취소·변경 + 즉시 차감/복구, 동시성 보장, 관리자 예약 관리·휴강, Notification 스키마·알림 레코드 생성
@@ -34,7 +34,7 @@
 **Plans**: 3 plans (D-10에 따라 순차 실행 — 플랜 단위 브랜치 → dev PR → 머지 → 다음 플랜)
 - [x] 01-01-PLAN.md — 전역 ProblemDetail 에러 응답 + ErrorCode 레지스트리 (FOUND-01)
 - [x] 01-02-PLAN.md — V2 초기 스키마(Branch/Member/Admin/AdminBranch) + JPA 엔티티 (FOUND-02)
-- [ ] 01-03-PLAN.md — openapi.yaml 재생성 파이프라인 `./gradlew generateApiDocs` (FOUND-03)
+- [x] 01-03-PLAN.md — openapi.yaml 재생성 파이프라인 `./gradlew generateApiDocs` (FOUND-03)
 
 ### Phase 2: 인증·회원
 **Goal**: 회원이 카카오로 가입해 온보딩·관리자 승인을 거쳐 활성 상태가 되고, 관리자는 ID/PW로 로그인해 회원을 관리할 수 있다.
@@ -108,7 +108,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. 기반 | 1/3 | In Progress|  |
+| 1. 기반 | 3/3 | Complete   | 2026-07-30 |
 | 2. 인증·회원 | 0/TBD | Not started | - |
 | 3. 이용권 | 0/TBD | Not started | - |
 | 4. 시간표·예약 | 0/TBD | Not started | - |
