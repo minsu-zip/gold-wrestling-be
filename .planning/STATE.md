@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 1 context gathered
-last_updated: "2026-07-30T11:16:54.199Z"
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-07-30T11:27:03.046Z"
 last_activity: 2026-07-30
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 01 (foundation) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-07-30
 
-Progress: [███░░░░░░░] 33%
+Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Progress: [███░░░░░░░] 33%
 
 *Updated after each plan completion*
 | Phase 01 P01 | 45min | 3 tasks | 7 files |
+| Phase 01-foundation P02 | 15min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -65,6 +66,8 @@ Recent decisions affecting current work:
 - Phase 5(배치)의 "마지막 출석일" 기준은 Phase 6(출석) 데이터 도입 전까지 등록일 fallback으로 동작 — Attendance 스키마는 필요시 Phase 5에서 선반영 가능
 - Phase 2에서 `SecurityConfig`의 현재 전체 permitAll 뼈대를 실제 인가 규칙으로 교체 예정
 - [Phase 01]: ErrorCode enum이 defaultStatus를 직접 보유해 코드-HTTP상태 매핑을 코드 안에 고정 (D-028) — 문서(error-codes.md)와 코드가 갈라지는 것을 방지
+- [Phase 01]: admin_branch는 서로게이트 PK(id) + UNIQUE(admin_id, branch_id)로 설계 — 복합 PK 대신 add-migration §2 'PK는 항상 id' 관례와 일관성 유지
+- [Phase 01]: created_at은 Phase 1 엔티티에 매핑하지 않음 — 첫 INSERT 경로가 없어 Clock 빈 기반 감사 시각 전략은 Phase 2에서 결정
 
 ### Pending Todos
 
@@ -84,6 +87,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-30T11:16:04.608Z
-Stopped at: Phase 1 context gathered
+Last session: 2026-07-30T11:27:03.040Z
+Stopped at: Completed 01-02-PLAN.md
 Resume file: None

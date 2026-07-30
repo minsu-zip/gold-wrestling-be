@@ -33,7 +33,7 @@
   3. 한 번의 명령으로 `docs/api/openapi.yaml`이 재생성되어 커밋 가능한 상태가 된다 (springdoc 기반)
 **Plans**: 3 plans (D-10에 따라 순차 실행 — 플랜 단위 브랜치 → dev PR → 머지 → 다음 플랜)
 - [x] 01-01-PLAN.md — 전역 ProblemDetail 에러 응답 + ErrorCode 레지스트리 (FOUND-01)
-- [ ] 01-02-PLAN.md — V2 초기 스키마(Branch/Member/Admin/AdminBranch) + JPA 엔티티 (FOUND-02)
+- [x] 01-02-PLAN.md — V2 초기 스키마(Branch/Member/Admin/AdminBranch) + JPA 엔티티 (FOUND-02)
 - [ ] 01-03-PLAN.md — openapi.yaml 재생성 파이프라인 `./gradlew generateApiDocs` (FOUND-03)
 
 ### Phase 2: 인증·회원
