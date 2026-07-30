@@ -126,6 +126,23 @@ tasks.register<Exec>("startApiDocsApp") {
     commandLine(
         "bash", "-c",
         """
+        # 이전 실행이 finalizer(stopApiDocsApp)를 못 돌리고 죽었으면 옛 jar 의 앱이 $apiDocsPort 를 점유한 채
+        # 살아남는다. 그대로 기동하면 health 폴링이 잔존 앱에 성공해 "옛 스펙"을 조용히 내려받게 되므로,
+        # (1) PID 파일에 남은 프로세스를 먼저 정리하고 (2) 그래도 응답하는 미지의 프로세스가 있으면 즉시 실패시킨다.
+        if [ -f "${apiDocsPidFile.get().asFile}" ]; then
+          OLD_PID=${'$'}(cat "${apiDocsPidFile.get().asFile}")
+          kill "${'$'}OLD_PID" 2>/dev/null || true
+          for i in {1..10}; do
+            kill -0 "${'$'}OLD_PID" 2>/dev/null || break
+            sleep 1
+          done
+          rm -f "${apiDocsPidFile.get().asFile}"
+        fi
+        if curl -sf "http://localhost:$apiDocsPort/actuator/health" > /dev/null; then
+          echo "포트 $apiDocsPort 에서 이미 다른 프로세스가 응답 중입니다 — 그 프로세스를 종료한 뒤 다시 실행하세요." >&2
+          echo "(이대로 진행하면 그 프로세스의 낡은 스펙이 docs/api/openapi.yaml 로 내려받힙니다)" >&2
+          exit 1
+        fi
         nohup java -Duser.timezone=Asia/Seoul -jar "${apiDocsJarFile.get().asFile}" \
           --server.port=$apiDocsPort > "${apiDocsLogFile.get().asFile}" 2>&1 &
         echo ${'$'}! > "${apiDocsPidFile.get().asFile}"
@@ -141,7 +158,14 @@ tasks.register<Exec>("waitApiDocsApp") {
     commandLine(
         "bash", "-c",
         """
+        # health 응답만 믿지 않는다 — startApiDocsApp 이 기록한 PID 가 살아 있는지 함께 확인해,
+        # "우리가 띄운 프로세스는 죽고 다른 프로세스가 응답 중"인 상황을 걸러낸다.
         for i in {1..60}; do
+          if ! kill -0 "${'$'}(cat "${apiDocsPidFile.get().asFile}")" 2>/dev/null; then
+            echo "openapi 재생성용 앱 프로세스가 기동 중 종료됨(포트 충돌 등) — app.log 마지막 20줄:" >&2
+            tail -n 20 "${apiDocsLogFile.get().asFile}" >&2
+            exit 1
+          fi
           curl -sf "http://localhost:$apiDocsPort/actuator/health" > /dev/null && exit 0
           sleep 1
         done
