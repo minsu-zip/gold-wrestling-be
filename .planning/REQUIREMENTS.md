@@ -53,7 +53,7 @@
 
 ### 배치 (M5) — BATCH
 
-- [ ] **BATCH-01**: `SESSION_PASS` 2주 미사용 시 1회 자동 차감, 이후 2주마다 반복(`INACTIVITY`) — 기준일: 출석 이력 없으면 등록일, 있으면 마지막 출석일
+- [ ] **BATCH-01**: `SESSION_PASS` 2주 미사용 시 1회 자동 차감, 이후 2주마다 반복(`INACTIVITY`) — 기준일: 마지막 출석일과 마지막 예약의 수업일 중 더 최근 날짜, 둘 다 없으면 등록일 (D-027)
 - [ ] **BATCH-02**: 차감 예외가 지켜진다 — `ON_LEAVE` 기간, 잔여 0, 유효기간 만료 이용권은 차감하지 않음
 - [ ] **BATCH-03**: 유효기간(등록일+1년) 만료 이용권이 사용 불가 처리된다
 - [ ] **BATCH-04**: 배치는 멱등하다 — 같은 날 중복 실행돼도 이중 차감 0건 (매일 새벽 실행)
@@ -64,7 +64,7 @@
 - [ ] **ATTEND-02**: 관리자가 횟수권 회원의 저녁반 참여를 0.5회 수동 차감할 수 있다 (`EVENING_HALF`) — 잔여 0.5 이상일 때만
 - [ ] **NOTICE-01**: 관리자가 공지사항을 등록/수정/삭제할 수 있다
 - [ ] **NOTICE-02**: 회원이 공지 목록·상세를 열람할 수 있다
-- [ ] **NOTIF-01**: 예약 생성/변경/취소·휴강 시 관리자 알림이 생성된다
+- [ ] **NOTIF-01**: 예약 생성/변경/취소·휴강 시 관리자 알림이 생성된다 — Notification 스키마·레코드 생성은 Phase 4에서 구현 (조회·확인·폴링·피드는 Phase 6)
 - [ ] **NOTIF-02**: 관리자가 알림 목록을 폴링(30초)으로 조회하고 확인 처리할 수 있다 — 미확인 카운트 제공
 - [ ] **NOTIF-03**: 관리자가 최근 활동 피드(예약 이벤트 타임라인)를 조회할 수 있다 — 알림과 동일 데이터의 다른 뷰
 
@@ -99,17 +99,58 @@
 
 ## Traceability
 
-로드맵 생성 시 채워진다.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (roadmap 생성 후 갱신) | | |
+| FOUND-01 | Phase 1 | Pending |
+| FOUND-02 | Phase 1 | Pending |
+| FOUND-03 | Phase 1 | Pending |
+| AUTH-01 | Phase 2 | Pending |
+| AUTH-02 | Phase 2 | Pending |
+| AUTH-03 | Phase 2 | Pending |
+| AUTH-04 | Phase 2 | Pending |
+| AUTH-05 | Phase 2 | Pending |
+| AUTH-06 | Phase 2 | Pending |
+| MEMBER-01 | Phase 2 | Pending |
+| MEMBER-02 | Phase 2 | Pending |
+| MEMBER-03 | Phase 2 | Pending |
+| MEMBER-04 | Phase 2 | Pending |
+| PASS-01 | Phase 3 | Pending |
+| PASS-02 | Phase 3 | Pending |
+| PASS-03 | Phase 3 | Pending |
+| PASS-04 | Phase 3 | Pending |
+| PASS-05 | Phase 3 | Pending |
+| PASS-06 | Phase 3 | Pending |
+| SCHED-01 | Phase 4 | Pending |
+| SCHED-02 | Phase 4 | Pending |
+| SCHED-03 | Phase 4 | Pending |
+| RESV-01 | Phase 4 | Pending |
+| RESV-02 | Phase 4 | Pending |
+| RESV-03 | Phase 4 | Pending |
+| RESV-04 | Phase 4 | Pending |
+| RESV-05 | Phase 4 | Pending |
+| RESV-06 | Phase 4 | Pending |
+| RESV-07 | Phase 4 | Pending |
+| RESV-08 | Phase 4 | Pending |
+| RESV-09 | Phase 4 | Pending |
+| NOTIF-01 | Phase 4 | Pending |
+| BATCH-01 | Phase 5 | Pending |
+| BATCH-02 | Phase 5 | Pending |
+| BATCH-03 | Phase 5 | Pending |
+| BATCH-04 | Phase 5 | Pending |
+| ATTEND-01 | Phase 6 | Pending |
+| ATTEND-02 | Phase 6 | Pending |
+| NOTICE-01 | Phase 6 | Pending |
+| NOTICE-02 | Phase 6 | Pending |
+| NOTIF-02 | Phase 6 | Pending |
+| NOTIF-03 | Phase 6 | Pending |
 
 **Coverage:**
-- v1 requirements: 36 total
-- Mapped to phases: 0 (로드맵 생성 대기)
-- Unmapped: 36 ⚠️
+- v1 requirements: 42 total
+- Mapped to phases: 42 ✓
+- Unmapped: 0 ✓
+
+> 참고: 최초 작성 시 이 섹션 상단에 있던 "36 total" 표기는 실제 위 v1 목록(FOUND~NOTIF, 42건)과 맞지 않는 집계 오류였다. 로드맵 작성 시 실제 목록 기준으로 42건 전부를 매핑해 정정했다.
 
 ---
 *Requirements defined: 2026-07-30*
-*Last updated: 2026-07-30 after initial definition*
+*Last updated: 2026-07-30 after roadmap creation (Phase 1~6 매핑)*

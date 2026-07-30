@@ -116,6 +116,11 @@
 
 ## 커밋·브랜치 규칙
 
+- **커밋·푸시는 사용자가 명시적으로 요청했을 때만 실행한다.** 작업을 마쳤다고 해서
+  `git commit`·`git push`를 자동으로 실행하지 않는다 — 결과물을 사용자가 확인한 뒤
+  적절한 단위로 커밋을 지시한다. "작업이 끝났으니 커밋한다"는 판단을 AI가 스스로 내리지 말 것.
+  이 규칙은 GSD 등 자동 커밋을 전제로 하는 워크플로우에도 우선 적용된다 —
+  해당 워크플로우가 커밋을 요구하면 커밋 없이 멈추고 사용자에게 알린다.
 - 브랜치: dev에서 작업하고 dev → main PR 머지 시 배포. main 직접 커밋 금지
 - 커밋은 작업 단위로 잘게, Conventional Commits 형식 사용 (feat:, fix:, refactor:, docs:, test:, chore:)
 - 커밋 메시지 본문은 한국어 가능, 제목은 형식 준수
@@ -125,3 +130,82 @@
 
 - `docker-compose up -d` (Postgres) 후 부트 실행
 - 브랜치: dev에서 작업, main 머지 시 GitHub Actions 배포 (EC2)
+
+<!-- 이하 섹션은 GSD가 자동 관리한다 (마커 안만 갱신됨). 손으로 편집하지 말 것 -->
+
+<!-- GSD:project-start source:PROJECT.md -->
+## Project
+
+**gold-wrestling-be**
+
+레슬링 체육관 "골드레슬링" 송파점의 회원 관리·수업 예약 시스템 **백엔드**.
+회원은 카카오 로그인으로 가입해 관리자 승인 후 이용권(저녁반 회비 / 예약제 횟수권 / 1:1 레슨권)으로
+수업을 예약하고, 관리자는 회원·이용권·예약·출석·공지·알림을 한 곳에서 운영한다.
+Kotlin + Spring Boot 4.1.x + JPA + PostgreSQL, FE(React)와는 `docs/api/openapi.yaml` 계약으로만 통신한다.
+
+**Core Value:** **회원이 보는 잔여 횟수는 항상 실제 사용 가능 횟수와 일치한다.**
+즉시 차감/복구 + 전 이력 기록(PassTransaction) + 초과 예약 0건 — 이 정합성이 무너지면 나머지 전부가 무의미하다.
+
+### Constraints
+
+- **Tech stack**: Kotlin + Spring Boot 4.1.x (Spring Framework 7) + JPA + PostgreSQL 18, JDK 21, Gradle Kotlin DSL — D-005/D-014. Boot 3 예제 이식 금지, 의존성은 Boot 4 호환 버전만
+- **스키마**: 변경은 Flyway 마이그레이션만 (ddl-auto 금지). 커밋된 마이그레이션 수정 금지 — 새 버전 추가
+- **에러 응답**: RFC 9457 ProblemDetail 고정, 커스텀 공통 래퍼 금지 — D-017
+- **횟수 표현**: `DECIMAL(4,1)` + `BigDecimal`, 비교는 `compareTo` — D-016
+- **동시성**: DB 제약 + 조건부 갱신 우선, 부족한 곳만 비관적 락 — D-021. 초과 예약 0건
+- **트랜잭션**: 서비스 메서드 = 트랜잭션 단위 — D-020
+- **시간대**: `Asia/Seoul` 명시, 주 시작은 월요일. `Clock` 빈 주입
+- **시크릿**: 실값 커밋 절대 금지. `.env`(로컬) / 환경변수(배포), `.env.example`에 키 이름 동기화
+- **브랜치**: dev 작업 → dev→main PR. main 직접 커밋 금지
+<!-- GSD:project-end -->
+
+<!-- GSD:stack-start source:STACK.md -->
+## Technology Stack
+
+Technology stack not yet documented. Will populate after codebase mapping or first phase.
+<!-- GSD:stack-end -->
+
+<!-- GSD:conventions-start source:CONVENTIONS.md -->
+## Conventions
+
+Conventions not yet established. Will populate as patterns emerge during development.
+<!-- GSD:conventions-end -->
+
+<!-- GSD:architecture-start source:ARCHITECTURE.md -->
+## Architecture
+
+Architecture not yet mapped. Follow existing patterns found in the codebase.
+<!-- GSD:architecture-end -->
+
+<!-- GSD:skills-start source:skills/ -->
+## Project Skills
+
+| Skill | Description | Path |
+|-------|-------------|------|
+| add-domain-test | "도메인 로직·DB·동시성 테스트를 작성할 때의 골격과 규약. 차감 정책, 예약 검증, 정원 경쟁 테스트가 필요하면 이 절차를 따른다." | `.claude/skills/add-domain-test/SKILL.md` |
+| add-endpoint | "REST API 엔드포인트를 추가·변경할 때의 절차. openapi.yaml 재생성까지 포함. API 관련 작업이면 항상 이 절차를 따른다." | `.claude/skills/add-endpoint/SKILL.md` |
+| add-migration | "DB 스키마를 바꿀 때의 Flyway 마이그레이션 절차와 금지사항. 테이블·컬럼·인덱스·제약 변경이면 항상 이 절차를 따른다." | `.claude/skills/add-migration/SKILL.md` |
+| verify-boot4-api | "Spring Boot 4 / Kotlin API·의존성 버전을 추측하지 않고 확인하는 절차. 새 의존성 추가, 낯선 애노테이션·설정 키 사용, 임포트 오류, 예제 코드 이식 전에 사용한다." | `.claude/skills/verify-boot4-api/SKILL.md` |
+<!-- GSD:skills-end -->
+
+<!-- GSD:workflow-start source:GSD defaults -->
+## GSD Workflow Enforcement
+
+Before using Edit, Write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
+
+Use these entry points:
+- `/gsd-quick` for small fixes, doc updates, and ad-hoc tasks
+- `/gsd-debug` for investigation and bug fixing
+- `/gsd-execute-phase` for planned phase work
+
+Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
+<!-- GSD:workflow-end -->
+
+
+
+<!-- GSD:profile-start -->
+## Developer Profile
+
+> Profile not yet configured. Run `/gsd-profile-user` to generate your developer profile.
+> This section is managed by `generate-claude-profile` -- do not edit manually.
+<!-- GSD:profile-end -->
