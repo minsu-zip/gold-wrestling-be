@@ -90,3 +90,8 @@ goldwrestling:
     redirect-uri: ${KAKAO_REDIRECT_URI:}
   # 신규 회원(카카오 가입) 자동 배정 지점 (decisions.md D-047)
   default-branch-name: ${DEFAULT_BRANCH_NAME:송파점}
+  admin-seed:
+    # 첫 관리자 계정 시드. 비워 두면 기동 시 시드를 건너뛴다 (decisions.md D-038)
+    login-id: ${ADMIN_SEED_LOGIN_ID:}
+    password: ${ADMIN_SEED_PASSWORD:}
+    name: ${ADMIN_SEED_NAME:관리자}
