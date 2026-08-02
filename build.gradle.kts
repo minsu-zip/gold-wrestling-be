@@ -94,6 +94,11 @@ tasks.withType<Test> {
     useJUnitPlatform()
     // 도메인 규칙상 서버 기준 시간대는 Asia/Seoul 고정
     systemProperty("user.timezone", "Asia/Seoul")
+    // JwtConfig가 시크릿 미주입 시 기동을 막으므로(T-02-09), 전체 스프링 컨텍스트를 띄우는
+    // 테스트(HealthControllerTest 등 JWT와 무관한 기존 테스트 포함)가 모두 이 값을 전제로 한다.
+    // System property는 application.yml 클래스패스 리소스 검색에 영향을 주지 않아(리소스를
+    // 가리는 위험이 없어) 이 전역 기본값 주입에 안전하다. 실값 아님 — 32바이트 이상 명백한 더미.
+    systemProperty("goldwrestling.jwt.secret", "test-only-jwt-secret-value-do-not-use-in-production")
     testLogging {
         events("passed", "skipped", "failed")
     }

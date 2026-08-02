@@ -19,18 +19,23 @@ import java.time.Duration
  * [SimpleClientHttpRequestFactory]의 `Duration` 기반 타임아웃 setter로 구성한다
  * (verify-boot4-api 절차로 실제 classpath jar를 확인함).
  *
- * 이 빈은 테스트에서 `MockRestServiceServer.bindTo(builder)`로 목킹되는 대상이다 — 실제 네트워크
- * 호출 없이 카카오 연동을 검증할 수 있다.
+ * **`RestClient.Builder`를 빈으로 주입받지 않고 `RestClient.builder()`를 직접 호출한다.** 이 프로젝트
+ * 클래스패스에는 `RestClient.Builder` 자동 구성 빈을 등록하는 `spring-boot-restclient` 모듈이 없어
+ * (`./gradlew dependencies --configuration compileClasspath`로 실제 확인), 주입을 시도하면
+ * `NoSuchBeanDefinitionException`으로 앱 기동 자체가 실패한다(실행해 확인한 버그, Rule 1로 즉시 수정).
+ *
+ * 이 빈은 테스트에서 `MockRestServiceServer.bindTo(RestClient.builder())`로 목킹되는 대상이다 — 실제
+ * 네트워크 호출 없이 카카오 연동을 검증할 수 있다.
  */
 @Configuration
 class KakaoRestClientConfig {
     @Bean
-    fun kakaoRestClient(builder: RestClient.Builder): RestClient {
+    fun kakaoRestClient(): RestClient {
         val requestFactory =
             SimpleClientHttpRequestFactory().apply {
                 setConnectTimeout(Duration.ofSeconds(3))
                 setReadTimeout(Duration.ofSeconds(5))
             }
-        return builder.requestFactory(requestFactory).build()
+        return RestClient.builder().requestFactory(requestFactory).build()
     }
 }
