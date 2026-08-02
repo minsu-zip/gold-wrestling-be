@@ -106,6 +106,78 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/AdminLoginResponse"
+  /api/admin/members/{memberId}/rejection:
+    post:
+      tags:
+      - admin-member
+      summary: 가입 거절 (INACTIVE 전환 + 사유 기록)
+      operationId: reject
+      parameters:
+      - name: memberId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectMemberRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MemberDetailResponse"
+  /api/admin/members/{memberId}/approval:
+    post:
+      tags:
+      - admin-member
+      summary: 가입 승인 (온보딩 완료 PENDING 회원만)
+      operationId: approve
+      parameters:
+      - name: memberId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MemberDetailResponse"
+  /api/admin/members/{memberId}/status:
+    patch:
+      tags:
+      - admin-member
+      summary: 회원 상태 변경 (ACTIVE가 아니게 되면 해당 회원 강제 로그아웃)
+      operationId: changeStatus
+      parameters:
+      - name: memberId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMemberStatusRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MemberDetailResponse"
   /api/system/health:
     get:
       tags:
@@ -345,6 +417,81 @@ components:
         name:
           type: string
           description: 관리자 이름
+    RejectMemberRequest:
+      type: object
+      description: 거절 사유. 관리자 전용 정보이며 회원에게 원문이 노출되지 않는다 (D-043)
+      properties:
+        reason:
+          type: string
+          description: "거절 사유(관리자 전용, 500자 이내)"
+          example: 제출한 정보와 실제 신원이 일치하지 않습니다.
+          maxLength: 500
+          minLength: 0
+      required:
+      - reason
+    MemberDetailResponse:
+      type: object
+      description: 관리자 회원 상세 — 거절 사유 원문 포함
+      properties:
+        memberId:
+          type: integer
+          format: int64
+          description: 회원 ID
+        name:
+          type:
+          - string
+          - "null"
+          description: 실명 — 온보딩 미완료면 null
+        phoneNumber:
+          type:
+          - string
+          - "null"
+          description: 전화번호(하이픈 제거된 숫자) — 온보딩 미완료면 null
+        status:
+          type: string
+          description: 회원 상태
+          enum:
+          - PENDING
+          - ACTIVE
+          - ON_LEAVE
+          - INACTIVE
+        onboardingCompleted:
+          type: boolean
+          description: 온보딩(실명·전화번호 입력) 완료 여부
+        rejected:
+          type: boolean
+          description: 가입 거절 여부(D-034)
+        rejectionReason:
+          type:
+          - string
+          - "null"
+          description: "거절 사유 원문 — 관리자 전용, 거절되지 않았으면 null(D-043)"
+        branchName:
+          type: string
+          description: 소속 지점명
+        kakaoId:
+          type: integer
+          format: int64
+          description: 카카오 사용자 식별자
+        createdAt:
+          type: string
+          format: date-time
+          description: 가입 신청 시각
+    UpdateMemberStatusRequest:
+      type: object
+      description: 변경할 회원 상태. PENDING으로 되돌리면 거절 사유가 초기화되어 재신청 상태가 된다 (D-034)
+      properties:
+        status:
+          type: string
+          description: 변경할 상태(PENDING/ACTIVE/ON_LEAVE/INACTIVE)
+          enum:
+          - PENDING
+          - ACTIVE
+          - ON_LEAVE
+          - INACTIVE
+          example: ON_LEAVE
+      required:
+      - status
     HealthResponse:
       type: object
       properties:
@@ -451,51 +598,3 @@ components:
           type: integer
           format: int32
           description: 전체 페이지 수
-    MemberDetailResponse:
-      type: object
-      description: 관리자 회원 상세 — 거절 사유 원문 포함
-      properties:
-        memberId:
-          type: integer
-          format: int64
-          description: 회원 ID
-        name:
-          type:
-          - string
-          - "null"
-          description: 실명 — 온보딩 미완료면 null
-        phoneNumber:
-          type:
-          - string
-          - "null"
-          description: 전화번호(하이픈 제거된 숫자) — 온보딩 미완료면 null
-        status:
-          type: string
-          description: 회원 상태
-          enum:
-          - PENDING
-          - ACTIVE
-          - ON_LEAVE
-          - INACTIVE
-        onboardingCompleted:
-          type: boolean
-          description: 온보딩(실명·전화번호 입력) 완료 여부
-        rejected:
-          type: boolean
-          description: 가입 거절 여부(D-034)
-        rejectionReason:
-          type:
-          - string
-          - "null"
-          description: "거절 사유 원문 — 관리자 전용, 거절되지 않았으면 null(D-043)"
-        branchName:
-          type: string
-          description: 소속 지점명
-        kakaoId:
-          type: integer
-          format: int64
-          description: 카카오 사용자 식별자
-        createdAt:
-          type: string
-          format: date-time
-          description: 가입 신청 시각
