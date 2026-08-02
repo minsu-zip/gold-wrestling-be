@@ -45,6 +45,25 @@ paths:
       responses:
         "204":
           description: No Content
+  /api/auth/kakao/login:
+    post:
+      tags:
+      - auth
+      summary: 카카오 인가 코드로 로그인 (최초 로그인 시 PENDING 회원 생성)
+      operationId: login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KakaoLoginRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/KakaoLoginResponse"
   /api/system/health:
     get:
       tags:
@@ -98,6 +117,48 @@ components:
           minLength: 1
       required:
       - refreshToken
+    KakaoLoginRequest:
+      type: object
+      description: 카카오 인가 코드 로그인 요청
+      properties:
+        code:
+          type: string
+          description: 카카오 인가 코드(FE가 카카오 리다이렉트에서 전달받은 값)
+          minLength: 1
+      required:
+      - code
+    KakaoLoginResponse:
+      type: object
+      description: 카카오 로그인 성공 응답 — 토큰과 회원 세션 요약을 함께 담는다
+      properties:
+        tokens:
+          $ref: "#/components/schemas/TokenPairResponse"
+          description: 발급된 access/refresh 토큰 쌍
+        member:
+          $ref: "#/components/schemas/MemberSessionResponse"
+          description: "회원 세션 요약 — FE 화면 분기용(AUTH-06, D-034)"
+    MemberSessionResponse:
+      type: object
+      description: 로그인 응답에 포함되는 회원 세션 요약 — FE 화면 분기용
+      properties:
+        memberId:
+          type: integer
+          format: int64
+          description: 회원 ID
+        status:
+          type: string
+          description: 회원 상태
+          enum:
+          - PENDING
+          - ACTIVE
+          - ON_LEAVE
+          - INACTIVE
+        onboardingCompleted:
+          type: boolean
+          description: 온보딩(실명·전화번호 입력) 완료 여부 — false면 온보딩 화면
+        rejected:
+          type: boolean
+          description: 가입 거절 여부(D-034) — true면 거절 안내 화면. 사유 원문은 담지 않는다(D-043)
     HealthResponse:
       type: object
       properties:
