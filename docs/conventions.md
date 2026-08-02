@@ -214,6 +214,10 @@ class ReservationService(
 | Testcontainers | `org.testcontainers:postgresql` | `org.testcontainers:testcontainers-postgresql` (2.x) |
 | MockMvc 자동설정 | `boot.test.autoconfigure.web.servlet` | `org.springframework.boot.webmvc.test.autoconfigure` |
 | springdoc | 2.x | **3.x** |
+| Mock 빈 애노테이션 | `@MockBean`(`org.springframework.boot.test.mock.mockito`) | `@MockitoBean`(`org.springframework.test.context.bean.override.mockito`) — Phase 2에서 실제 사용해 확인 |
+| `RestClient.Builder` 자동 구성 | `spring-boot-starter-web`이 자동 구성 빈을 제공 | 이 프로젝트 classpath(`spring-boot-starter-webmvc`)엔 해당 모듈이 없어 빈 주입 시 `NoSuchBeanDefinitionException` — 없으면 `RestClient.builder()` 직접 호출 (D-048, `./gradlew dependencies`로 확인) |
+| Jackson 애노테이션 패키지 | `@JsonProperty`·`@JsonNaming` 모두 `com.fasterxml.jackson.*` | Jackson 3에서도 `@JsonProperty`는 구 패키지(`com.fasterxml.jackson.annotation`)에 남고, `@JsonNaming`/`PropertyNamingStrategies`만 `tools.jackson.databind.annotation`으로 이동 — 패키지 비대칭 주의(02-06, jar 클래스 목록으로 확인) |
+| `RestClient` 응답 바디 처리 | `body(Class)!!`(non-null assertion 관용구) | `RestClient.ResponseSpec.requiredBody(Class)`(Boot 4.1/Spring Framework 7 신규 API, javap로 시그니처 확인) — null 바디를 라이브러리가 직접 예외로 처리해 assertion 불필요(02-06) |
 
 - `spring.datasource` / `spring.jpa` / `spring.flyway` / `spring.jackson` **설정 키는 3.x와 동일**하다
 - **모르는 API는 추측하지 말고 확인한다**: ① context7 MCP로 해당 버전 문서 조회 → ② 버전은 `https://repo1.maven.org/maven2/<경로>/maven-metadata.xml` 로 실제 확인 → ③ `./gradlew compileKotlin`으로 검증
