@@ -31,6 +31,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-security")
+    // 자체 JWT(HS256 대칭키) 발급·검증용 NimbusJwtEncoder/NimbusJwtDecoder.
+    // Boot 4.1.0 BOM이 spring-security-bom(7.1.0)으로 버전을 관리해 여기에는 버전을 적지 않는다.
+    implementation("org.springframework.security:spring-security-oauth2-jose")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     // Boot 4는 Flyway도 전용 스타터로 분리됨
     implementation("org.springframework.boot:spring-boot-starter-flyway")
