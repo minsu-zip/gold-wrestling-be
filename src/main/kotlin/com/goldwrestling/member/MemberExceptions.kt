@@ -38,6 +38,11 @@ class OnboardingAlreadyCompletedException :
 /**
  * 회원 상태가 요청된 동작을 허용하지 않는 그 밖의 충돌 상황. 호출부가 상황에 맞는 사용자 대면
  * 문구를 [message]로 넘긴다(예: "현재 상태에서는 정보를 등록할 수 없습니다.").
+ *
+ * 02-10(가입 승인·거절)도 이 예외를 그대로 재사용한다 — 온보딩 미완료 승인 시도, 이미 ACTIVE인
+ * 회원 승인, PENDING이 아닌 회원 거절 등 여러 실패 상황을 새 예외 클래스로 늘리지 않고 전부 이
+ * 하나로 표현한다. FE 쪽 처리(안내 문구 표시)가 어느 경우든 동일해 에러코드를 늘릴 실익이 없기
+ * 때문이다.
  */
 class MemberStateConflictException(
     message: String,
