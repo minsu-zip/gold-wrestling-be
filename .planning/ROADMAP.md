@@ -47,9 +47,9 @@
   4. 관리자는 ID/PW로 로그인해(카카오 연동 없음, 회원과 동일한 JWT 체계) 회원 목록·상세를 조회하고 이름·전화번호로 검색하며, 회원 상태(`ACTIVE`/`ON_LEAVE`/`INACTIVE`)를 변경할 수 있다
   5. `PENDING`이거나 온보딩 미완료인 회원은 승인 대기 정보 외 기능에 접근할 수 없고, 회원은 본인 프로필(이름·전화번호)을 조회할 수 있다
 **Plans**: 11 plans (D-10에 따라 순차 실행 — 플랜 단위 브랜치 → dev PR → 머지 → 다음 플랜. Wave 1의 3개만 병렬 가능)
-- [ ] 02-01-PLAN.md — 용어·에러코드·설계 결정 문서 정합 + ErrorCode 확장 (AUTH-02/03/04, MEMBER-01/03)
-- [ ] 02-02-PLAN.md — V3 인증 스키마 + 엔티티·리포지토리 (AUTH-01/03/06, MEMBER-01)
-- [ ] 02-03-PLAN.md — JWT·카카오 설정, 의존성 1건, 테스트 인프라(Wave 0) (AUTH-01/02)
+- [x] 02-01-PLAN.md — 용어·에러코드·설계 결정 문서 정합 + ErrorCode 확장 (AUTH-02/03/04, MEMBER-01/03)
+- [x] 02-02-PLAN.md — V3 인증 스키마 + 엔티티·리포지토리 (AUTH-01/03/06, MEMBER-01)
+- [x] 02-03-PLAN.md — JWT·카카오 설정, 의존성 1건, 테스트 인프라(Wave 0) (AUTH-01/02)
 - [ ] 02-04-PLAN.md — TokenService(발급·회전·재사용 감지) + 토큰 갱신·로그아웃 API (AUTH-02)
 - [ ] 02-05-PLAN.md — JWT 인증 필터 + 역할 기반 인가 + 401/403 ProblemDetail (AUTH-02/04)
 - [ ] 02-06-PLAN.md — 카카오 인가코드 로그인 + PENDING 회원 생성 (AUTH-01/02/06)
@@ -120,7 +120,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. 기반 | 3/3 | Complete   | 2026-07-30 |
-| 2. 인증·회원 | 0/11 | Planned | - |
+| 2. 인증·회원 | 3/11 | In Progress|  |
 | 3. 이용권 | 0/TBD | Not started | - |
 | 4. 시간표·예약 | 0/TBD | Not started | - |
 | 5. 배치 | 0/TBD | Not started | - |
