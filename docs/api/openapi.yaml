@@ -8,7 +8,43 @@ servers:
 tags:
 - name: system
   description: 서버 상태·환경 확인
+- name: auth
+  description: 인증·토큰
 paths:
+  /api/auth/refresh:
+    post:
+      tags:
+      - auth
+      summary: access 토큰 갱신 (refresh 회전)
+      operationId: refresh
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TokenPairResponse"
+  /api/auth/logout:
+    post:
+      tags:
+      - auth
+      summary: 로그아웃 (refresh 토큰 폐기)
+      operationId: logout
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogoutRequest"
+        required: true
+      responses:
+        "204":
+          description: No Content
   /api/system/health:
     get:
       tags:
@@ -24,6 +60,44 @@ paths:
                 $ref: "#/components/schemas/HealthResponse"
 components:
   schemas:
+    RefreshTokenRequest:
+      type: object
+      description: access 토큰 갱신 요청
+      properties:
+        refreshToken:
+          type: string
+          description: 발급받은 refresh 토큰 원문
+          minLength: 1
+      required:
+      - refreshToken
+    TokenPairResponse:
+      type: object
+      description: 발급된 access/refresh 토큰 쌍
+      properties:
+        accessToken:
+          type: string
+          description: access 토큰(JWT)
+        refreshToken:
+          type: string
+          description: refresh 토큰(다음 회전에 사용)
+        accessTokenExpiresAt:
+          type: string
+          format: date-time
+          description: access 토큰 만료 시각
+        refreshTokenExpiresAt:
+          type: string
+          format: date-time
+          description: refresh 토큰 만료 시각
+    LogoutRequest:
+      type: object
+      description: 로그아웃 요청
+      properties:
+        refreshToken:
+          type: string
+          description: 폐기할 refresh 토큰 원문
+          minLength: 1
+      required:
+      - refreshToken
     HealthResponse:
       type: object
       properties:
