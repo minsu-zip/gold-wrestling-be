@@ -44,6 +44,11 @@ import org.springframework.web.server.ResponseStatusException
  * `@Import(...)`를 쓴다(컨텍스트 캐시 재사용 — conventions §10.1). 다만 `@Import` 인자가 기존 두 테스트와
  * 달라(테스트 전용 컨트롤러 추가) 스프링 컨텍스트가 하나 더 뜬다 — FOUND-01의 모든 케이스를 이 한 클래스에
  * 모아 추가 컨텍스트를 1개로 묶는 트레이드오프를 택했다.
+ *
+ * **02-05 이후 주의:** 테스트 전용 경로를 `/api/system/internal-test` 하위에 둔다 — `SecurityConfig`가
+ * `anyRequest().authenticated()`를 기본값으로 두므로(T-02-17), `/api/system` 하위가 아닌 임의 경로는
+ * 이 필터체인 통과 자체가 401로 막혀 여기 있는 예외 변환 검증(400/404/405/415/500 등)에 도달하지 못한다.
+ * `/api/system` 하위는 permitAll이라 이 테스트의 목적(예외 변환 검증, 인가 검증 아님)과 맞다.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -55,7 +60,7 @@ class GlobalExceptionHandlerTest {
     @Test
     fun `매핑되지 않은 경로는 404 problem+json 으로 응답하고 code 는 RESOURCE_NOT_FOUND 다`() {
         mockMvc
-            .perform(get("/api/nonexistent"))
+            .perform(get("/api/system/nonexistent"))
             .andExpect(status().isNotFound)
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
             .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
@@ -75,7 +80,7 @@ class GlobalExceptionHandlerTest {
     fun `요청 값 검증 실패는 400 problem+json 으로 응답하고 code 는 VALIDATION_FAILED 다`() {
         mockMvc
             .perform(
-                post("/internal-test/validate")
+                post("/api/system/internal-test/validate")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""{"name":""}"""),
             ).andExpect(status().isBadRequest)
@@ -87,7 +92,7 @@ class GlobalExceptionHandlerTest {
     fun `본문 파싱 실패는 400 problem+json 으로 응답하고 code 는 MALFORMED_REQUEST 다`() {
         mockMvc
             .perform(
-                post("/internal-test/validate")
+                post("/api/system/internal-test/validate")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""{"name":"""),
             ).andExpect(status().isBadRequest)
@@ -99,7 +104,7 @@ class GlobalExceptionHandlerTest {
     fun `지원하지 않는 Content-Type 요청은 415 problem+json 으로 응답하고 code 는 UNSUPPORTED_MEDIA_TYPE 다`() {
         mockMvc
             .perform(
-                post("/internal-test/validate")
+                post("/api/system/internal-test/validate")
                     .contentType(MediaType.TEXT_PLAIN)
                     .content("plain text"),
             ).andExpect(status().isUnsupportedMediaType)
@@ -118,7 +123,7 @@ class GlobalExceptionHandlerTest {
     @Test
     fun `필수 헤더 누락은 400 problem+json 으로 응답하고 code 는 MALFORMED_REQUEST 다`() {
         mockMvc
-            .perform(get("/internal-test/required-header"))
+            .perform(get("/api/system/internal-test/required-header"))
             .andExpect(status().isBadRequest)
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
             .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"))
@@ -127,7 +132,7 @@ class GlobalExceptionHandlerTest {
     @Test
     fun `매핑되지 않은 4xx 예외는 INTERNAL_ERROR 가 아니라 MALFORMED_REQUEST 로 응답된다`() {
         mockMvc
-            .perform(post("/internal-test/unmapped-conflict"))
+            .perform(post("/api/system/internal-test/unmapped-conflict"))
             .andExpect(status().isConflict)
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
             .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"))
@@ -137,7 +142,7 @@ class GlobalExceptionHandlerTest {
     fun `예상하지 못한 예외는 500 problem+json 으로 응답하고 code 는 INTERNAL_ERROR 이며 본문에 내부 정보가 없다`() {
         val result =
             mockMvc
-                .perform(post("/internal-test/boom"))
+                .perform(post("/api/system/internal-test/boom"))
                 .andExpect(status().isInternalServerError)
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
@@ -152,7 +157,7 @@ class GlobalExceptionHandlerTest {
     @Test
     fun `도메인 예외는 그 예외의 errorCode 가 code 로 message 가 detail 로 응답된다`() {
         mockMvc
-            .perform(post("/internal-test/domain-error"))
+            .perform(post("/api/system/internal-test/domain-error"))
             .andExpect(status().isBadRequest)
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
             .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
@@ -160,18 +165,25 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    fun `컨트롤러 안에서 던져진 시큐리티 인가 예외는 500 으로 삼켜지지 않고 403 으로 처리된다`() {
+    fun `컨트롤러 안에서 던져진 시큐리티 인가 예외는 500 으로 삼켜지지 않고 문제 형식으로 처리된다`() {
         // 포괄 Exception 핸들러가 AccessDeniedException 을 잡아 500+INTERNAL_ERROR 로 감싸면 안 된다 —
-        // 되던져진 예외는 ExceptionTranslationFilter 가 받아 403 으로 변환한다.
+        // 되던져진 예외는 ExceptionTranslationFilter 가 받는다. 이 요청은 인증되지 않은(익명) 상태라,
+        // ExceptionTranslationFilter는 AccessDeniedException을 AccessDeniedHandler(403)가 아니라
+        // AuthenticationEntryPoint(02-05 ProblemDetailAuthenticationEntryPoint)로 위임해 401로 응답한다 —
+        // "인증되지 않은 사용자가 인가가 필요한 동작을 시도하면 403이 아니라 401로 로그인을 요구한다"는
+        // 프레임워크의 표준 동작이다. 인증된 사용자가 역할이 부족해 거부되는 403 경로는
+        // SecurityFilterChainTest(관리자 전용 경로에 회원 토큰 접근)가 별도로 검증한다.
         mockMvc
-            .perform(post("/internal-test/access-denied"))
-            .andExpect(status().isForbidden)
+            .perform(post("/api/system/internal-test/access-denied"))
+            .andExpect(status().isUnauthorized)
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"))
     }
 
     @Test
     fun `모든 에러 응답 본문에는 trace 와 exception 필드가 없다`() {
         mockMvc
-            .perform(post("/internal-test/boom"))
+            .perform(post("/api/system/internal-test/boom"))
             .andExpect(jsonPath("$.trace").doesNotExist())
             .andExpect(jsonPath("$.exception").doesNotExist())
     }
@@ -183,7 +195,7 @@ class GlobalExceptionHandlerTest {
     }
 
     @RestController
-    @RequestMapping("/internal-test")
+    @RequestMapping("/api/system/internal-test")
     class TestErrorController {
         @PostMapping("/validate", consumes = [MediaType.APPLICATION_JSON_VALUE])
         fun validate(
