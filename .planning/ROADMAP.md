@@ -56,7 +56,7 @@
 - [x] 02-07-PLAN.md — 관리자 ID/PW 로그인 + 멱등 시드 (AUTH-02/03)
 - [x] 02-08-PLAN.md — 온보딩 + 본인 프로필 + 상태 게이트 (AUTH-04/05/06, MEMBER-04)
 - [x] 02-09-PLAN.md — 관리자 회원 목록·검색·상세 (MEMBER-01/02)
-- [ ] 02-10-PLAN.md — 가입 승인·거절 + 상태 변경 + 강제 로그아웃 (MEMBER-01/03)
+- [x] 02-10-PLAN.md — 가입 승인·거절 + 상태 변경 + 강제 로그아웃 (MEMBER-01/03)
 - [ ] 02-11-PLAN.md — phase 마감: 전체 검증·문서 정합 + 실제 카카오 E2E 수동 확인 (전 요구사항)
 
 **Note**: `src/main/kotlin/com/goldwrestling/config/SecurityConfig.kt`의 현재 전체 `permitAll` 뼈대는 이 phase에서 실제 인가 규칙으로 교체된다 (02-05).
@@ -120,7 +120,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. 기반 | 3/3 | Complete   | 2026-07-30 |
-| 2. 인증·회원 | 9/11 | In Progress|  |
+| 2. 인증·회원 | 10/11 | In Progress|  |
 | 3. 이용권 | 0/TBD | Not started | - |
 | 4. 시간표·예약 | 0/TBD | Not started | - |
 | 5. 배치 | 0/TBD | Not started | - |
