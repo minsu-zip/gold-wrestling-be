@@ -50,7 +50,7 @@
 - [x] 02-01-PLAN.md — 용어·에러코드·설계 결정 문서 정합 + ErrorCode 확장 (AUTH-02/03/04, MEMBER-01/03)
 - [x] 02-02-PLAN.md — V3 인증 스키마 + 엔티티·리포지토리 (AUTH-01/03/06, MEMBER-01)
 - [x] 02-03-PLAN.md — JWT·카카오 설정, 의존성 1건, 테스트 인프라(Wave 0) (AUTH-01/02)
-- [ ] 02-04-PLAN.md — TokenService(발급·회전·재사용 감지) + 토큰 갱신·로그아웃 API (AUTH-02)
+- [x] 02-04-PLAN.md — TokenService(발급·회전·재사용 감지) + 토큰 갱신·로그아웃 API (AUTH-02)
 - [ ] 02-05-PLAN.md — JWT 인증 필터 + 역할 기반 인가 + 401/403 ProblemDetail (AUTH-02/04)
 - [ ] 02-06-PLAN.md — 카카오 인가코드 로그인 + PENDING 회원 생성 (AUTH-01/02/06)
 - [ ] 02-07-PLAN.md — 관리자 ID/PW 로그인 + 멱등 시드 (AUTH-02/03)
@@ -120,7 +120,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. 기반 | 3/3 | Complete   | 2026-07-30 |
-| 2. 인증·회원 | 3/11 | In Progress|  |
+| 2. 인증·회원 | 4/11 | In Progress|  |
 | 3. 이용권 | 0/TBD | Not started | - |
 | 4. 시간표·예약 | 0/TBD | Not started | - |
 | 5. 배치 | 0/TBD | Not started | - |
