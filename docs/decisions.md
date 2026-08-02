@@ -409,6 +409,14 @@
 - 이유: `member.branch_id`는 NOT NULL인데 회원 스스로 지점을 고르는 UI가 v1에 없다(MVP는 송파점 단일 — D-031). 지점명을 설정으로 빼두면 2호점이 생겨도 코드 수정 없이 환경별로 다르게 둘 수 있다.
 - 기각 대안: 코드에 `송파점` 하드코딩(지점 추가 시 코드 수정), `branch.id = 1` 가정(identity 시퀀스에 의존하는 취약한 전제), 회원이 가입 시 지점 선택(v1 스코프 밖 — CROSS-01은 v2).
 
-## D-048. (예시 — 다음 결정을 여기에 추가)
+## D-048. 카카오 RestClient는 `RestClient.builder()` 직접 호출, `RestClient.Builder` 빈 주입 안 함
 
-- 날짜 / 결정 / 이유 / 기각 대안
+- 2026-08 / `KakaoRestClientConfig.kakaoRestClient()`는 스프링이 자동 구성한 `RestClient.Builder`를 생성자로 주입받지 않고 `RestClient.builder()`를 직접 호출해 만든다.
+- 이유: 이 프로젝트 클래스패스에는 `RestClient.Builder` 자동 구성 빈을 등록하는 Boot 4.1의 `spring-boot-restclient`/`spring-boot-http-client` 모듈이 없다(`spring-boot-starter-webmvc`가 이를 끌어오지 않음 — `./gradlew dependencies --configuration compileClasspath`로 실제 확인). 주입을 시도하면 `NoSuchBeanDefinitionException`으로 앱 기동 자체가 실패한다(02-03 실행 중 재현·확인).
+- 기각 대안: `spring-boot-starter-restclient`(또는 동등 모듈) 신규 추가(이번 phase가 명시한 "신규 패키지 1건" 예산을 넘어섬 — 필요성이 타임아웃 설정 하나뿐이라 과함), Boot의 `HttpClientSettings`/`ClientHttpRequestFactoryBuilder` API 사용(같은 이유로 모듈 부재). 대신 이미 `spring-web`에 있는 `SimpleClientHttpRequestFactory`의 `Duration` 기반 타임아웃 setter로 타임아웃(연결 3초/읽기 5초)을 구성한다.
+
+## D-049. 테스트 Clock 교체: 같은 이름 `@Bean` 대체가 아니라 다른 이름 + `@Primary`
+
+- 2026-08 / `TestClockConfiguration`이 프로덕션 `Clock` 빈(`ClockConfig.clock()`)을 테스트에서 대체하는 방식은, 빈 이름을 `clock`으로 맞춰 재정의하는 것이 아니라 **다른 이름(`testClock()`) + `@Primary`** 조합이다.
+- 이유: `@SpringBootTest`가 컴포넌트 스캔으로 찾는 `ClockConfig.clock()`과 테스트에서 `@Import`로 등록한 같은 이름의 `@Bean`이 있으면, Spring Boot(`allow-bean-definition-overriding` 기본값 `false`)가 컨텍스트 로딩 시점에 `BeanDefinitionOverrideException`을 던진다는 것을 실행해 직접 재현·확인했다(교체가 아니라 예외). 다른 이름 + `@Primary`는 이름 충돌 없이 타입 기반 주입 지점 전부가 테스트 빈을 우선 선택하게 한다.
+- 기각 대안: `spring.main.allow-bean-definition-overriding=true` 전역 설정(테스트 전체에서 의도치 않은 다른 빈 충돌도 조용히 통과시켜 버그를 숨길 위험), 매 통합테스트마다 `@TestPropertySource`로 이 플래그를 개별 지정(보일러플레이트가 늘고 까먹기 쉬움).
