@@ -21,6 +21,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.Instant
@@ -46,6 +47,9 @@ class AdminAuthControllerTest {
 
     @Autowired
     private lateinit var adminRepository: AdminRepository
+
+    @Autowired
+    private lateinit var refreshTokenRepository: RefreshTokenRepository
 
     @Autowired
     private lateinit var passwordEncoder: PasswordEncoder
@@ -78,6 +82,32 @@ class AdminAuthControllerTest {
             .andExpect(jsonPath("$.admin.name").value("송파점 관리자"))
             .andExpect(jsonPath("$.admin.passwordHash").doesNotExist())
             .andExpect(jsonPath("$.admin.loginId").doesNotExist())
+    }
+
+    /**
+     * 읽기 전용 트랜잭션 회귀 테스트 — 02-11 수동 검증에서 발견된 500 버그의 재현 조건.
+     *
+     * 이 클래스의 다른 테스트는 클래스 레벨 `@Transactional`(테스트 트랜잭션) 안에서 돌고, 그 바깥
+     * 트랜잭션은 **쓰기 가능**이라 서비스의 `readOnly = true`가 합류해도 INSERT가 통과해 버린다 —
+     * 즉 운영에서만 터지는 read-only 위반을 테스트가 가려 버린다. 이 테스트만 `NOT_SUPPORTED`로
+     * 테스트 트랜잭션을 끄고, 서비스가 스스로 여는 트랜잭션 경계 그대로 로그인을 실행해
+     * refresh 토큰 INSERT까지 실제로 커밋되는지 확인한다. 커밋이 실제로 남으므로 finally에서 직접 지운다.
+     */
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    fun `테스트 트랜잭션 없이 로그인해도 refresh 토큰 INSERT가 성공한다 (read-only 회귀)`() {
+        val admin = persistAdmin(loginId = "admin-readonly-regression", name = "관리자")
+        try {
+            mockMvc
+                .perform(loginRequest("admin-readonly-regression", rawPassword))
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.tokens.refreshToken").exists())
+
+            assertThat(refreshTokenRepository.findAllByAdminAndRevokedAtIsNull(admin)).isNotEmpty()
+        } finally {
+            refreshTokenRepository.deleteAll(refreshTokenRepository.findAllByAdminAndRevokedAtIsNull(admin))
+            adminRepository.delete(admin)
+        }
     }
 
     @Test

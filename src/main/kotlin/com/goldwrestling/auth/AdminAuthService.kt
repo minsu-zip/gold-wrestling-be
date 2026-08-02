@@ -12,8 +12,12 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * 관리자 ID/PW 로그인(AUTH-03, D-026). 토큰 발급은 [TokenService]의 자기 트랜잭션이 처리하므로
- * 이 서비스는 조회·검증만 한다(클래스 기본이 `readOnly = true`인 이유).
+ * 관리자 ID/PW 로그인(AUTH-03, D-026).
+ *
+ * [login]은 클래스 기본(`readOnly = true`)을 쓰기 트랜잭션으로 **반드시 오버라이드**해야 한다 —
+ * [TokenService.issueTokenPair]의 `@Transactional`은 전파 기본값(REQUIRED)이라 새 트랜잭션을 열지 않고
+ * 바깥 트랜잭션에 합류하는데, 바깥이 read-only면 refresh 토큰 INSERT가
+ * `cannot execute INSERT in a read-only transaction`으로 거부된다(02-11 수동 검증에서 실제 발생).
  */
 @Service
 @Transactional(readOnly = true)
@@ -26,6 +30,7 @@ class AdminAuthService(
      * loginId가 없는 경우와 비밀번호가 틀린 경우 **완전히 같은 예외(같은 메시지)** 를 던진다 —
      * 응답만으로 "어느 loginId가 실제로 존재하는지"를 유추할 수 있는 계정 열거 공격을 막는다(T-02-24).
      */
+    @Transactional
     fun login(
         loginId: String,
         rawPassword: String,
