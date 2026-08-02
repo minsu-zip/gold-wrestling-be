@@ -10,7 +10,28 @@ tags:
   description: 서버 상태·환경 확인
 - name: auth
   description: 인증·토큰
+- name: member
+  description: 회원 본인 정보
 paths:
+  /api/members/me/onboarding:
+    post:
+      tags:
+      - member
+      summary: "온보딩 — 실명·전화번호 등록 (최초 1회, 재제출은 409로 거부된다)"
+      operationId: submitOnboarding
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OnboardingRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MyProfileResponse"
   /api/auth/refresh:
     post:
       tags:
@@ -96,8 +117,72 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/HealthResponse"
+  /api/members/me:
+    get:
+      tags:
+      - member
+      summary: 본인 프로필 조회 (승인 대기·거절 안내 화면 포함 모든 상태에서 접근 가능)
+      operationId: getMyProfile
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MyProfileResponse"
 components:
   schemas:
+    OnboardingRequest:
+      type: object
+      description: "온보딩 제출 요청 — 실명·전화번호(최초 1회만 허용, D-042)"
+      properties:
+        name:
+          type: string
+          description: 실명
+          example: 홍길동
+          maxLength: 50
+          minLength: 0
+        phoneNumber:
+          type: string
+          description: 휴대폰 번호(하이픈 포함/미포함 모두 허용)
+          example: 010-1234-5678
+          minLength: 1
+          pattern: "^01[016789]-?\\d{3,4}-?\\d{4}$"
+      required:
+      - name
+      - phoneNumber
+    MyProfileResponse:
+      type: object
+      description: 본인 프로필 — 이름·전화번호·상태와 화면 분기용 플래그를 담는다
+      properties:
+        memberId:
+          type: integer
+          format: int64
+          description: 회원 ID
+        name:
+          type:
+          - string
+          - "null"
+          description: 실명 — 온보딩 미완료면 null
+        phoneNumber:
+          type:
+          - string
+          - "null"
+          description: 전화번호(하이픈 제거된 숫자) — 온보딩 미완료면 null
+        status:
+          type: string
+          description: 회원 상태
+          enum:
+          - PENDING
+          - ACTIVE
+          - ON_LEAVE
+          - INACTIVE
+        onboardingCompleted:
+          type: boolean
+          description: 온보딩(실명·전화번호 입력) 완료 여부
+        rejected:
+          type: boolean
+          description: 가입 거절 여부(D-034) — true면 거절 안내 화면. 사유 원문은 담지 않는다(D-043)
     RefreshTokenRequest:
       type: object
       description: access 토큰 갱신 요청
