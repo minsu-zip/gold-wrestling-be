@@ -28,7 +28,7 @@ class FlywayMigrationIntegrationTest {
 
         assertThat(applied).isNotEmpty()
         assertThat(applied).allSatisfy { (_, success) -> assertThat(success).isTrue() }
-        assertThat(applied.map { it.first }).contains("1")
+        assertThat(applied.map { it.first }).contains("1", "2")
     }
 
     @Test
@@ -36,5 +36,52 @@ class FlywayMigrationIntegrationTest {
         val timeZone = jdbcClient.sql("SHOW TIME ZONE").query(String::class.java).single()
 
         assertThat(timeZone).isEqualTo("Asia/Seoul")
+    }
+
+    @Test
+    fun `송파점 지점이 시드로 한 건 존재한다`() {
+        val count =
+            jdbcClient
+                .sql("SELECT count(*) FROM branch WHERE name = '송파점'")
+                .query(Long::class.java)
+                .single()
+
+        assertThat(count).isEqualTo(1)
+    }
+
+    @Test
+    fun `member 테이블은 branch_id NOT NULL FK 를 갖는다`() {
+        val isNullable =
+            jdbcClient
+                .sql(
+                    """
+                    SELECT is_nullable FROM information_schema.columns
+                    WHERE table_name = 'member' AND column_name = 'branch_id'
+                    """.trimIndent(),
+                ).query(String::class.java)
+                .single()
+        assertThat(isNullable).isEqualTo("NO")
+
+        val fkCount =
+            jdbcClient
+                .sql(
+                    """
+                    SELECT count(*) FROM information_schema.table_constraints
+                    WHERE constraint_name = 'fk_member_branch' AND constraint_type = 'FOREIGN KEY'
+                    """.trimIndent(),
+                ).query(Long::class.java)
+                .single()
+        assertThat(fkCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `admin 테이블에는 아직 로그인 자격 컬럼이 없다`() {
+        val columnNames =
+            jdbcClient
+                .sql("SELECT column_name FROM information_schema.columns WHERE table_name = 'admin'")
+                .query(String::class.java)
+                .list()
+
+        assertThat(columnNames).doesNotContain("password", "login_id", "password_hash")
     }
 }

@@ -2,6 +2,13 @@ spring:
   application:
     name: gold-wrestling-be
 
+  mvc:
+    # 우리 GlobalExceptionHandler(ResponseEntityExceptionHandler 상속)가 있는 동안엔 자동 등록되는
+    # ProblemDetailsExceptionHandler가 물러나므로 실제 응답은 우리 클래스가 전담한다. 이 키는 우리 핸들러가
+    # 빠졌을 때도 내장 예외가 ProblemDetail로 나가게 하는 2차 방어선이다 (common/error/GlobalExceptionHandler.kt).
+    problemdetails:
+      enabled: true
+
   # 로컬 개발용 .env 를 properties 로 읽어들인다(파일이 없으면 무시).
   # 배포 환경에서는 .env 없이 OS 환경변수로 동일한 키를 주입한다.
   config:
