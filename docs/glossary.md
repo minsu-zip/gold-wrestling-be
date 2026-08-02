@@ -34,6 +34,24 @@
 
 `PENDING`(승인대기) / `ACTIVE`(활성) / `ON_LEAVE`(휴회) / `INACTIVE`(비활성)
 
+## 인증·회원 (Phase 2)
+
+| 한국어                 | 코드 네이밍                   | 설명                                                                                          |
+| ---------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------- |
+| 카카오 사용자 식별자   | `kakaoId`                      | 카카오가 발급하는 회원 고유 번호 (DB `kakao_id`). 회원 1명당 1개, 중복 가입 방지의 기준         |
+| 리프레시 토큰(개념)    | `RefreshToken`                 | access 토큰 재발급용 자격증명 (DB `refresh_token`). DB에 해시로 저장                            |
+| 액세스 토큰(값)        | `accessToken`                  | 클라이언트가 매 요청에 실어 보내는 단기 토큰 값                                                 |
+| 리프레시 토큰(값)      | `refreshToken`                 | access 재발급에 쓰는 장기 토큰 값                                                                |
+| 토큰 회전              | `rotation`                     | refresh를 쓸 때마다 새 refresh를 발급하고 기존 것을 폐기하는 방식                                |
+| 토큰 주체 종류         | `PrincipalType` (`MEMBER` / `ADMIN`) | Member/Admin이 별도 테이블이라 토큰이 어느 쪽을 가리키는지 구분한다                        |
+| 인증 주체              | `AuthenticatedPrincipal`       | 요청을 수행하는 회원/관리자를 나타내는 값 객체 (엔티티가 아니다)                                |
+| 관리자 로그인 ID       | `loginId`                      | 관리자 ID/PW 로그인의 아이디 (DB `login_id`)                                                     |
+| 비밀번호 해시          | `passwordHash`                 | 관리자 비밀번호의 해시값 (DB `password_hash`). 평문 비밀번호는 어디에도 저장하지 않는다          |
+| 거절 사유              | `rejectionReason`              | 가입 거절 시 기록 (DB `rejection_reason`, D-034)                                                 |
+| 온보딩                 | `Onboarding`                   | 최초 로그인 회원이 실명·전화번호를 입력하는 절차 (policies §5.1)                                |
+| 온보딩 완료 여부       | `onboardingCompleted`          | 별도 상태 컬럼이 아니라 `name`·`phoneNumber` 입력 여부로 판정한다 (D-025)                       |
+| 회원 상태 게이트       | `MemberStateGate`              | 엔드포인트가 요구하는 회원 상태를 DB 현재 값 기준으로 검사하는 컴포넌트 (D-033 노트)             |
+
 ## 차감 사유 (TransactionReason)
 
 | 코드                    | 의미                               |
@@ -48,6 +66,7 @@
 ## 기타 규칙
 
 - 금지어: 위 개념에 대해 `Ticket`, `Voucher`, `Coupon`, `Booking`, `Course` 등 다른 단어 사용 금지
+- 금지어(인증 영역): `Session`(우리 체계는 STATELESS라 세션 개념이 없다 — `ClassSession`과도 혼동됨), `User`(→ `Member`), `Account`(→ `Member`/`Admin`), `Role` 단독 사용(→ `PrincipalType`)
 - 횟수는 0.5 단위가 존재하므로 정수형 금지 — **`DECIMAL(4,1)` + `BigDecimal` 로 확정** (D-016).
   비교는 `equals`가 아니라 `compareTo` 를 쓴다 (`0.5 != 0.50`)
 - 날짜/시간은 서버·DB 모두 `Asia/Seoul` 기준으로 명시적 처리
