@@ -111,52 +111,39 @@ class PassAdjustmentPolicyTest {
             createdAt = FIXED_TIME,
         )
 
-    private fun eveningMembership(status: PassStatus = PassStatus.ACTIVE): Pass =
+    /** `Pass` 픽스처 공통부(회원·지점·등록 관리자·시작일·생성 시각)를 모아, 타입별 팩토리가 차이만 넘긴다. */
+    private fun pass(
+        type: PassType,
+        status: PassStatus,
+        endDate: LocalDate,
+        remainingCount: BigDecimal?,
+    ): Pass =
         Pass(
             member = member(),
             branch = branch(),
             registeredBy = admin(),
-            type = PassType.EVENING_MEMBERSHIP,
+            type = type,
             status = status,
             startDate = FIXED_TODAY,
-            endDate = FIXED_TODAY.plusMonths(1),
-            remainingCount = null,
+            endDate = endDate,
+            remainingCount = remainingCount,
             createdAt = FIXED_TIME,
         )
+
+    private fun eveningMembership(status: PassStatus = PassStatus.ACTIVE): Pass =
+        pass(type = PassType.EVENING_MEMBERSHIP, status = status, endDate = FIXED_TODAY.plusMonths(1), remainingCount = null)
 
     private fun sessionPass(
         remaining: String,
         endDate: LocalDate = FIXED_TODAY.plusYears(1),
         status: PassStatus = PassStatus.ACTIVE,
-    ): Pass =
-        Pass(
-            member = member(),
-            branch = branch(),
-            registeredBy = admin(),
-            type = PassType.SESSION_PASS,
-            status = status,
-            startDate = FIXED_TODAY,
-            endDate = endDate,
-            remainingCount = BigDecimal(remaining),
-            createdAt = FIXED_TIME,
-        )
+    ): Pass = pass(type = PassType.SESSION_PASS, status = status, endDate = endDate, remainingCount = BigDecimal(remaining))
 
     private fun lessonPass(
         remaining: String,
         endDate: LocalDate = FIXED_TODAY.plusYears(1),
         status: PassStatus = PassStatus.ACTIVE,
-    ): Pass =
-        Pass(
-            member = member(),
-            branch = branch(),
-            registeredBy = admin(),
-            type = PassType.LESSON_PASS,
-            status = status,
-            startDate = FIXED_TODAY,
-            endDate = endDate,
-            remainingCount = BigDecimal(remaining),
-            createdAt = FIXED_TIME,
-        )
+    ): Pass = pass(type = PassType.LESSON_PASS, status = status, endDate = endDate, remainingCount = BigDecimal(remaining))
 
     companion object {
         private val FIXED_TIME: OffsetDateTime = OffsetDateTime.parse("2026-08-01T00:00:00+09:00")
