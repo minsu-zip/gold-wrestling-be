@@ -1,7 +1,5 @@
 package com.goldwrestling.pass
 
-// 03-09가 등록 취소 케이스를 이 클래스에 추가한다 — 취소 상쇄까지 포함한 전체 순환은 그 플랜에서 닫힌다.
-
 import com.goldwrestling.TestcontainersConfiguration
 import com.goldwrestling.admin.Admin
 import com.goldwrestling.admin.AdminRepository
@@ -11,6 +9,7 @@ import com.goldwrestling.member.Member
 import com.goldwrestling.member.MemberRepository
 import com.goldwrestling.member.MemberStatus
 import com.goldwrestling.pass.dto.AdjustPassRequest
+import com.goldwrestling.pass.dto.CancelPassRequest
 import com.goldwrestling.pass.dto.RegisterPassRequest
 import com.goldwrestling.support.MutableTestClock
 import com.goldwrestling.support.TestClockConfiguration
@@ -167,6 +166,43 @@ class PassLedgerInvariantTest {
         val pass = passRepository.findById(response.passId).get()
         assertThat(pass.remainingCount).isNull()
         assertThat(countTransactions(response.passId)).isEqualTo(0)
+    }
+
+    @Test
+    fun `등록 가감 가감 취소를 모두 거친 뒤에도 잔여가 0이고 이력 합계도 0이다`() {
+        val member = persistMember()
+        val admin = persistAdmin()
+        val passId =
+            adminPassService
+                .register(
+                    member.id!!,
+                    RegisterPassRequest(type = PassType.SESSION_PASS, initialCount = BigDecimal("3.0")),
+                    admin.id!!,
+                ).passId
+
+        adminPassService.adjust(passId, AdjustPassRequest(BigDecimal("-0.5"), "저녁반 참여 보정"), admin.id!!)
+        adminPassService.adjust(passId, AdjustPassRequest(BigDecimal("1.0"), "이벤트 보상"), admin.id!!)
+        adminPassService.cancel(passId, CancelPassRequest("관리자 오등록으로 인한 취소"), admin.id!!)
+
+        assertLedgerInvariant(passId, BigDecimal.ZERO)
+    }
+
+    @Test
+    fun `잔여 0인 이용권을 취소해도 잔여와 이력 합계가 일치한다`() {
+        val member = persistMember()
+        val admin = persistAdmin()
+        val passId =
+            adminPassService
+                .register(
+                    member.id!!,
+                    RegisterPassRequest(type = PassType.SESSION_PASS, initialCount = BigDecimal("1.0")),
+                    admin.id!!,
+                ).passId
+        adminPassService.adjust(passId, AdjustPassRequest(BigDecimal("-1.0"), "전량 소진 처리"), admin.id!!)
+
+        adminPassService.cancel(passId, CancelPassRequest("소진 후 오등록 취소"), admin.id!!)
+
+        assertLedgerInvariant(passId, BigDecimal.ZERO)
     }
 
     /** 잔여가 [expectedRemaining]과 같고, 동시에 이력 합계와도 같음을 함께 확인한다. */

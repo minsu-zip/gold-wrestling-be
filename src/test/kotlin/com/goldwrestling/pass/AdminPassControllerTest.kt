@@ -22,6 +22,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
@@ -634,6 +635,251 @@ class AdminPassControllerTest {
                     .content("""{"newEndDate":"2027-06-30","reason":"보정"}"""),
             ).andExpect(status().isUnauthorized)
             .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"))
+    }
+
+    // ---------- 등록 취소 ----------
+
+    @Test
+    fun `잔여 3dot0인 횟수권을 취소하면 200과 CANCELED remainingCount 0이 오고 REGISTRATION_CANCELED 이력 1건이 남는다`() {
+        val pass = persistPass(remaining = BigDecimal("3.0"))
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                post("/api/admin/passes/${pass.id}/cancellation")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"reason":"관리자 오등록"}"""),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.displayStatus").value("CANCELED"))
+            .andExpect(jsonPath("$.remainingCount").value(0))
+
+        val transactions = passTransactionRepository.findAll().filter { it.pass.id == pass.id }
+        assertThat(transactions).hasSize(1)
+        assertThat(transactions[0].reason).isEqualTo(TransactionReason.REGISTRATION_CANCELED)
+        assertThat(transactions[0].amount).isEqualByComparingTo(BigDecimal("-3.0"))
+        assertThat(transactions[0].note).isEqualTo("관리자 오등록")
+    }
+
+    @Test
+    fun `잔여 0dot0인 횟수권을 취소하면 200이고 상쇄 이력이 0건이다`() {
+        val pass = persistPass(remaining = BigDecimal.ZERO)
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                post("/api/admin/passes/${pass.id}/cancellation")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"reason":"관리자 오등록"}"""),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.displayStatus").value("CANCELED"))
+
+        val transactions = passTransactionRepository.findAll().filter { it.pass.id == pass.id }
+        assertThat(transactions).isEmpty()
+    }
+
+    @Test
+    fun `기간제 이용권을 취소하면 200이고 이력이 0건이며 canceledAt cancelReason이 응답에 존재한다`() {
+        val pass = persistPass(remaining = null, type = PassType.EVENING_MEMBERSHIP)
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                post("/api/admin/passes/${pass.id}/cancellation")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"reason":"저녁반 오등록"}"""),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.displayStatus").value("CANCELED"))
+            .andExpect(jsonPath("$.canceledAt").exists())
+            .andExpect(jsonPath("$.cancelReason").value("저녁반 오등록"))
+
+        val transactions = passTransactionRepository.findAll().filter { it.pass.id == pass.id }
+        assertThat(transactions).isEmpty()
+    }
+
+    @Test
+    fun `이미 취소된 이용권을 재취소하면 409와 PASS_ALREADY_CANCELED를 반환한다`() {
+        val pass = persistPass(remaining = BigDecimal("3.0"), status = PassStatus.CANCELED)
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                post("/api/admin/passes/${pass.id}/cancellation")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"reason":"재취소 시도"}"""),
+            ).andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("PASS_ALREADY_CANCELED"))
+    }
+
+    @Test
+    fun `취소된 이용권에 가감을 시도하면 409와 PASS_ALREADY_CANCELED를 반환한다`() {
+        val pass = persistPass(remaining = BigDecimal("3.0"), status = PassStatus.CANCELED)
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                post("/api/admin/passes/${pass.id}/adjustments")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"amount":1.0,"note":"보정 시도"}"""),
+            ).andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("PASS_ALREADY_CANCELED"))
+    }
+
+    @Test
+    fun `취소된 이용권의 기간을 수정하려 하면 409와 PASS_ALREADY_CANCELED를 반환한다`() {
+        val pass = persistPass(remaining = BigDecimal("3.0"), status = PassStatus.CANCELED)
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                patch("/api/admin/passes/${pass.id}/period")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"newEndDate":"2027-06-30","reason":"보정 시도"}"""),
+            ).andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("PASS_ALREADY_CANCELED"))
+    }
+
+    @Test
+    fun `취소 사유가 공백이면 400과 VALIDATION_FAILED를 반환한다`() {
+        val pass = persistPass(remaining = BigDecimal("3.0"))
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                post("/api/admin/passes/${pass.id}/cancellation")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"reason":"   "}"""),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+    }
+
+    @Test
+    fun `존재하지 않는 passId를 취소하면 404와 PASS_NOT_FOUND를 반환한다`() {
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                post("/api/admin/passes/999999999/cancellation")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"reason":"보정 시도"}"""),
+            ).andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.code").value("PASS_NOT_FOUND"))
+    }
+
+    @Test
+    fun `회원 토큰으로 취소를 시도하면 403과 ACCESS_DENIED를 반환한다`() {
+        val pass = persistPass(remaining = BigDecimal("3.0"))
+        val token = memberAccessToken(pass.member)
+
+        mockMvc
+            .perform(
+                post("/api/admin/passes/${pass.id}/cancellation")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"reason":"보정 시도"}"""),
+            ).andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.code").value("ACCESS_DENIED"))
+    }
+
+    @Test
+    fun `토큰 없이 취소를 시도하면 401과 UNAUTHENTICATED를 반환한다`() {
+        val pass = persistPass(remaining = BigDecimal("3.0"))
+
+        mockMvc
+            .perform(
+                post("/api/admin/passes/${pass.id}/cancellation")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"reason":"보정 시도"}"""),
+            ).andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"))
+    }
+
+    // ---------- 관리자 이용권 목록 ----------
+
+    @Test
+    fun `취소된 이용권과 정상 이용권을 함께 보유한 회원의 목록에 둘 다 나오고 displayStatus로 구분된다`() {
+        val member = persistMember()
+        val admin = persistAdmin()
+        val usablePass =
+            passRepository.saveAndFlush(
+                Pass(
+                    member = member,
+                    branch = songpaBranch(),
+                    registeredBy = admin,
+                    type = PassType.SESSION_PASS,
+                    status = PassStatus.ACTIVE,
+                    startDate = LocalDate.now(clock),
+                    endDate = LocalDate.now(clock).plusYears(1).minusDays(1),
+                    remainingCount = BigDecimal("5.0"),
+                    createdAt = OffsetDateTime.now(clock),
+                ),
+            )
+        val canceledPass =
+            passRepository.saveAndFlush(
+                Pass(
+                    member = member,
+                    branch = songpaBranch(),
+                    registeredBy = admin,
+                    type = PassType.SESSION_PASS,
+                    status = PassStatus.ACTIVE,
+                    startDate = LocalDate.now(clock),
+                    endDate = LocalDate.now(clock).plusYears(1).minusDays(1),
+                    remainingCount = BigDecimal("2.0"),
+                    createdAt = OffsetDateTime.now(clock),
+                ),
+            )
+        canceledPass.cancel(reason = "사전 취소", admin = admin, now = OffsetDateTime.now(clock))
+        passRepository.saveAndFlush(canceledPass)
+        val token = adminAccessToken()
+
+        val responseBody =
+            mockMvc
+                .perform(
+                    get("/api/admin/members/${member.id}/passes")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer $token"),
+                ).andExpect(status().isOk)
+                .andReturn()
+                .response.contentAsString
+
+        val statusesByPassId =
+            objectMapper
+                .readTree(responseBody)
+                .associate { it.get("passId").asLong() to it.get("displayStatus").asString() }
+        assertThat(statusesByPassId).hasSize(2)
+        assertThat(statusesByPassId[usablePass.id]).isEqualTo("USABLE")
+        assertThat(statusesByPassId[canceledPass.id]).isEqualTo("CANCELED")
+    }
+
+    @Test
+    fun `존재하지 않는 memberId로 목록을 조회하면 404와 MEMBER_NOT_FOUND를 반환한다`() {
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                get("/api/admin/members/999999999/passes")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token"),
+            ).andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.code").value("MEMBER_NOT_FOUND"))
+    }
+
+    @Test
+    fun `회원 토큰으로 목록 조회를 시도하면 403과 ACCESS_DENIED를 반환한다`() {
+        val member = persistMember()
+        val token = memberAccessToken(member)
+
+        mockMvc
+            .perform(
+                get("/api/admin/members/${member.id}/passes")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token"),
+            ).andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.code").value("ACCESS_DENIED"))
     }
 
     private fun songpaBranch(): Branch = branchRepository.findByName("송파점")!!
