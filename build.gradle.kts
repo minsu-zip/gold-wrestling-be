@@ -31,6 +31,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-security")
+    // 자체 JWT(HS256 대칭키) 발급·검증용 NimbusJwtEncoder/NimbusJwtDecoder.
+    // Boot 4.1.0 BOM이 spring-security-bom(7.1.0)으로 버전을 관리해 여기에는 버전을 적지 않는다.
+    implementation("org.springframework.security:spring-security-oauth2-jose")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     // Boot 4는 Flyway도 전용 스타터로 분리됨
     implementation("org.springframework.boot:spring-boot-starter-flyway")
@@ -91,6 +94,11 @@ tasks.withType<Test> {
     useJUnitPlatform()
     // 도메인 규칙상 서버 기준 시간대는 Asia/Seoul 고정
     systemProperty("user.timezone", "Asia/Seoul")
+    // JwtConfig가 시크릿 미주입 시 기동을 막으므로(T-02-09), 전체 스프링 컨텍스트를 띄우는
+    // 테스트(HealthControllerTest 등 JWT와 무관한 기존 테스트 포함)가 모두 이 값을 전제로 한다.
+    // System property는 application.yml 클래스패스 리소스 검색에 영향을 주지 않아(리소스를
+    // 가리는 위험이 없어) 이 전역 기본값 주입에 안전하다. 실값 아님 — 32바이트 이상 명백한 더미.
+    systemProperty("goldwrestling.jwt.secret", "test-only-jwt-secret-value-do-not-use-in-production")
     testLogging {
         events("passed", "skipped", "failed")
     }

@@ -293,6 +293,160 @@
   `data.sql`(Flyway와 주입 경로가 이원화되어 실행 순서 보장이 어긋남)
 - 유의: `V2__create_branch_member_admin.sql` 주석의 "D-09"는 phase 1 계획 문서의 로컬 ID로, 이 항목을 가리킨다
 
-## D-032. (예시 — 다음 결정을 여기에 추가)
+## D-032. 카카오 OAuth: 인가 코드 방식, 토큰 교환은 BE가 수행
 
-- 날짜 / 결정 / 이유 / 기각 대안
+- 2026-08 / FE는 카카오 리다이렉트와 **인가 코드 전달만** 담당하고, BE가 인가 코드로 카카오 토큰
+  교환·사용자 정보 조회를 수행한 뒤 **자체 JWT를 발급**한다. `client_secret`은 서버 환경변수에만
+  존재한다 (`.env.example`에 키 이름 동기화)
+- 이유: 시크릿이 브라우저에 노출되지 않고, 카카오 API 의존이 BE 한 곳에 모여 FE와의 계약
+  (openapi.yaml)이 "인가 코드 주면 JWT 준다"로 단순해진다
+- 기각 대안: FE가 SDK로 카카오 액세스 토큰을 받아 BE에 전달(BE가 토큰 진위를 별도 검증해야 하고
+  시크릿 보호 이점이 사라짐), Spring Security OAuth2 Client 리다이렉트 위임(세션 기반 흐름이라
+  STATELESS JWT 체계(D-026)와 상충)
+
+## D-033. JWT 토큰 정책: access 30분 / refresh 14일, DB 저장 + 회전
+
+- 2026-08 / access 토큰 30분, refresh 토큰 14일. refresh는 **DB에 저장**하고 **사용할 때마다
+  회전(rotation)**한다. 로그아웃 = refresh 삭제. 회원 상태가 `ACTIVE`가 아니게 되면 refresh를
+  무효화해 **강제 로그아웃이 가능**해야 한다
+- 이유: refresh를 DB에 저장해야 강제 만료·회전·로그아웃이 가능하다. 무상태 refresh는 탈취 시
+  14일간 차단 수단이 없다
+- 노트: refresh 무효화만으로는 기발급 access가 최대 30분 유효한 창이 남는다. 따라서 상태 게이트
+  인가(AUTH-04, `PENDING` 접근 제한 등)는 토큰 클레임이 아니라 **DB의 현재 상태 기준**으로 검사한다
+- 기각 대안: 무상태 refresh(강제 만료 불가), 세션 기반(무상태 API 원칙과 상충),
+  access 수명 단축으로 창 제거(갱신 트래픽 증가 대비 이득이 작고 DB 상태 검사가 더 정확)
+
+## D-034. 가입 거절: 별도 상태 없이 INACTIVE 전환 + 거절 사유 기록
+
+- 2026-08 / 거절 시 `REJECTED` 상태를 추가하지 않고 **`INACTIVE` 전환 + 거절 사유 기록**으로
+  처리한다. 거절된 회원 재로그인 시 거절 안내 화면 대상으로 식별된다. 재신청은 관리자가 상태를
+  `PENDING`으로 되돌리는 운영 방식, 승인 취소도 기존 상태 변경 기능으로 갈음한다 (policies §5.2)
+- 이유: 회원 상태 4종(policies §5)을 유지해 모든 상태 분기 코드가 단순하게 남는다. 거절 사유
+  기록이 있으면 `INACTIVE`의 다른 유래(탈퇴·장기 미이용)와 구분할 수 있다
+- 기각 대안: `REJECTED` 상태 추가(상태 기계가 5종으로 늘어 전 코드의 분기 복잡화),
+  거절 시 데이터 삭제(재로그인 시 신규 가입으로 오인되고 거절 이력 소실)
+
+## D-035. 관리자 회원 목록 API: page/size + 통합 검색 + 상태 필터, 승인 대기 목록 재사용
+
+- 2026-08 / 회원 목록은 **page/size 페이지네이션**, **검색어 하나로 이름·전화번호 부분 일치**,
+  **상태 필터**를 제공한다. 승인 대기 목록(MEMBER-01)은 전용 API 없이 동일 API에
+  `status=PENDING` + 온보딩 완료 필터 조합으로 재사용한다
+- 이유: 화면별 전용 API를 늘리지 않고 하나로 운영한다. 온보딩 완료 필터가 있어야 승인 목록
+  정책(policies §5.1 — 프로필 입력된 `PENDING`만 노출)이 지켜진다
+- 기각 대안: 전체 반환 후 FE 필터(회원 수 증가 시 계약 변경 필요), 승인 대기 전용 API(목록 로직 중복)
+
+## D-036. refresh 토큰 표현·저장: 랜덤 문자열 + SHA-256 해시 저장, 사용 시 회전
+
+- 2026-08 / refresh 토큰은 JWT가 아니라 256비트 난수를 Base64URL로 인코딩한 문자열이고, DB에는 원문이 아니라 SHA-256 hex(64자)를 `token_hash`에 저장한다. 사용할 때마다 새 토큰을 발급하고 기존 행은 `revoked_at`을 채워 폐기한다. 이미 폐기된 토큰이 다시 제시되면 재사용으로 보고 해당 주체의 모든 refresh를 폐기한다. 회원당 여러 refresh 행을 허용해 멀티 디바이스 로그인을 지원한다.
+- 이유: refresh는 DB 조회가 전제라 자기기술적 JWT일 이유가 없다. 원문 저장은 DB 유출이 곧 계정 탈취다. 비밀번호와 달리 이미 고엔트로피라 BCrypt 같은 느린 해시가 필요 없다.
+- 기각 대안: refresh도 JWT(폐기·회전 추적을 위해 어차피 DB 행이 필요해 이점이 없음), 원문 저장(유출 즉시 탈취), 회원당 1개만 허용(모바일·PC 동시 로그인이 서로를 로그아웃시킴).
+
+## D-037. refresh_token의 주체 참조: nullable FK 쌍 + CHECK 제약
+
+- 2026-08 / `refresh_token`은 `member_id`·`admin_id` 두 FK를 모두 nullable로 두고 `CHECK ((member_id IS NULL) <> (admin_id IS NULL))`로 정확히 하나만 채워지도록 강제한다.
+- 이유: Member/Admin이 별도 테이블이라 단일 FK로 표현할 수 없는데, `principal_type` 문자열 + `principal_id` 조합은 FK 무결성을 잃는다. 이 레포는 `admin_branch`에서도 FK를 명시해 왔다.
+- 기각 대안: `principal_type`+`principal_id` 문자열 조합(참조 무결성 없음 — 삭제된 회원의 토큰 행이 남음), 테이블 2개로 분리(`member_refresh_token`/`admin_refresh_token` — 회전·폐기 로직이 통째로 두 벌이 됨).
+
+## D-038. 관리자 시드: ApplicationRunner 멱등 시드 (Flyway INSERT 금지)
+
+- 2026-08 / 관리자 계정은 `AdminSeeder`(`ApplicationRunner`)가 기동 시 `login_id` 존재 여부를 확인해 없을 때만 INSERT한다. 자격은 `ADMIN_SEED_LOGIN_ID`·`ADMIN_SEED_PASSWORD`·`ADMIN_SEED_NAME` 환경변수로 주입하고, 비어 있으면 시드를 건너뛰고 경고 로그만 남긴다(앱은 정상 기동).
+- 이유: 비밀번호는 환경마다 달라야 하는 시크릿이다. Branch 시드(D-031)처럼 Flyway INSERT로 넣으면 플레이스홀더가 비어 있는 채로 한 번 적용되는 순간 깨진 해시가 그 환경 DB에 영구히 박히고, 커밋된 마이그레이션은 수정 금지라 새 UPDATE 마이그레이션이 필요해진다.
+- 기각 대안: Flyway 시드 + `spring.flyway.placeholders`(위 이유), 관리자 가입 API(D-026이 셀프 가입 없음으로 확정).
+
+## D-039. 감사 시각(created_at): JPA Auditing 미도입, 애플리케이션이 Clock으로 명시 세팅
+
+- 2026-08 / `@EnableJpaAuditing`/`@CreatedDate`를 도입하지 않는다. `Member`·`Admin`·`RefreshToken`의 `createdAt`은 엔티티 생성 시 서비스가 주입받은 `Clock`으로 채운다. DB의 `DEFAULT now()`는 그대로 두어 방어선으로 남긴다. (Phase 1에서 이월된 결정 — D-030 유의 참조)
+- 이유: 감사 시각이 필요한 필드가 아직 소수이고, `Clock` 주입은 이미 프로젝트 규약(conventions §5)이라 테스트에서 시각을 고정하기 쉽다. Auditing은 커스텀 `DateTimeProvider` 빈 배선이 추가로 필요하고 시각 고정 경로가 한 겹 늘어난다.
+- 기각 대안: `@CreatedDate` + `dateTimeProviderRef`(배선 추가 대비 이득이 작음), DB DEFAULT만 쓰고 매핑하지 않기(회원 목록에 가입 신청 시각을 못 보여줌).
+
+## D-040. 인가 구현: URL/역할은 authorizeHttpRequests, 상태 게이트는 MemberStateGate
+
+- 2026-08 / 역할 구분(공개 / `ROLE_MEMBER` / `ROLE_ADMIN`)은 `SecurityConfig`의 `authorizeHttpRequests` URL 규칙으로만 표현한다. "회원 상태가 `ACTIVE`여야 한다" 같은 조건은 `MemberStateGate` 컴포넌트가 서비스 계층에서 DB 현재 상태로 검사하고 `DomainException`을 던진다. `@EnableMethodSecurity`/`@PreAuthorize`는 쓰지 않는다.
+- 이유: 상태 규칙에는 엔드포인트별 예외가 있다(`GET /api/members/me`와 온보딩 제출은 `PENDING`도 접근 가능해야 한다). 이를 URL 규칙이나 전역 메서드 시큐리티로 표현하면 예외를 또 열어주는 규칙이 겹쳐 오히려 복잡해진다. 서비스 계층 검사는 도메인 예외 경로를 그대로 타서 `ProblemDetail` 형식이 자동으로 통일된다.
+- 기각 대안: `@PreAuthorize`에 SpEL로 상태 조건 넣기(예외 엔드포인트마다 규칙 중복, 에러 응답이 시큐리티 경로로 빠져 `code` 주입이 갈라짐), 필터에서 상태까지 차단(거절 안내 화면 조회가 401로 막힘).
+- 유의: 서비스 계층 검사는 "빠뜨릴 수 있는" 방식이다. 회원 대상 엔드포인트를 새로 만들 때마다 `MemberStateGate` 호출이 필요한지 확인한다.
+
+## D-041. 전화번호: 하이픈 제거 후 숫자만 저장, UNIQUE 제약 없음
+
+- 2026-08 / 온보딩 요청은 `010-1234-5678`·`01012345678` 두 형태를 모두 받고(형식 검증 정규식 `^01[016789]-?\d{3,4}-?\d{4}$`), 서버가 하이픈을 제거해 숫자만 `member.phone_number`에 저장한다. `phone_number`에 DB UNIQUE 제약은 걸지 않는다.
+- 이유: 저장 형식이 섞이면 "전화번호 부분 일치 검색"(D-035)이 입력 형태에 따라 결과가 달라진다. UNIQUE는 policies §5.1이 요구하지 않고, 운영 규모가 작아 중복은 관리자가 승인 단계에서 걸러낼 수 있다.
+- 기각 대안: 하이픈 포함 저장(검색 불안정), 입력을 숫자만으로 제한(FE·사용자 입력 관습과 어긋남), UNIQUE 제약(가족 공유폰 등 정당한 중복을 막고, 제거하려면 새 마이그레이션이 필요).
+- 유의: 중복 가입 방지가 필요해지면 v2에서 UNIQUE 제약을 새 마이그레이션으로 추가한다 — 컬럼 추가보다 싼 변경이다.
+
+## D-042. 온보딩 재제출 금지
+
+- 2026-08 / 온보딩 제출 API는 회원 상태가 `PENDING`이면서 온보딩 미완료일 때만 허용한다. 이미 완료했으면 `ONBOARDING_ALREADY_COMPLETED`(409)로 거부한다.
+- 이유: 이 API를 열어두면 회원이 온보딩 경로로 이름·전화번호를 자유롭게 바꿀 수 있어, "프로필 수정은 관리자만"(MVP, 셀프 수정은 v2 PROF-01)이라는 결정이 우회된다. 이름·전화번호는 관리자가 회원을 식별하는 기준(policies §5.1)이라 임의 변경은 운영 사고다.
+- 기각 대안: 멱등하게 덮어쓰기 허용(PROF-01 우회), 완료 후에도 값이 같을 때만 허용(우회 여지는 남고 규칙만 복잡).
+
+## D-043. 거절 사유 노출 범위: 회원에게는 rejected 불리언만
+
+- 2026-08 / 회원 대상 응답(카카오 로그인 응답, `GET /api/members/me`)에는 `rejected: Boolean`만 담고 `rejectionReason` 원문은 담지 않는다. 사유 원문은 관리자 회원 상세 응답에서만 반환한다.
+- 이유: policies §5.2가 요구하는 것은 "거절 안내 화면 대상으로 식별"까지다. 사유는 관리자가 내부 운영 메모로 쓸 수 있어(예: "타 회원 신고 이력") 그대로 노출하면 분쟁 소지가 된다.
+- 기각 대안: 회원에게 사유 원문 노출(내부 메모 유출), 사유를 아예 기록하지 않음(D-034가 요구하는 `INACTIVE` 유래 구분이 불가능).
+
+## D-044. 상태 변경 시 refresh 무효화 + PENDING 복귀 시 거절 사유 초기화
+
+- 2026-08 / 관리자의 회원 상태 변경·거절로 **전환 후 상태가 `ACTIVE`가 아니게 되면** 해당 회원의 폐기되지 않은 refresh 토큰을 전부 폐기한다. 승인(`PENDING`→`ACTIVE`)에서는 폐기하지 않는다. 상태를 `PENDING`으로 되돌리는 재신청 처리(D-034)에서는 `rejection_reason`을 `NULL`로 초기화한다.
+- 이유: D-033이 요구하는 강제 로그아웃의 실현부다. `PENDING` 복귀 시 사유가 남아 있으면 재신청 회원에게 거절 안내 화면이 계속 뜬다.
+- 기각 대안: 모든 상태 변경에서 폐기(승인 직후 재로그인을 강요), refresh를 두고 access 만료만 기다림(최대 30분 창이 남음 — D-033이 명시적으로 기각).
+
+## D-045. 비밀번호 해싱: DelegatingPasswordEncoder (기본 bcrypt)
+
+- 2026-08 / `PasswordEncoderFactories.createDelegatingPasswordEncoder()`를 `PasswordEncoder` 빈으로 등록한다. 저장 값에는 `{bcrypt}` 접두가 붙으므로 `admin.password_hash`는 `VARCHAR(100)`으로 잡는다.
+- 이유: 저장 값 자체가 알고리즘을 기술하므로, 나중에 알고리즘을 바꿔도 기존 해시를 그대로 검증할 수 있다. `spring-boot-starter-security`에 이미 포함돼 추가 비용이 0이다.
+- 기각 대안: `BCryptPasswordEncoder` 직접 등록(알고리즘 교체 시 전 계정 재설정 필요), 직접 salt+hash 구현(적응형 work factor·타이밍 안전 비교를 직접 다뤄야 함).
+
+## D-046. 카카오 연동 세부: state는 FE 책임, redirect_uri는 서버 환경변수 고정
+
+- 2026-08 / CSRF 방지용 `state` 파라미터의 생성·검증은 FE가 담당한다. BE는 인가 코드만 받는다. `redirect_uri`는 요청 본문이 아니라 서버 환경변수(`KAKAO_REDIRECT_URI`)에서 읽어 카카오 토큰 교환에 사용한다.
+- 이유: BE가 STATELESS(세션 없음)라 `state`를 저장해 둘 곳이 없다. `redirect_uri`를 요청에서 받으면 공격자가 자기 서버를 넣어 인가 코드를 유도할 수 있고, 카카오 콘솔 등록값과 서버 설정이 갈라진다.
+- 기각 대안: BE가 state를 Redis 등에 저장해 검증(인프라 추가), redirect_uri를 요청 파라미터로 수용(오픈 리다이렉트 유사 위험).
+
+## D-047. 신규 회원 지점 배정: 기본 지점 이름 설정으로 조회 배정
+
+- 2026-08 / 카카오 최초 로그인으로 `Member`를 만들 때 `goldwrestling.default-branch-name`(기본값 `송파점`) 설정으로 `Branch`를 조회해 배정한다. 해당 지점이 없으면 로그인은 서버 오류로 실패한다.
+- 이유: `member.branch_id`는 NOT NULL인데 회원 스스로 지점을 고르는 UI가 v1에 없다(MVP는 송파점 단일 — D-031). 지점명을 설정으로 빼두면 2호점이 생겨도 코드 수정 없이 환경별로 다르게 둘 수 있다.
+- 기각 대안: 코드에 `송파점` 하드코딩(지점 추가 시 코드 수정), `branch.id = 1` 가정(identity 시퀀스에 의존하는 취약한 전제), 회원이 가입 시 지점 선택(v1 스코프 밖 — CROSS-01은 v2).
+
+## D-048. 카카오 RestClient는 `RestClient.builder()` 직접 호출, `RestClient.Builder` 빈 주입 안 함
+
+- 2026-08 / `KakaoRestClientConfig.kakaoRestClient()`는 스프링이 자동 구성한 `RestClient.Builder`를 생성자로 주입받지 않고 `RestClient.builder()`를 직접 호출해 만든다.
+- 이유: 이 프로젝트 클래스패스에는 `RestClient.Builder` 자동 구성 빈을 등록하는 Boot 4.1의 `spring-boot-restclient`/`spring-boot-http-client` 모듈이 없다(`spring-boot-starter-webmvc`가 이를 끌어오지 않음 — `./gradlew dependencies --configuration compileClasspath`로 실제 확인). 주입을 시도하면 `NoSuchBeanDefinitionException`으로 앱 기동 자체가 실패한다(02-03 실행 중 재현·확인).
+- 기각 대안: `spring-boot-starter-restclient`(또는 동등 모듈) 신규 추가(이번 phase가 명시한 "신규 패키지 1건" 예산을 넘어섬 — 필요성이 타임아웃 설정 하나뿐이라 과함), Boot의 `HttpClientSettings`/`ClientHttpRequestFactoryBuilder` API 사용(같은 이유로 모듈 부재). 대신 이미 `spring-web`에 있는 `SimpleClientHttpRequestFactory`의 `Duration` 기반 타임아웃 setter로 타임아웃(연결 3초/읽기 5초)을 구성한다.
+
+## D-049. 테스트 Clock 교체: 같은 이름 `@Bean` 대체가 아니라 다른 이름 + `@Primary`
+
+- 2026-08 / `TestClockConfiguration`이 프로덕션 `Clock` 빈(`ClockConfig.clock()`)을 테스트에서 대체하는 방식은, 빈 이름을 `clock`으로 맞춰 재정의하는 것이 아니라 **다른 이름(`testClock()`) + `@Primary`** 조합이다.
+- 이유: `@SpringBootTest`가 컴포넌트 스캔으로 찾는 `ClockConfig.clock()`과 테스트에서 `@Import`로 등록한 같은 이름의 `@Bean`이 있으면, Spring Boot(`allow-bean-definition-overriding` 기본값 `false`)가 컨텍스트 로딩 시점에 `BeanDefinitionOverrideException`을 던진다는 것을 실행해 직접 재현·확인했다(교체가 아니라 예외). 다른 이름 + `@Primary`는 이름 충돌 없이 타입 기반 주입 지점 전부가 테스트 빈을 우선 선택하게 한다.
+- 기각 대안: `spring.main.allow-bean-definition-overriding=true` 전역 설정(테스트 전체에서 의도치 않은 다른 빈 충돌도 조용히 통과시켜 버그를 숨길 위험), 매 통합테스트마다 `@TestPropertySource`로 이 플래그를 개별 지정(보일러플레이트가 늘고 까먹기 쉬움).
+
+## D-050. 카카오 최초 로그인 경쟁 복구는 트랜잭션 밖 1회 재시도
+
+- 2026-08 / `MemberRegistrationService.findOrCreateByKakaoId`는 유니크 제약 위반 예외를 잡지 않고 그대로 전파한다. 트랜잭션 애노테이션이 없는 `KakaoAuthService.login`이 이 예외를 잡아 같은 메서드를 새 트랜잭션으로 정확히 1회 재호출한다(02-REVIEW.md CR-01).
+- 이유: PostgreSQL은 제약 위반 시 트랜잭션을 abort해 같은 트랜잭션 내 재조회가 불가능하고("current transaction is aborted"), 예외가 리포지토리 프록시 경계를 넘으면 스프링이 트랜잭션을 rollback-only로 마킹해 커밋이 `UnexpectedRollbackException`으로 실패한다 — 복구는 반드시 트랜잭션 경계 밖이어야 한다.
+- 기각 대안: 같은 트랜잭션 내 catch 후 재조회(02-06의 원래 구현 — PostgreSQL에서 동작 불가), `login` 전체를 `@Transactional`로 묶기(conventions §7 위반 + 재시도가 같은 트랜잭션이 되어 무의미), `REQUIRES_NEW` 전파로 내부 재시도(self-invocation이라 프록시를 거치지 않아 적용되지 않고, 별도 빈을 새로 만들면 호출 체인만 늘어남).
+
+## D-051. refresh 회전 폐기는 조건부 UPDATE + 실패 응답에서도 커밋
+
+- 2026-08 / `TokenService.rotate`의 폐기 판단과 기록을 `RefreshTokenRepository.revokeIfUsable` 단일 조건부 UPDATE(`revokedAt is null`일 때만 갱신)로 원자화하고, 갱신 행 수 0을 재사용 신호로 취급한다. `rotate`는 `@Transactional(noRollbackFor = [RefreshTokenInvalidException::class])`로 재사용·만료 실패 응답을 주면서도 그 과정의 폐기를 커밋한다(02-REVIEW.md WR-01).
+- 이유: 조회 → 메모리 판단(`isRevoked()`) → 더티체킹 폐기는 READ COMMITTED에서 같은 refresh 토큰이 동시에 두 번 제시되면 둘 다 미폐기 상태를 읽고 둘 다 회전에 성공시켜(TOCTOU), D-036의 재사용 감지가 정확히 탈취 시나리오에서 무력화된다. 또한 재사용 감지 후 예외(`RefreshTokenInvalidException`은 `RuntimeException` 상속)가 그대로 전파되면 스프링 기본 규칙에 걸려 감지 폐기 자체가 롤백돼 DB에 남지 않는다.
+- 기각 대안: 비관적 락(`SELECT ... FOR UPDATE`)으로 행을 잠금(조건부 UPDATE로 충분한데 대기 비용만 늘어남), `SERIALIZABLE` 격리(전역 성능 비용), 예외를 체크 예외로 바꿔 롤백을 회피(코틀린에는 체크 예외 개념이 없고 이 프로젝트의 `ErrorCode`/`DomainException` 체계와도 어긋남).
+
+## D-052. 상태 변경 API의 ACTIVE 전환도 온보딩 완료를 서버에서 강제
+
+- 2026-08 / `changeStatus`는 `newStatus == ACTIVE`이면서 온보딩(실명·전화번호) 미완료인 회원에 대해 `MEMBER_STATE_CONFLICT`(409)로 거부한다. ACTIVE가 아닌 전이는 종전대로 제한 없음.
+- 이유: `approve()`가 서버에서 강제하는 policies §5.1 규칙을 같은 리소스의 다른 엔드포인트가 우회시키면, 관리자가 회원을 이름·전화번호로 식별한다는 전제(D-025)가 깨진 ACTIVE 회원이 생긴다.
+- 기각 대안: 우회를 허용하고 문서에만 명시(정책이 엔드포인트마다 갈라짐), 모든 전이에 전이표를 도입(policies §5.2가 "승인 취소는 상태 변경으로 갈음"이라 관리자 재량을 남겨 둔 취지와 충돌).
+
+## D-053. 통합 검색어는 정규화 결과가 빈 문자열이면 전화번호 술어를 만들지 않는다
+
+- 2026-08 / `keywordContains`는 `PhoneNumberNormalizer.normalize` 결과가 빈 문자열이면 전화번호 술어를 생성하지 않고 이름 술어만 사용한다. 온보딩 완료 판정 쿼리는 SQL `TRIM` 기준으로 엔티티의 `isNullOrBlank()`와 맞춘다(공백 문자 범위에서 일치).
+- 이유: LIKE 와일드카드 이스케이프만으로는 `"-"` 같은 입력이 `LIKE '%%'`가 되는 경로를 막지 못해 전화번호가 있는 전 회원이 반환된다. 판정 규칙이 엔티티와 쿼리 두 곳에 존재하는 한 한쪽만 고쳐지면 승인 대기 목록이 어긋난다.
+- 기각 대안: 검색어에서 하이픈을 제거한 뒤 blank 검사(이름에 하이픈이 든 검색을 못 하게 됨), 전화번호 컬럼에 함수 인덱스 도입(문제의 원인이 인덱스가 아님).
+
+## D-054. 쿼리 조건 DTO는 `@ParameterObject`로 개별 파라미터로 펼쳐 기술한다
+
+- 2026-08 / `@ModelAttribute`로 받는 조건 DTO 파라미터에는 항상 springdoc `@ParameterObject`를 함께 붙여, 생성되는 openapi.yaml이 필드별 개별 쿼리 파라미터가 되게 한다. 이후 페이즈의 목록·검색 엔드포인트도 이 규칙을 따른다.
+- 이유: 객체 파라미터 표현은 OpenAPI 기본 해석으로는 등가지만 생성기에 따라 `deepObject`나 JSON 문자열로 직렬화되어 서버가 값을 전혀 바인딩하지 못한다. openapi.yaml이 FE와의 유일한 계약(D-013)인 이상 해석이 갈리는 표현은 계약으로 부적합하다.
+- 기각 대안: 컨트롤러 시그니처를 개별 `@RequestParam` 5개로 풀기(검증 애노테이션과 기본값이 흩어지고 조건이 늘 때마다 시그니처가 길어짐), 생성된 yaml을 손으로 수정(D-029의 재생성이 되돌려 버려 드리프트의 원인이 됨), FE 쪽 직렬화 설정으로 회피(계약이 아니라 소비자 구현에 의존하게 됨).

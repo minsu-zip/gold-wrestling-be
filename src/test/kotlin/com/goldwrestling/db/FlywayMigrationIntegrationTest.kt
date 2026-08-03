@@ -28,7 +28,7 @@ class FlywayMigrationIntegrationTest {
 
         assertThat(applied).isNotEmpty()
         assertThat(applied).allSatisfy { (_, success) -> assertThat(success).isTrue() }
-        assertThat(applied.map { it.first }).contains("1", "2")
+        assertThat(applied.map { it.first }).contains("1", "2", "3")
     }
 
     @Test
@@ -75,13 +75,49 @@ class FlywayMigrationIntegrationTest {
     }
 
     @Test
-    fun `admin 테이블에는 아직 로그인 자격 컬럼이 없다`() {
+    fun `admin 테이블에 로그인 자격 컬럼이 있다`() {
         val columnNames =
             jdbcClient
                 .sql("SELECT column_name FROM information_schema.columns WHERE table_name = 'admin'")
                 .query(String::class.java)
                 .list()
 
-        assertThat(columnNames).doesNotContain("password", "login_id", "password_hash")
+        assertThat(columnNames).contains("login_id", "password_hash")
+    }
+
+    @Test
+    fun `member 테이블에 kakao_id 유니크 제약과 rejection_reason 컬럼이 있다`() {
+        val columnNames =
+            jdbcClient
+                .sql("SELECT column_name FROM information_schema.columns WHERE table_name = 'member'")
+                .query(String::class.java)
+                .list()
+        assertThat(columnNames).contains("kakao_id", "rejection_reason")
+
+        val uniqueCount =
+            jdbcClient
+                .sql(
+                    """
+                    SELECT count(*) FROM information_schema.table_constraints
+                    WHERE constraint_name = 'uq_member_kakao_id' AND constraint_type = 'UNIQUE'
+                    """.trimIndent(),
+                ).query(Long::class.java)
+                .single()
+        assertThat(uniqueCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `refresh_token 테이블에 주체 배타 CHECK 제약이 있다`() {
+        val checkCount =
+            jdbcClient
+                .sql(
+                    """
+                    SELECT count(*) FROM information_schema.table_constraints
+                    WHERE constraint_name = 'ck_refresh_token_principal' AND constraint_type = 'CHECK'
+                    """.trimIndent(),
+                ).query(Long::class.java)
+                .single()
+
+        assertThat(checkCount).isEqualTo(1)
     }
 }

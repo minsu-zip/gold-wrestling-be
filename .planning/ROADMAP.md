@@ -15,7 +15,7 @@
 - Decimal phases (2.1, 2.2): Urgent insertions (마감 후 `/gsd:phase insert`로 생성)
 
 - [x] **Phase 1: 기반** - 공통 에러 포맷(ProblemDetail), 초기 스키마(Branch/Member/Admin/AdminBranch), openapi.yaml 재생성 파이프라인 (completed 2026-07-30)
-- [ ] **Phase 2: 인증·회원** - 카카오 로그인, 온보딩, JWT, 관리자 ID/PW 인증, 가입 승인, 회원 관리
+- [x] **Phase 2: 인증·회원** - 카카오 로그인, 온보딩, JWT, 관리자 ID/PW 인증, 가입 승인, 회원 관리 (본 작업 완료 2026-08-02 / 검증 갭 클로저 진행 중 — 02-12~02-15) (completed 2026-08-03)
 - [ ] **Phase 3: 이용권** - Pass 3종 등록, PassTransaction 이력, 수동 가감·기간 수정, 본인 조회
 - [ ] **Phase 4: 시간표·예약** - ClassSchedule/ClassSession, 예약 생성·취소·변경 + 즉시 차감/복구, 동시성 보장, 관리자 예약 관리·휴강, Notification 스키마·알림 레코드 생성
 - [ ] **Phase 5: 배치** - 2주 미사용 차감, 유효기간 만료 처리, 멱등 실행
@@ -46,9 +46,26 @@
   3. 관리자 승인 목록에는 온보딩(실명·전화번호 입력)을 완료한 `PENDING` 회원만 노출되고, 관리자가 승인하면 `ACTIVE`로 전환되어 전체 기능을 쓸 수 있다 (거절도 가능)
   4. 관리자는 ID/PW로 로그인해(카카오 연동 없음, 회원과 동일한 JWT 체계) 회원 목록·상세를 조회하고 이름·전화번호로 검색하며, 회원 상태(`ACTIVE`/`ON_LEAVE`/`INACTIVE`)를 변경할 수 있다
   5. `PENDING`이거나 온보딩 미완료인 회원은 승인 대기 정보 외 기능에 접근할 수 없고, 회원은 본인 프로필(이름·전화번호)을 조회할 수 있다
-**Plans**: TBD
+**Plans**: 15 plans (본 작업 11 + 갭 클로저 4. D-10에 따라 순차 실행 — 플랜 단위 브랜치 → dev PR → 머지 → 다음 플랜. Wave 1의 3개만 병렬 가능)
+- [x] 02-01-PLAN.md — 용어·에러코드·설계 결정 문서 정합 + ErrorCode 확장 (AUTH-02/03/04, MEMBER-01/03)
+- [x] 02-02-PLAN.md — V3 인증 스키마 + 엔티티·리포지토리 (AUTH-01/03/06, MEMBER-01)
+- [x] 02-03-PLAN.md — JWT·카카오 설정, 의존성 1건, 테스트 인프라(Wave 0) (AUTH-01/02)
+- [x] 02-04-PLAN.md — TokenService(발급·회전·재사용 감지) + 토큰 갱신·로그아웃 API (AUTH-02)
+- [x] 02-05-PLAN.md — JWT 인증 필터 + 역할 기반 인가 + 401/403 ProblemDetail (AUTH-02/04)
+- [x] 02-06-PLAN.md — 카카오 인가코드 로그인 + PENDING 회원 생성 (AUTH-01/02/06)
+- [x] 02-07-PLAN.md — 관리자 ID/PW 로그인 + 멱등 시드 (AUTH-02/03)
+- [x] 02-08-PLAN.md — 온보딩 + 본인 프로필 + 상태 게이트 (AUTH-04/05/06, MEMBER-04)
+- [x] 02-09-PLAN.md — 관리자 회원 목록·검색·상세 (MEMBER-01/02)
+- [x] 02-10-PLAN.md — 가입 승인·거절 + 상태 변경 + 강제 로그아웃 (MEMBER-01/03)
+- [x] 02-11-PLAN.md — phase 마감: 전체 검증·문서 정합 + 실제 카카오 E2E 수동 확인 (전 요구사항)
+- [x] 02-12-PLAN.md — [갭] CR-01: 동시 최초 로그인 경쟁 복구를 트랜잭션 밖으로 + 동시성 테스트 (AUTH-01)
+- [x] 02-13-PLAN.md — [갭] WR-01: refresh 회전 폐기 원자화(조건부 UPDATE) + 재사용 감지 폐기 커밋 (AUTH-02)
+- [x] 02-14-PLAN.md — [갭] WR-03/04/05: 상태변경 ACTIVE 우회 차단 + 검색어·온보딩 판정 정합 (MEMBER-01/02/03)
+- [x] 02-15-PLAN.md — [갭] WR-06: 회원 목록 쿼리 파라미터를 개별 파라미터로 기술(@ParameterObject) (MEMBER-02)
 
-**Note**: `src/main/kotlin/com/goldwrestling/config/SecurityConfig.kt`의 현재 전체 `permitAll` 뼈대는 이 phase에서 실제 인가 규칙으로 교체된다.
+**Note**: `src/main/kotlin/com/goldwrestling/config/SecurityConfig.kt`의 현재 전체 `permitAll` 뼈대는 이 phase에서 실제 인가 규칙으로 교체된다 (02-05).
+
+**Note (갭 클로저)**: 02-VERIFICATION.md가 Blocker 1건(CR-01)을 남겨 Phase 2를 `gaps_found`로 판정했다. 02-12~02-15는 그 Blocker와 02-REVIEW.md의 Warning 5건을 닫는 플랜이다. WR-02(관리자 로그인 타이밍 부채널)와 Info 6건(IN-01~IN-06)은 이번 갭 클로저 범위 밖으로 두었다 — 사용자 판단 사항.
 
 ### Phase 3: 이용권
 **Goal**: 관리자가 회원에게 이용권을 등록·조정하고, 모든 변경이 감사 가능한 이력으로 남으며, 회원이 본인 이용권 현황을 확인할 수 있다.
@@ -109,8 +126,9 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. 기반 | 3/3 | Complete   | 2026-07-30 |
-| 2. 인증·회원 | 0/TBD | Not started | - |
+| 2. 인증·회원 | 15/15 | Complete   | 2026-08-03 |
 | 3. 이용권 | 0/TBD | Not started | - |
 | 4. 시간표·예약 | 0/TBD | Not started | - |
 | 5. 배치 | 0/TBD | Not started | - |
 | 6. 운영 | 0/TBD | Not started | - |
+</content>
