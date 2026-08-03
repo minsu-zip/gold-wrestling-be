@@ -123,3 +123,8 @@ None - no external service configuration required.
 ---
 *Phase: 03-pass*
 *Completed: 2026-08-03*
+
+## Self-Check: PASSED
+
+- 13개 산출물 파일 전부 `ls`로 존재 확인 (V4 마이그레이션, enum 5종, 엔티티 3종, 리포지토리 3종, 테스트 1종)
+- Task 커밋 3건(`3e0ff63`, `2e9c7a4`, `cdfe4f5`) 전부 `git log`로 확인
