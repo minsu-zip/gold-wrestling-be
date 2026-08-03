@@ -15,7 +15,7 @@
 - Decimal phases (2.1, 2.2): Urgent insertions (마감 후 `/gsd:phase insert`로 생성)
 
 - [x] **Phase 1: 기반** - 공통 에러 포맷(ProblemDetail), 초기 스키마(Branch/Member/Admin/AdminBranch), openapi.yaml 재생성 파이프라인 (completed 2026-07-30)
-- [ ] **Phase 2: 인증·회원** - 카카오 로그인, 온보딩, JWT, 관리자 ID/PW 인증, 가입 승인, 회원 관리 (본 작업 완료 2026-08-02 / 검증 갭 클로저 진행 중 — 02-12~02-15)
+- [x] **Phase 2: 인증·회원** - 카카오 로그인, 온보딩, JWT, 관리자 ID/PW 인증, 가입 승인, 회원 관리 (본 작업 완료 2026-08-02 / 검증 갭 클로저 진행 중 — 02-12~02-15) (completed 2026-08-03)
 - [ ] **Phase 3: 이용권** - Pass 3종 등록, PassTransaction 이력, 수동 가감·기간 수정, 본인 조회
 - [ ] **Phase 4: 시간표·예약** - ClassSchedule/ClassSession, 예약 생성·취소·변경 + 즉시 차감/복구, 동시성 보장, 관리자 예약 관리·휴강, Notification 스키마·알림 레코드 생성
 - [ ] **Phase 5: 배치** - 2주 미사용 차감, 유효기간 만료 처리, 멱등 실행
@@ -61,7 +61,7 @@
 - [x] 02-12-PLAN.md — [갭] CR-01: 동시 최초 로그인 경쟁 복구를 트랜잭션 밖으로 + 동시성 테스트 (AUTH-01)
 - [x] 02-13-PLAN.md — [갭] WR-01: refresh 회전 폐기 원자화(조건부 UPDATE) + 재사용 감지 폐기 커밋 (AUTH-02)
 - [x] 02-14-PLAN.md — [갭] WR-03/04/05: 상태변경 ACTIVE 우회 차단 + 검색어·온보딩 판정 정합 (MEMBER-01/02/03)
-- [ ] 02-15-PLAN.md — [갭] WR-06: 회원 목록 쿼리 파라미터를 개별 파라미터로 기술(@ParameterObject) (MEMBER-02)
+- [x] 02-15-PLAN.md — [갭] WR-06: 회원 목록 쿼리 파라미터를 개별 파라미터로 기술(@ParameterObject) (MEMBER-02)
 
 **Note**: `src/main/kotlin/com/goldwrestling/config/SecurityConfig.kt`의 현재 전체 `permitAll` 뼈대는 이 phase에서 실제 인가 규칙으로 교체된다 (02-05).
 
@@ -126,7 +126,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. 기반 | 3/3 | Complete   | 2026-07-30 |
-| 2. 인증·회원 | 14/15 | In Progress|  |
+| 2. 인증·회원 | 15/15 | Complete   | 2026-08-03 |
 | 3. 이용권 | 0/TBD | Not started | - |
 | 4. 시간표·예약 | 0/TBD | Not started | - |
 | 5. 배치 | 0/TBD | Not started | - |
