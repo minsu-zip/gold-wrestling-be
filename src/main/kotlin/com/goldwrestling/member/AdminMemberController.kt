@@ -9,6 +9,7 @@ import com.goldwrestling.member.dto.UpdateMemberStatusRequest
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import org.springdoc.core.annotations.ParameterObject
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.ModelAttribute
 import org.springframework.web.bind.annotation.PatchMapping
@@ -33,12 +34,17 @@ import org.springframework.web.bind.annotation.RestController
 class AdminMemberController(
     private val adminMemberService: AdminMemberService,
 ) {
+    // 아래 springdoc 스펙 생성 힌트: MemberSearchCondition을 "condition"이라는 객체 파라미터 1개가
+    // 아니라 keyword/status/onboardingCompleted/page/size 개별 쿼리 파라미터로 펼쳐 기술하라는 뜻이다.
+    // 런타임 바인딩을 담당하는 폼 바인딩 애노테이션에는 관여하지 않는다 — 이게 없으면 openapi.yaml이
+    // 객체 파라미터 1개로 기술되고, 이를 deepObject나 JSON 문자열로 직렬화하는 FE 생성기에서는 서버가
+    // 파라미터를 전혀 바인딩하지 못한다(02-REVIEW.md WR-06, D-054).
     @GetMapping
     @Operation(
         summary = "회원 목록 조회 (검색·상태 필터·페이지네이션. status=PENDING+onboardingCompleted=true 가 승인 대기 목록)",
     )
     fun search(
-        @ModelAttribute @Valid condition: MemberSearchCondition,
+        @ParameterObject @ModelAttribute @Valid condition: MemberSearchCondition,
     ): PageResponse<MemberSummaryResponse> = adminMemberService.search(condition)
 
     @GetMapping("/{memberId}")
