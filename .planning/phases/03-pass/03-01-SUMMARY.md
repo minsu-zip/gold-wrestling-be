@@ -119,10 +119,15 @@ Task 2의 `<acceptance_criteria>`에 적힌 검증 커맨드 `grep -v '^#' docs/
 
 None - 외부 서비스 설정 불필요.
 
+## Requirements Traceability Note
+
+이 플랜의 frontmatter는 `requirements: [PASS-01, PASS-03, PASS-07, PASS-08]`을 명시하지만, 이번 플랜은 **문서·에러코드 정합화만 수행**했고 등록/수동가감/유효기간수정/등록취소의 실제 기능(엔티티·서비스·API)은 구현하지 않았다. `REQUIREMENTS.md`의 해당 항목을 `[x] Complete`로 표시하지 않고 `[ ] Pending`으로 유지했다(자동 실행 중 `requirements mark-complete`를 한 번 실행했으나, 실제 기능 미구현 상태와 맞지 않아 즉시 되돌렸다). 이 4개 요구사항은 03-pass의 후속 플랜(등록/가감/기간수정/취소 서비스 구현)이 실제로 완료할 때 표시되어야 한다.
+
 ## Next Phase Readiness
 
 - 03-pass의 이후 플랜(엔티티·마이그레이션·서비스)이 이 플랜에서 확정한 이름(PassStatus, PassDisplayStatus, EveningMembershipTerm, note, registeredBy)과 D-060~D-067, 이용권 에러코드 7종을 그대로 사용할 수 있다.
 - D-066 경계 산정이 확정되어 03-04(유효기간 계산 로직)가 모호함 없이 진행 가능하다.
+- PASS-01/03/07/08은 여전히 Pending — 후속 기능 구현 플랜에서 완료 표시 필요.
 - 블로커 없음.
 
 ---
