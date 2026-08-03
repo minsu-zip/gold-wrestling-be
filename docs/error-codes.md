@@ -30,8 +30,18 @@
 | `ONBOARDING_ALREADY_COMPLETED` | 409 | 이미 온보딩을 마친 회원의 온보딩 재제출 (프로필 수정은 v2 PROF-01) | `MemberProfileService` |
 | `MEMBER_STATE_CONFLICT` | 409 | 승인 대상이 아니거나 허용되지 않는 상태 전이 | `AdminMemberService` |
 
+## 이용권 코드 (Phase 3)
+
+| 코드 | HTTP 상태 | 의미 | 발생 지점 |
+|---|---|---|---|
+| `PASS_NOT_FOUND` | 404 | 대상 이용권 없음 | `AdminPassService` |
+| `INVALID_ADJUSTMENT_UNIT` | 400 | 가감 수량이 0.5 단위가 아니거나 0 (policies §4.2a) | `AdminPassService` |
+| `INSUFFICIENT_PASS_COUNT` | 409 | 가감 결과 잔여가 음수가 됨 | `Pass` |
+| `PASS_TYPE_NOT_ADJUSTABLE` | 409 | 기간제(`EVENING_MEMBERSHIP`)에 횟수 가감 시도 | `Pass` |
+| `PASS_ALREADY_CANCELED` | 409 | 이미 취소된 이용권을 가감·기간수정·재취소하려 함 | `Pass` |
+| `INVALID_PASS_PERIOD` | 400 | 종료일이 시작일보다 앞서거나, 횟수권 시작일 수정 시도 (D-062) | `AdminPassService` |
+| `PASS_STATE_CONFLICT` | 409 | 조건부 갱신 경쟁 패배 등 위 코드로 나뉘지 않는 이용권 상태 충돌 | `AdminPassService` |
+
 **폴백 규칙** — 위 표에 매핑되지 않은 예외는 상태값으로 코드를 추측하지 않고 다음으로 고정된다:
 4xx → `MALFORMED_REQUEST`, 그 외 → `INTERNAL_ERROR`. (이때 HTTP 상태는 예외가 정한 값이 그대로 나가므로,
 FE가 특정 코드로 구분해야 하는 에러가 생기면 이 표와 핸들러에 명시 매핑을 추가한다.)
-
-도메인 코드(예: `RESERVATION_FULL`, `INSUFFICIENT_PASS_COUNT`)는 해당 도메인이 생기는 이후 phase에서 이 표에 추가된다.

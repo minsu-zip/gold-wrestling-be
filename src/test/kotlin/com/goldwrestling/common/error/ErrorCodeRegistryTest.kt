@@ -12,7 +12,7 @@ import java.io.File
  *
  * 양방향으로 검증한다:
  * - enum → 문서: [ErrorCode.entries] 전부가 문서 본문에 백틱으로 감싸여 등장해야 한다
- * - 문서 → enum: `## 공통 코드`·`## 인증·회원 코드` 표의 **첫 번째 열**에 있는 코드가 전부 enum에 있어야 한다
+ * - 문서 → enum: `## 공통 코드`·`## 인증·회원 코드`·`## 이용권 코드` 표의 **첫 번째 열**에 있는 코드가 전부 enum에 있어야 한다
  *   (역방향은 표의 첫 열만 본다 — "발생 지점" 열의 클래스명도 백틱을 쓰므로 전체 텍스트를 정규식으로
  *   훑으면 `AdminAuthService` 같은 오탐이 섞인다)
  */
@@ -41,7 +41,7 @@ class ErrorCodeRegistryTest {
      * `^[A-Z][A-Z_]{4,}$` 형태만 코드로 인정해 `TZ` 같은 짧은 오탐을 피한다.
      */
     private fun extractFirstColumnCodeTokens(text: String): List<String> {
-        val targetSectionPrefixes = listOf("## 공통 코드", "## 인증·회원 코드")
+        val targetSectionPrefixes = listOf("## 공통 코드", "## 인증·회원 코드", "## 이용권 코드")
         val codeTokenPattern = Regex("^[A-Z][A-Z_]{4,}$")
 
         var inTargetSection = false
