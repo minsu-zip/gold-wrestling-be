@@ -29,12 +29,14 @@
 
 ### 이용권 (M3) — PASS
 
-- [ ] **PASS-01**: 관리자가 회원에게 이용권을 등록할 수 있다 — `EVENING_MEMBERSHIP`(1/3/6개월), `SESSION_PASS`/`LESSON_PASS`(횟수 지정, 유효기간 등록일+1년)
+- [ ] **PASS-01**: 관리자가 회원에게 이용권을 등록할 수 있다 — `EVENING_MEMBERSHIP`(1/3/6개월), `SESSION_PASS`/`LESSON_PASS`(횟수 지정, 유효기간 시작일+1년 — D-055: 시작일 지정 가능, 기본 오늘)
 - [ ] **PASS-02**: 모든 차감/복구가 `PassTransaction` 이력으로 남는다 — (이용권, ±수량, 사유 코드, 주체, 시각). 이력 없는 잔여 변경 불가
 - [ ] **PASS-03**: 관리자가 횟수를 수동 가감할 수 있다 — 사유 입력 필수(`ADMIN_ADJUST`)
 - [ ] **PASS-04**: 관리자가 저녁반 회비 기간을 수정/연장할 수 있다
 - [ ] **PASS-05**: 회원이 본인 이용권 목록·잔여 횟수·유효기간을 조회할 수 있다
 - [ ] **PASS-06**: 회원이 본인 차감/복구 이력을 조회할 수 있다 (언제, 무슨 사유로 몇 회)
+- [ ] **PASS-07**: 관리자가 횟수권(`SESSION_PASS`/`LESSON_PASS`) 유효기간을 수정할 수 있다 — 만료 후 서비스 부여 대응, 만료권 수동 가감과 세트 (D-056, 2026-08-03 Phase 3 논의로 추가)
+- [ ] **PASS-08**: 관리자가 이용권 등록을 취소할 수 있다 — 물리 삭제 아닌 취소 상태 전환 + `REGISTRATION_CANCELED` 상쇄 이력, 회원 화면 숨김·관리자 구분 표시 (D-059, 2026-08-03 Phase 3 논의로 추가)
 
 ### 시간표·예약 (M4) — SCHED / RESV
 
@@ -120,6 +122,8 @@
 | PASS-04 | Phase 3 | Pending |
 | PASS-05 | Phase 3 | Pending |
 | PASS-06 | Phase 3 | Pending |
+| PASS-07 | Phase 3 | Pending |
+| PASS-08 | Phase 3 | Pending |
 | SCHED-01 | Phase 4 | Pending |
 | SCHED-02 | Phase 4 | Pending |
 | SCHED-03 | Phase 4 | Pending |
@@ -145,12 +149,12 @@
 | NOTIF-03 | Phase 6 | Pending |
 
 **Coverage:**
-- v1 requirements: 42 total
-- Mapped to phases: 42 ✓
+- v1 requirements: 44 total (42 + Phase 3 논의로 PASS-07·PASS-08 추가, 2026-08-03)
+- Mapped to phases: 44 ✓
 - Unmapped: 0 ✓
 
 > 참고: 최초 작성 시 이 섹션 상단에 있던 "36 total" 표기는 실제 위 v1 목록(FOUND~NOTIF, 42건)과 맞지 않는 집계 오류였다. 로드맵 작성 시 실제 목록 기준으로 42건 전부를 매핑해 정정했다.
 
 ---
 *Requirements defined: 2026-07-30*
-*Last updated: 2026-07-30 after roadmap creation (Phase 1~6 매핑)*
+*Last updated: 2026-08-03 after Phase 3 discussion (PASS-07·PASS-08 추가)*
