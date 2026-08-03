@@ -22,6 +22,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
@@ -64,6 +65,9 @@ class AdminPassControllerTest {
 
     @Autowired
     private lateinit var passTransactionRepository: PassTransactionRepository
+
+    @Autowired
+    private lateinit var passPeriodChangeRepository: PassPeriodChangeRepository
 
     @Autowired
     private lateinit var tokenService: TokenService
@@ -427,6 +431,211 @@ class AdminPassControllerTest {
             .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"))
     }
 
+    // ---------- 기간·유효기간 수정 ----------
+
+    @Test
+    fun `저녁반 기간을 수정하면 200과 새 기간이 오고 PassPeriodChange 1건에 전값이 남는다`() {
+        val previousStart = LocalDate.of(2026, 3, 1)
+        val previousEnd = LocalDate.of(2026, 4, 1)
+        val pass = persistPass(remaining = null, type = PassType.EVENING_MEMBERSHIP, startDate = previousStart, endDate = previousEnd)
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                patch("/api/admin/passes/${pass.id}/period")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"newStartDate":"2026-03-15","newEndDate":"2026-05-15","reason":"휴회 보상 연장"}"""),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.startDate").value("2026-03-15"))
+            .andExpect(jsonPath("$.endDate").value("2026-05-15"))
+
+        val history = passPeriodChangeRepository.findAllByPassIdOrderByOccurredAtDesc(pass.id!!)
+        assertThat(history).hasSize(1)
+        assertThat(history[0].previousStartDate).isEqualTo(previousStart)
+        assertThat(history[0].previousEndDate).isEqualTo(previousEnd)
+        assertThat(history[0].newStartDate).isEqualTo(LocalDate.of(2026, 3, 15))
+        assertThat(history[0].newEndDate).isEqualTo(LocalDate.of(2026, 5, 15))
+        assertThat(history[0].reason).isEqualTo("휴회 보상 연장")
+    }
+
+    @Test
+    fun `횟수권 종료일만 수정하면 200이고 startDate는 불변이며 이력 1건이 남는다`() {
+        val previousStart = LocalDate.of(2026, 3, 1)
+        val previousEnd = LocalDate.of(2027, 2, 28)
+        val pass = persistPass(remaining = BigDecimal("3.0"), startDate = previousStart, endDate = previousEnd)
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                patch("/api/admin/passes/${pass.id}/period")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"newEndDate":"2027-06-30","reason":"만료 연장"}"""),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.startDate").value(previousStart.toString()))
+            .andExpect(jsonPath("$.endDate").value("2027-06-30"))
+
+        val history = passPeriodChangeRepository.findAllByPassIdOrderByOccurredAtDesc(pass.id!!)
+        assertThat(history).hasSize(1)
+        assertThat(history[0].previousStartDate).isEqualTo(previousStart)
+        assertThat(history[0].newStartDate).isEqualTo(previousStart)
+        assertThat(history[0].previousEndDate).isEqualTo(previousEnd)
+        assertThat(history[0].newEndDate).isEqualTo(LocalDate.of(2027, 6, 30))
+    }
+
+    @Test
+    fun `만료된 횟수권의 유효기간을 미래로 연장하면 200이다`() {
+        val pass =
+            persistPass(
+                remaining = BigDecimal("1.0"),
+                startDate = LocalDate.of(2019, 1, 1),
+                endDate = LocalDate.of(2020, 1, 1),
+            )
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                patch("/api/admin/passes/${pass.id}/period")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"newEndDate":"2027-12-31","reason":"만료 후 서비스 부여"}"""),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.endDate").value("2027-12-31"))
+    }
+
+    @Test
+    fun `횟수권에 기존과 다른 newStartDate를 지정하면 400과 INVALID_PASS_PERIOD를 반환한다`() {
+        val pass =
+            persistPass(
+                remaining = BigDecimal("3.0"),
+                startDate = LocalDate.of(2026, 3, 1),
+                endDate = LocalDate.of(2027, 2, 28),
+            )
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                patch("/api/admin/passes/${pass.id}/period")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"newStartDate":"2026-04-01","newEndDate":"2027-02-28","reason":"보정"}"""),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("INVALID_PASS_PERIOD"))
+    }
+
+    @Test
+    fun `newEndDate가 시작일보다 앞서면 400과 INVALID_PASS_PERIOD를 반환한다`() {
+        val pass =
+            persistPass(
+                remaining = null,
+                type = PassType.EVENING_MEMBERSHIP,
+                startDate = LocalDate.of(2026, 3, 1),
+                endDate = LocalDate.of(2026, 4, 1),
+            )
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                patch("/api/admin/passes/${pass.id}/period")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"newEndDate":"2026-02-01","reason":"보정"}"""),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("INVALID_PASS_PERIOD"))
+    }
+
+    @Test
+    fun `취소된 이용권의 기간을 수정하면 409와 PASS_ALREADY_CANCELED를 반환한다`() {
+        val pass = persistPass(remaining = BigDecimal("3.0"), status = PassStatus.CANCELED)
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                patch("/api/admin/passes/${pass.id}/period")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"newEndDate":"2027-06-30","reason":"보정"}"""),
+            ).andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("PASS_ALREADY_CANCELED"))
+    }
+
+    @Test
+    fun `reason이 공백이면 400과 VALIDATION_FAILED를 반환한다`() {
+        val pass = persistPass(remaining = BigDecimal("3.0"))
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                patch("/api/admin/passes/${pass.id}/period")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"newEndDate":"2027-06-30","reason":"   "}"""),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+    }
+
+    @Test
+    fun `존재하지 않는 passId로 기간을 수정하면 404와 PASS_NOT_FOUND를 반환한다`() {
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                patch("/api/admin/passes/999999999/period")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"newEndDate":"2027-06-30","reason":"보정"}"""),
+            ).andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.code").value("PASS_NOT_FOUND"))
+    }
+
+    @Test
+    fun `전값과 동일한 값으로 기간 수정을 요청하면 200이고 PassPeriodChange 건수가 늘지 않는다`() {
+        val startDate = LocalDate.of(2026, 3, 1)
+        val endDate = LocalDate.of(2027, 2, 28)
+        val pass = persistPass(remaining = BigDecimal("3.0"), startDate = startDate, endDate = endDate)
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                patch("/api/admin/passes/${pass.id}/period")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"newStartDate":"$startDate","newEndDate":"$endDate","reason":"변화 없음 재전송"}"""),
+            ).andExpect(status().isOk)
+
+        val history = passPeriodChangeRepository.findAllByPassIdOrderByOccurredAtDesc(pass.id!!)
+        assertThat(history).isEmpty()
+    }
+
+    @Test
+    fun `회원 토큰으로 기간 수정을 시도하면 403과 ACCESS_DENIED를 반환한다`() {
+        val pass = persistPass(remaining = BigDecimal("3.0"))
+        val token = memberAccessToken(pass.member)
+
+        mockMvc
+            .perform(
+                patch("/api/admin/passes/${pass.id}/period")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"newEndDate":"2027-06-30","reason":"보정"}"""),
+            ).andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.code").value("ACCESS_DENIED"))
+    }
+
+    @Test
+    fun `토큰 없이 기간 수정을 시도하면 401과 UNAUTHENTICATED를 반환한다`() {
+        val pass = persistPass(remaining = BigDecimal("3.0"))
+
+        mockMvc
+            .perform(
+                patch("/api/admin/passes/${pass.id}/period")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"newEndDate":"2027-06-30","reason":"보정"}"""),
+            ).andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"))
+    }
+
     private fun songpaBranch(): Branch = branchRepository.findByName("송파점")!!
 
     private fun persistMember(): Member {
@@ -462,25 +671,34 @@ class AdminPassControllerTest {
 
     private fun memberAccessToken(member: Member): String = tokenService.issueTokenPair(PrincipalType.MEMBER, member.id!!).accessToken
 
-    /** 가감 대상 이용권을 등록 API를 거치지 않고 직접 저장한다 — 가감 계약만 검증하는 테스트라 등록 경로와 결합할 필요가 없다. */
+    /** 가감·기간수정 대상 이용권을 등록 API를 거치지 않고 직접 저장한다 — 계약만 검증하는 테스트라 등록 경로와 결합할 필요가 없다. */
     private fun persistPass(
         remaining: BigDecimal?,
         type: PassType = PassType.SESSION_PASS,
+        startDate: LocalDate = LocalDate.now(clock),
+        endDate: LocalDate = LocalDate.now(clock).plusYears(1).minusDays(1),
+        status: PassStatus = PassStatus.ACTIVE,
     ): Pass {
         val member = persistMember()
         val admin = persistAdmin()
-        return passRepository.saveAndFlush(
+        val pass =
             Pass(
                 member = member,
                 branch = songpaBranch(),
                 registeredBy = admin,
                 type = type,
+                // ck_pass_cancellation(V4)이 CANCELED를 canceled_at/cancel_reason/canceled_by_admin_id
+                // 3종 동시 존재와 묶어 강제한다 — 우선 ACTIVE로 저장하고, CANCELED가 필요하면 아래에서
+                // `Pass.cancel`로 3종을 함께 채운다.
                 status = PassStatus.ACTIVE,
-                startDate = LocalDate.now(clock),
-                endDate = LocalDate.now(clock).plusYears(1).minusDays(1),
+                startDate = startDate,
+                endDate = endDate,
                 remainingCount = remaining,
                 createdAt = OffsetDateTime.now(clock),
-            ),
-        )
+            )
+        if (status == PassStatus.CANCELED) {
+            pass.cancel(reason = "테스트 사전 취소", admin = admin, now = OffsetDateTime.now(clock))
+        }
+        return passRepository.saveAndFlush(pass)
     }
 }

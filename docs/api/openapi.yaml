@@ -206,6 +206,32 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/MemberDetailResponse"
+  /api/admin/passes/{passId}/period:
+    patch:
+      tags:
+      - admin-pass
+      summary: "이용권 기간·유효기간 수정 (저녁반은 시작·종료, 횟수권은 종료일만)"
+      operationId: changePeriod
+      parameters:
+      - name: passId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePassPeriodRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PassResponse"
   /api/admin/members/{memberId}/status:
     patch:
       tags:
@@ -686,6 +712,31 @@ components:
           example: 10.0
       required:
       - type
+    ChangePassPeriodRequest:
+      type: object
+      description: "기간·유효기간 수정 요청 — 저녁반은 시작·종료 모두, 횟수권은 종료일만 반영된다(D-062)"
+      properties:
+        newStartDate:
+          type:
+          - string
+          - "null"
+          format: date
+          description: 새 시작일. 저녁반 회비만 변경 가능하다. 횟수권은 생략하거나 기존 시작일과 같은 값이어야 한다(D-062)
+          example: 2026-03-15
+        newEndDate:
+          type: string
+          format: date
+          description: 새 종료일(유효기간)
+          example: 2026-05-15
+        reason:
+          type: string
+          description: "변경 사유(필수, 500자 이내)"
+          example: 휴회 보상 연장
+          maxLength: 500
+          minLength: 0
+      required:
+      - newEndDate
+      - reason
     UpdateMemberStatusRequest:
       type: object
       description: 변경할 회원 상태. PENDING으로 되돌리면 거절 사유가 초기화되어 재신청 상태가 된다 (D-034)

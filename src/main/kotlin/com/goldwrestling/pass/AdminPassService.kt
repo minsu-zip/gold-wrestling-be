@@ -4,6 +4,7 @@ import com.goldwrestling.admin.AdminRepository
 import com.goldwrestling.member.MemberNotFoundException
 import com.goldwrestling.member.MemberRepository
 import com.goldwrestling.pass.dto.AdjustPassRequest
+import com.goldwrestling.pass.dto.ChangePassPeriodRequest
 import com.goldwrestling.pass.dto.PassResponse
 import com.goldwrestling.pass.dto.RegisterPassRequest
 import org.springframework.stereotype.Service
@@ -28,6 +29,7 @@ class AdminPassService(
     private val adminRepository: AdminRepository,
     private val passRepository: PassRepository,
     private val passTransactionRepository: PassTransactionRepository,
+    private val passPeriodChangeRepository: PassPeriodChangeRepository,
     private val clock: Clock,
 ) {
     /**
@@ -134,5 +136,52 @@ class AdminPassService(
         )
 
         return PassResponse.from(refreshedPass, today)
+    }
+
+    /**
+     * 기간·유효기간 통합 수정(PASS-04·PASS-07, D-057, D-062). 저녁반 기간·횟수권 유효기간 수정이
+     * 이 하나의 메서드로 처리된다 — 타입별 차이는 `Pass.changePeriod`가 서버에서 강제한다.
+     *
+     * 처리 순서: 조회 → **`changePeriod` 호출 전 전값 보관**(호출 후에는 되찾을 방법이 없다) →
+     * `pass.changePeriod` 호출(규칙 위반은 여기서 예외) → 전값·후값이 하나라도 달라졌으면 같은
+     * 트랜잭션에서 `PassPeriodChange` 이력 저장(D-069 — 변화가 없으면 이력을 남기지 않는다) →
+     * 응답 변환. `pass`는 영속 상태라 변경 감지로 flush되므로 별도 `passRepository.save`를 넣지
+     * 않는다.
+     */
+    @Transactional
+    fun changePeriod(
+        passId: Long,
+        request: ChangePassPeriodRequest,
+        adminId: Long,
+    ): PassResponse {
+        val pass = passRepository.findById(passId).orElseThrow { PassNotFoundException(passId) }
+        val admin =
+            adminRepository.findById(adminId).orElseThrow {
+                IllegalStateException("이용권 기간을 수정하려는 관리자(id=$adminId)를 찾을 수 없습니다.")
+            }
+        val today = LocalDate.now(clock)
+        val now = OffsetDateTime.now(clock)
+
+        val previousStartDate = pass.startDate
+        val previousEndDate = pass.endDate
+
+        pass.changePeriod(request.newStartDate, request.newEndDate)
+
+        if (previousStartDate != pass.startDate || previousEndDate != pass.endDate) {
+            passPeriodChangeRepository.save(
+                PassPeriodChange(
+                    pass = pass,
+                    previousStartDate = previousStartDate,
+                    previousEndDate = previousEndDate,
+                    newStartDate = pass.startDate,
+                    newEndDate = pass.endDate,
+                    reason = request.reason.trim(),
+                    admin = admin,
+                    occurredAt = now,
+                ),
+            )
+        }
+
+        return PassResponse.from(pass, today)
     }
 }
