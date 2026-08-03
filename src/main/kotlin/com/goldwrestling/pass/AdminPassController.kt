@@ -6,12 +6,14 @@ import com.goldwrestling.pass.dto.RegisterPassRequest
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.net.URI
 
@@ -30,6 +32,11 @@ class AdminPassController(
     private val adminPassService: AdminPassService,
 ) {
     @PostMapping("/members/{memberId}/passes")
+    // 실제 응답 상태는 ResponseEntity.created(...)가 결정한다(Spring MVC가 ResponseEntity 상태를
+    // 항상 우선한다) — 이 애노테이션은 springdoc이 openapi.yaml에 201을 기술하게 하는 문서화 전용
+    // 힌트다. 없으면 springdoc이 반환 타입 바이트코드에서 실제 상태를 추론하지 못해 기본값 200으로
+    // 문서화한다.
+    @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "이용권 등록 (저녁반 회비 / 예약제 횟수권 / 1:1 레슨권)")
     fun register(
         @PathVariable memberId: Long,
