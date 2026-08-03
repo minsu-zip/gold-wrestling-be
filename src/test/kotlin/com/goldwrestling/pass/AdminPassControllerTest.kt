@@ -259,6 +259,174 @@ class AdminPassControllerTest {
             .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"))
     }
 
+    // ---------- 수동 가감 ----------
+
+    @Test
+    fun `관리자 토큰 + 유효 요청으로 가감하면 200과 즉시 갱신된 remainingCount를 반환한다`() {
+        val pass = persistPass(remaining = BigDecimal("2.0"))
+        val token = adminAccessToken()
+
+        val responseBody =
+            mockMvc
+                .perform(
+                    post("/api/admin/passes/${pass.id}/adjustments")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""{"amount":1.0,"note":"이벤트 보상"}"""),
+                ).andExpect(status().isOk)
+                .andReturn()
+                .response.contentAsString
+
+        // JSON 수치 비교는 스케일에 민감해(예: 3.0 vs 3.00) BigDecimal로 파싱해 compareTo 기반으로 단언한다.
+        val remaining = objectMapper.readTree(responseBody).get("remainingCount").decimalValue()
+        assertThat(remaining).isEqualByComparingTo(BigDecimal("3.0"))
+    }
+
+    @Test
+    fun `가감 성공 후 ADMIN_ADJUST 이력 1건이 생기고 amount note가 요청과 같다`() {
+        val pass = persistPass(remaining = BigDecimal("2.0"))
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                post("/api/admin/passes/${pass.id}/adjustments")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"amount":1.0,"note":"이벤트 보상"}"""),
+            ).andExpect(status().isOk)
+
+        val transactions = passTransactionRepository.findAll().filter { it.pass.id == pass.id }
+        assertThat(transactions).hasSize(1)
+        assertThat(transactions[0].reason).isEqualTo(TransactionReason.ADMIN_ADJUST)
+        assertThat(transactions[0].amount).isEqualByComparingTo(BigDecimal("1.0"))
+        assertThat(transactions[0].note).isEqualTo("이벤트 보상")
+    }
+
+    @Test
+    fun `가감 수량이 0dot5 단위가 아니면 400과 INVALID_ADJUSTMENT_UNIT을 반환한다`() {
+        val pass = persistPass(remaining = BigDecimal("2.0"))
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                post("/api/admin/passes/${pass.id}/adjustments")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"amount":0.3,"note":"보정"}"""),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("INVALID_ADJUSTMENT_UNIT"))
+    }
+
+    @Test
+    fun `잔여 0dot5에 -1dot0 가감을 시도하면 409와 INSUFFICIENT_PASS_COUNT를 반환한다`() {
+        val pass = persistPass(remaining = BigDecimal("0.5"))
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                post("/api/admin/passes/${pass.id}/adjustments")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"amount":-1.0,"note":"보정"}"""),
+            ).andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("INSUFFICIENT_PASS_COUNT"))
+    }
+
+    @Test
+    fun `기간제 이용권에 가감을 시도하면 409와 PASS_TYPE_NOT_ADJUSTABLE을 반환한다`() {
+        val pass = persistPass(remaining = null, type = PassType.EVENING_MEMBERSHIP)
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                post("/api/admin/passes/${pass.id}/adjustments")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"amount":0.5,"note":"보정"}"""),
+            ).andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("PASS_TYPE_NOT_ADJUSTABLE"))
+    }
+
+    /**
+     * `note`는 Kotlin non-null 생성자 파라미터라 JSON에 키 자체가 없으면 `@Valid`가 실행되기 전
+     * jackson-module-kotlin 역직렬화 단계에서 이미 실패한다(`MissingKotlinParameterException` →
+     * `HttpMessageNotReadableException`) — `MALFORMED_REQUEST`의 KDoc이 명시하는 "필수 파라미터
+     * 누락"에 해당한다. `@field:NotBlank`(`VALIDATION_FAILED`)는 필드가 "존재하되 값이 비었을
+     * 때"만 실행되는데 nullable하지 않은 타입에는 그 상태 자체가 있을 수 없다 —
+     * `MemberStatusChangeTest`의 "status 필드가 없으면 MALFORMED_REQUEST" 케이스와 같은 계열이다.
+     */
+    @Test
+    fun `note 필드가 없으면 400과 MALFORMED_REQUEST를 반환한다`() {
+        val pass = persistPass(remaining = BigDecimal("2.0"))
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                post("/api/admin/passes/${pass.id}/adjustments")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"amount":1.0}"""),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"))
+    }
+
+    @Test
+    fun `note가 공백이면 400과 VALIDATION_FAILED를 반환한다`() {
+        val pass = persistPass(remaining = BigDecimal("2.0"))
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                post("/api/admin/passes/${pass.id}/adjustments")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"amount":1.0,"note":"   "}"""),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+    }
+
+    @Test
+    fun `존재하지 않는 passId로 가감하면 404와 PASS_NOT_FOUND를 반환한다`() {
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                post("/api/admin/passes/999999999/adjustments")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"amount":1.0,"note":"보정"}"""),
+            ).andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.code").value("PASS_NOT_FOUND"))
+    }
+
+    @Test
+    fun `회원 토큰으로 가감을 시도하면 403과 ACCESS_DENIED를 반환한다`() {
+        val pass = persistPass(remaining = BigDecimal("2.0"))
+        val token = memberAccessToken(pass.member)
+
+        mockMvc
+            .perform(
+                post("/api/admin/passes/${pass.id}/adjustments")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"amount":1.0,"note":"보정"}"""),
+            ).andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.code").value("ACCESS_DENIED"))
+    }
+
+    @Test
+    fun `토큰 없이 가감을 시도하면 401과 UNAUTHENTICATED를 반환한다`() {
+        val pass = persistPass(remaining = BigDecimal("2.0"))
+
+        mockMvc
+            .perform(
+                post("/api/admin/passes/${pass.id}/adjustments")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"amount":1.0,"note":"보정"}"""),
+            ).andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"))
+    }
+
     private fun songpaBranch(): Branch = branchRepository.findByName("송파점")!!
 
     private fun persistMember(): Member {
@@ -293,4 +461,26 @@ class AdminPassControllerTest {
     }
 
     private fun memberAccessToken(member: Member): String = tokenService.issueTokenPair(PrincipalType.MEMBER, member.id!!).accessToken
+
+    /** 가감 대상 이용권을 등록 API를 거치지 않고 직접 저장한다 — 가감 계약만 검증하는 테스트라 등록 경로와 결합할 필요가 없다. */
+    private fun persistPass(
+        remaining: BigDecimal?,
+        type: PassType = PassType.SESSION_PASS,
+    ): Pass {
+        val member = persistMember()
+        val admin = persistAdmin()
+        return passRepository.saveAndFlush(
+            Pass(
+                member = member,
+                branch = songpaBranch(),
+                registeredBy = admin,
+                type = type,
+                status = PassStatus.ACTIVE,
+                startDate = LocalDate.now(clock),
+                endDate = LocalDate.now(clock).plusYears(1).minusDays(1),
+                remainingCount = remaining,
+                createdAt = OffsetDateTime.now(clock),
+            ),
+        )
+    }
 }
