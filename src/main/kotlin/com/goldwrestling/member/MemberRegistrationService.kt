@@ -1,7 +1,7 @@
 package com.goldwrestling.member
 
 import com.goldwrestling.branch.BranchRepository
-import com.goldwrestling.member.dto.MemberSessionResponse
+import com.goldwrestling.member.dto.MemberLoginSummaryResponse
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -45,10 +45,10 @@ class MemberRegistrationService(
      * `findByKakaoId` 조회만으로 끝난다.
      */
     @Transactional
-    fun findOrCreateByKakaoId(kakaoId: Long): MemberSessionResponse {
-        memberRepository.findByKakaoId(kakaoId)?.let { return MemberSessionResponse.from(it) }
+    fun findOrCreateByKakaoId(kakaoId: Long): MemberLoginSummaryResponse {
+        memberRepository.findByKakaoId(kakaoId)?.let { return MemberLoginSummaryResponse.from(it) }
 
-        return MemberSessionResponse.from(createPendingMember(kakaoId))
+        return MemberLoginSummaryResponse.from(createPendingMember(kakaoId))
     }
 
     private fun createPendingMember(kakaoId: Long): Member {

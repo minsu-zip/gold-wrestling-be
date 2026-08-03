@@ -16,7 +16,7 @@ import io.swagger.v3.oas.annotations.media.Schema
  * 충분하고, 원문 노출은 내부 메모 유출 위험만 키운다.
  */
 @Schema(description = "로그인 응답에 포함되는 회원 세션 요약 — FE 화면 분기용")
-data class MemberSessionResponse(
+data class MemberLoginSummaryResponse(
     @field:Schema(description = "회원 ID") val memberId: Long,
     @field:Schema(description = "회원 상태") val status: MemberStatus,
     @field:Schema(description = "온보딩(실명·전화번호 입력) 완료 여부 — false면 온보딩 화면") val onboardingCompleted: Boolean,
@@ -24,8 +24,8 @@ data class MemberSessionResponse(
     val rejected: Boolean,
 ) {
     companion object {
-        fun from(member: Member): MemberSessionResponse =
-            MemberSessionResponse(
+        fun from(member: Member): MemberLoginSummaryResponse =
+            MemberLoginSummaryResponse(
                 memberId = requireNotNull(member.id) { "저장되지 않은 Member는 세션 응답으로 변환할 수 없습니다." },
                 status = member.status,
                 onboardingCompleted = member.isOnboardingCompleted(),

@@ -397,9 +397,9 @@ components:
           $ref: "#/components/schemas/TokenPairResponse"
           description: 발급된 access/refresh 토큰 쌍
         member:
-          $ref: "#/components/schemas/MemberSessionResponse"
+          $ref: "#/components/schemas/MemberLoginSummaryResponse"
           description: "회원 세션 요약 — FE 화면 분기용(AUTH-06, D-034)"
-    MemberSessionResponse:
+    MemberLoginSummaryResponse:
       type: object
       description: 로그인 응답에 포함되는 회원 세션 요약 — FE 화면 분기용
       properties:

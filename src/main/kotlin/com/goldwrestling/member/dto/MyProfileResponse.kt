@@ -7,7 +7,7 @@ import io.swagger.v3.oas.annotations.media.Schema
 /**
  * 본인 프로필 조회(`GET /api/members/me`)·온보딩 제출(`POST /api/members/me/onboarding`) 공통 응답.
  *
- * [MemberSessionResponse]와의 차이: 저쪽은 카카오 로그인 직후 다음 화면을 결정하기 위한 최소 요약
+ * [MemberLoginSummaryResponse]와의 차이: 저쪽은 카카오 로그인 직후 다음 화면을 결정하기 위한 최소 요약
  * (`memberId`·`status`·`onboardingCompleted`·`rejected`)이고, 이쪽은 이름·전화번호까지 포함하는
  * "내 정보" 화면용 프로필이다.
  *

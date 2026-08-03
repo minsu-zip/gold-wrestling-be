@@ -51,6 +51,7 @@
 | 온보딩                 | `Onboarding`                   | 최초 로그인 회원이 실명·전화번호를 입력하는 절차 (policies §5.1)                                |
 | 온보딩 완료 여부       | `onboardingCompleted`          | 별도 상태 컬럼이 아니라 `name`·`phoneNumber` 입력 여부로 판정한다 (D-025)                       |
 | 회원 상태 게이트       | `MemberStateGate`              | 엔드포인트가 요구하는 회원 상태를 DB 현재 값 기준으로 검사하는 컴포넌트 (D-033 노트)             |
+| 로그인 회원 요약       | `MemberLoginSummaryResponse`   | 카카오 로그인 응답에 담기는 최소 요약 — FE가 온보딩/승인대기/거절 화면을 분기한다 (금지어 `Session`을 피한 이름) |
 
 ## 차감 사유 (TransactionReason)
 

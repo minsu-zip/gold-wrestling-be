@@ -42,17 +42,17 @@ class KakaoAuthService(
         val kakaoToken = kakaoApiClient.exchangeToken(code)
         val kakaoId = kakaoApiClient.fetchKakaoId(kakaoToken.accessToken)
 
-        val session =
+        val memberSummary =
             try {
                 memberRegistrationService.findOrCreateByKakaoId(kakaoId)
             } catch (e: DataIntegrityViolationException) {
                 memberRegistrationService.findOrCreateByKakaoId(kakaoId)
             }
-        val tokenPair = tokenService.issueTokenPair(PrincipalType.MEMBER, session.memberId)
+        val tokenPair = tokenService.issueTokenPair(PrincipalType.MEMBER, memberSummary.memberId)
 
         return KakaoLoginResponse(
             tokens = TokenPairResponse.from(tokenPair),
-            member = session,
+            member = memberSummary,
         )
     }
 }
