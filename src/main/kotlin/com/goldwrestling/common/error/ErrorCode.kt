@@ -67,4 +67,25 @@ enum class ErrorCode(
 
     /** 승인 대상이 아니거나 허용되지 않는 상태 전이 */
     MEMBER_STATE_CONFLICT(HttpStatus.CONFLICT),
+
+    /** 대상 이용권 없음 */
+    PASS_NOT_FOUND(HttpStatus.NOT_FOUND),
+
+    /** 가감 수량이 0.5 단위가 아니거나 0 (policies §4.2a) */
+    INVALID_ADJUSTMENT_UNIT(HttpStatus.BAD_REQUEST),
+
+    /** 가감 결과 잔여가 음수가 됨 */
+    INSUFFICIENT_PASS_COUNT(HttpStatus.CONFLICT),
+
+    /** 기간제(`EVENING_MEMBERSHIP`)에 횟수 가감 시도 */
+    PASS_TYPE_NOT_ADJUSTABLE(HttpStatus.CONFLICT),
+
+    /** 이미 취소된 이용권을 가감·기간수정·재취소하려 함 */
+    PASS_ALREADY_CANCELED(HttpStatus.CONFLICT),
+
+    /** 종료일이 시작일보다 앞서거나, 횟수권 시작일 수정 시도 (D-062) */
+    INVALID_PASS_PERIOD(HttpStatus.BAD_REQUEST),
+
+    /** 조건부 갱신 경쟁 패배 등 위 코드로 나뉘지 않는 이용권 상태 충돌 */
+    PASS_STATE_CONFLICT(HttpStatus.CONFLICT),
 }
