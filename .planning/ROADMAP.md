@@ -88,7 +88,7 @@
 - [x] 03-07-PLAN.md — 관리자 수동 가감 API + "잔여 = 이력 합계" 불변식 테스트 (PASS-02/03)
 - [x] 03-08-PLAN.md — 기간·유효기간 수정 통합 API + PassPeriodChange 이력 (PASS-04/07)
 - [x] 03-09-PLAN.md — 등록 취소 API + 관리자 이용권 목록(취소 구분) (PASS-08/02)
-- [ ] 03-10-PLAN.md — 회원 본인 이용권·이력 조회 (PASS-05/06)
+- [x] 03-10-PLAN.md — 회원 본인 이용권·이력 조회 (PASS-05/06)
 - [ ] 03-11-PLAN.md — phase 마감: 전체 검증·문서 정합 + 관리자 흐름 수동 확인 (PASS-01~08)
 
 **Note (API 표면)**: 이 phase가 여는 엔드포인트는 7개다 — `POST /api/admin/members/{memberId}/passes`,
@@ -151,7 +151,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 1. 기반 | 3/3 | Complete   | 2026-07-30 |
 | 2. 인증·회원 | 15/15 | Complete   | 2026-08-03 |
-| 3. 이용권 | 9/11 | In Progress|  |
+| 3. 이용권 | 10/11 | In Progress|  |
 | 4. 시간표·예약 | 0/TBD | Not started | - |
 | 5. 배치 | 0/TBD | Not started | - |
 | 6. 운영 | 0/TBD | Not started | - |
