@@ -19,6 +19,7 @@
 | 예약                       | `Reservation`                              | 회원 ↔ ClassSession                                            |
 | 출석                       | `Attendance`                               | ClassSession별 참여 기록 (참고용)                              |
 | 차감/복구 이력             | `PassTransaction`                          | ±수량, 사유, 주체, 시각                                        |
+| 기간 변경 이력             | `PassPeriodChange`                         | 저녁반 기간·횟수권 유효기간 변경의 전값/후값/사유/주체/시각 (D-057) |
 | 공지사항                   | `Notice`                                   |                                                                |
 | 알림                       | `Notification`                             | 관리자 인앱 알림                                               |
 
@@ -63,6 +64,8 @@
 | `EVENING_HALF`          | 횟수권 회원 저녁반 참여 0.5회 차감 |
 | `INACTIVITY`            | 2주 미사용 자동 차감               |
 | `CLASS_CANCELED_REFUND` | 휴강으로 인한 복구                 |
+| `INITIAL_GRANT`         | 이용권 등록 시 초기 횟수 부여 (D-055) |
+| `REGISTRATION_CANCELED` | 등록 취소(오등록 정정) 시 잔여를 0으로 상쇄 (D-059) |
 
 ## 기타 규칙
 
