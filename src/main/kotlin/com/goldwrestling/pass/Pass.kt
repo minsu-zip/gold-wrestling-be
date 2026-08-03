@@ -25,8 +25,16 @@ import java.time.OffsetDateTime
  * 2종뿐이고 만료·소진은 조회 시점 계산이다(D-064). 타입별 컬럼 규칙(횟수제만 [remainingCount]
  * NOT NULL)은 이 엔티티가 아니라 DB `ck_pass_remaining_count_by_type` CHECK가 강제한다(V4).
  *
- * 도메인 판정 메서드(가감 허용 여부, 만료·소진 계산 등)는 03-03~03-05의 TDD 플랜이 테스트를
- * 먼저 쓰고 채운다(RESEARCH Pattern 1) — [validateAdjustment]가 그 첫 번째 판정이다(03-03).
+ * 도메인 판정 메서드는 03-03~03-05의 TDD 플랜이 테스트를 먼저 쓰고 채웠다(RESEARCH Pattern 1):
+ * - [validateAdjustment] — 관리자 수동 가감 허용 여부 (policies §4.2a, D-056, 03-03)
+ * - [register] — 등록 시 타입별 필수·금지 필드, 종료일 계산 (policies §1, D-055·D-063·D-066, 03-04)
+ * - [displayStatus] — 취소/만료/소진/사용가능 표시 상태 계산 (D-064, 03-04)
+ * - [changePeriod] — 기간·유효기간 수정 판정 (PASS-04·PASS-07, D-062, 03-05)
+ * - [cancel] — 등록 취소 처리·상쇄 수량 산출 (PASS-08, D-059·D-065, 03-05)
+ *
+ * 취소된 이용권에 대한 후속 조작 거부([validateAdjustment]·[changePeriod]·[cancel] 공통)는
+ * [requireNotCanceled]로 모아 둔다 — D-059 "취소된 이용권 재조작 금지"가 세 진입점 모두에서
+ * 같은 예외로 일관되게 강제되게 하기 위해서다.
  */
 @Entity
 @Table(name = "pass")
@@ -78,7 +86,7 @@ class Pass(
      */
     fun validateAdjustment(amount: BigDecimal) {
         // 1. 취소된 이용권은 무엇보다 먼저 거부한다 (D-059)
-        if (status == PassStatus.CANCELED) throw PassAlreadyCanceledException()
+        requireNotCanceled()
 
         // 2. 기간제는 횟수 가감 대상이 아니다 — 기간 수정으로만 조정한다 (policies §4.2a)
         if (type == PassType.EVENING_MEMBERSHIP) throw PassTypeNotAdjustableException()
@@ -122,6 +130,68 @@ class Pass(
      * 소진 판정: 횟수제이며 잔여가 0 이하. 기간제는 [remainingCount]가 항상 null이라 소진 개념이 없다.
      */
     private fun isExhausted(): Boolean = remainingCount?.let { it.compareTo(BigDecimal.ZERO) <= 0 } ?: false
+
+    /**
+     * 기간·유효기간 수정 판정 (PASS-04·PASS-07, D-062).
+     *
+     * [newStartDate]가 null이면 기존 [startDate]를 유지한다. 횟수제(`SESSION_PASS`/`LESSON_PASS`)는
+     * 시작일이 고정이라 기존과 다른 값이 들어오면 거부한다 — 같은 값 재전송(변경 없음)은 허용한다.
+     * 기간제(`EVENING_MEMBERSHIP`)만 시작일도 함께 수정할 수 있다.
+     *
+     * **변경 전 값은 이 메서드가 대입하기 전 상태를 호출부가 지역 변수로 미리 보관해야 한다** —
+     * 이 메서드는 반환값이 없고, 호출부가 그 전값·후값으로 같은 트랜잭션에서 `PassPeriodChange`
+     * 이력을 남긴다(D-057).
+     */
+    fun changePeriod(
+        newStartDate: LocalDate?,
+        newEndDate: LocalDate,
+    ) {
+        requireNotCanceled()
+
+        val resolvedStart = newStartDate ?: startDate
+        if (type != PassType.EVENING_MEMBERSHIP && resolvedStart != startDate) {
+            throw InvalidPassPeriodException("횟수권은 유효기간의 종료일만 수정할 수 있습니다.")
+        }
+        if (newEndDate.isBefore(resolvedStart)) {
+            throw InvalidPassPeriodException("종료일은 시작일보다 앞설 수 없습니다.")
+        }
+
+        startDate = resolvedStart
+        endDate = newEndDate
+    }
+
+    /**
+     * 등록 취소 처리 (PASS-08, D-059).
+     *
+     * 상태를 [PassStatus.CANCELED]로 전환하고 취소 시각·사유·주체를 함께 기록한다. 반환값은
+     * **원장(`PassTransaction`)에 남길 상쇄 수량**이다 — 0이면 호출부가 상쇄 이력을 남기지
+     * 않는다(D-065). **잔여 횟수를 여기서 0으로 만들지 않는다** — 그 반영은
+     * `PassRepository.zeroRemainingCount`의 조건부 UPDATE가 하고, 이 메서드는 상쇄 수량만
+     * 돌려준다(D-021). [reason]의 공백 여부는 서비스/DTO의 `@NotBlank` 책임이며, 이 메서드는
+     * `reason.trim()` 결과를 그대로 저장한다.
+     */
+    fun cancel(
+        reason: String,
+        admin: Admin,
+        now: OffsetDateTime,
+    ): BigDecimal {
+        requireNotCanceled()
+
+        status = PassStatus.CANCELED
+        canceledAt = now
+        cancelReason = reason.trim()
+        canceledBy = admin
+
+        return remainingCount?.negate() ?: BigDecimal.ZERO
+    }
+
+    /**
+     * 이미 취소된 이용권에 대한 후속 조작을 공통으로 거부한다 (D-059).
+     * [validateAdjustment]·[changePeriod]·[cancel] 세 진입점이 함께 쓴다.
+     */
+    private fun requireNotCanceled() {
+        if (status == PassStatus.CANCELED) throw PassAlreadyCanceledException()
+    }
 
     companion object {
         private val HALF_SESSION = BigDecimal("0.5")
