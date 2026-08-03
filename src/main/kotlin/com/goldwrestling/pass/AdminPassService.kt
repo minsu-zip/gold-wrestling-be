@@ -4,11 +4,13 @@ import com.goldwrestling.admin.AdminRepository
 import com.goldwrestling.member.MemberNotFoundException
 import com.goldwrestling.member.MemberRepository
 import com.goldwrestling.pass.dto.AdjustPassRequest
+import com.goldwrestling.pass.dto.CancelPassRequest
 import com.goldwrestling.pass.dto.ChangePassPeriodRequest
 import com.goldwrestling.pass.dto.PassResponse
 import com.goldwrestling.pass.dto.RegisterPassRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
 import java.time.Clock
 import java.time.LocalDate
 import java.time.OffsetDateTime
@@ -183,5 +185,79 @@ class AdminPassService(
         }
 
         return PassResponse.from(pass, today)
+    }
+
+    /**
+     * 등록 취소(PASS-08, D-059, D-065). 물리 삭제를 하지 않고 상태 전환 + 상쇄 이력으로 처리해
+     * "잔여 = 이력 합계" 불변식을 취소된 이용권에도 유지한다.
+     *
+     * 처리 순서: 조회 → `pass.cancel`로 상태·취소 메타데이터 대입 + 상쇄 수량 산출(잔여는 아직
+     * 안 바뀜) → 상쇄 수량이 0(기간제 또는 잔여 0인 횟수권, D-065)이면 잔여 갱신도 이력 저장도
+     * 하지 않고 그대로 반환 → 0이 아니면 `zeroRemainingCount`로 잔여를 조건부로 0으로 만들고(이
+     * 호출은 `flushAutomatically`로 방금 대입한 취소 메타데이터를 먼저 flush하므로
+     * `ck_pass_cancellation` CHECK를 만족한 상태에서 UPDATE가 실행된다) → 반환 0이면 그 사이
+     * 잔여가 바뀐 것이므로 [PassStateConflictException] → `clearAutomatically`로 준영속이 된
+     * 엔티티 대신 재조회한 영속 `Pass`로 `REGISTRATION_CANCELED` 상쇄 이력을 저장한다(같은
+     * 트랜잭션, CLAUDE.md 규칙 6).
+     */
+    @Transactional
+    fun cancel(
+        passId: Long,
+        request: CancelPassRequest,
+        adminId: Long,
+    ): PassResponse {
+        val pass = passRepository.findById(passId).orElseThrow { PassNotFoundException(passId) }
+        val admin =
+            adminRepository.findById(adminId).orElseThrow {
+                IllegalStateException("이용권을 취소하려는 관리자(id=$adminId)를 찾을 수 없습니다.")
+            }
+        val today = LocalDate.now(clock)
+        val now = OffsetDateTime.now(clock)
+
+        val offset = pass.cancel(request.reason, admin, now)
+
+        if (offset.compareTo(BigDecimal.ZERO) == 0) {
+            return PassResponse.from(pass, today)
+        }
+
+        val expectedRemaining = offset.negate()
+        val updated = passRepository.zeroRemainingCount(passId, expectedRemaining)
+        if (updated == 0) {
+            throw PassStateConflictException("이용권 잔여가 방금 변경되어 취소를 완료하지 못했습니다. 다시 시도해 주세요.")
+        }
+
+        // 벌크 UPDATE(clearAutomatically = true) 직후 pass는 준영속 상태다 — 재조회한 영속
+        // 엔티티로 상쇄 이력을 저장한다(RESEARCH Pitfall 4, TokenService.rotate와 동일 함정).
+        val refreshed = passRepository.findById(passId).orElseThrow { PassNotFoundException(passId) }
+        passTransactionRepository.save(
+            PassTransaction(
+                pass = refreshed,
+                amount = offset,
+                reason = TransactionReason.REGISTRATION_CANCELED,
+                note = request.reason.trim(),
+                admin = admin,
+                occurredAt = now,
+            ),
+        )
+
+        return PassResponse.from(refreshed, today)
+    }
+
+    /**
+     * 관리자 이용권 목록 조회 (ROADMAP 성공기준 6 — 관리자 화면 구분 표시). 조회 전용이라 클래스
+     * 기본 `@Transactional(readOnly = true)`를 그대로 쓰고 별도 애노테이션을 붙이지 않는다(D-020).
+     *
+     * 회원 존재를 먼저 확인해 "없는 회원 = 404"와 "이용권 없는 회원 = 빈 배열"을 구분한다.
+     * **취소된 이용권을 제외하지 않는다** — 관리자 화면은 구분 표시가 요구사항이라
+     * `displayStatus`로 구분해 그대로 노출한다. 반대로 회원 본인 조회(03-10)는 취소된 이용권을
+     * 결과에서 제외한다(D-058) — 취소 사유 같은 관리자 전용 정보가 회원에게 도달하지 않게 하기
+     * 위해서다.
+     */
+    fun getMemberPasses(memberId: Long): List<PassResponse> {
+        memberRepository.findById(memberId).orElseThrow { MemberNotFoundException(memberId) }
+        val today = LocalDate.now(clock)
+        return passRepository
+            .findAllByMemberIdOrderByStartDateDescIdDesc(memberId)
+            .map { PassResponse.from(it, today) }
     }
 }
