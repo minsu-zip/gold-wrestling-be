@@ -1,6 +1,7 @@
 package com.goldwrestling.pass
 
 import com.goldwrestling.auth.AuthenticatedPrincipal
+import com.goldwrestling.pass.dto.AdjustPassRequest
 import com.goldwrestling.pass.dto.PassResponse
 import com.goldwrestling.pass.dto.RegisterPassRequest
 import io.swagger.v3.oas.annotations.Operation
@@ -46,4 +47,15 @@ class AdminPassController(
         val response = adminPassService.register(memberId, request, principal.requireAdminId())
         return ResponseEntity.created(URI.create("/api/admin/passes/${response.passId}")).body(response)
     }
+
+    // POST + 복수형(`/adjustments`)을 쓴다 — 호출할 때마다 새 PassTransaction 이력이 append되는
+    // 컬렉션이기 때문이다. 일회성 상태 전이인 `/approval`·`/cancellation`은 단수형을 쓰지만,
+    // 이 엔드포인트는 매 호출이 독립된 원장 항목을 만든다는 점에서 다르다.
+    @PostMapping("/passes/{passId}/adjustments")
+    @Operation(summary = "이용권 잔여 횟수 수동 가감 (사유 필수)")
+    fun adjust(
+        @PathVariable passId: Long,
+        @Valid @RequestBody request: AdjustPassRequest,
+        @AuthenticationPrincipal principal: AuthenticatedPrincipal,
+    ): PassResponse = adminPassService.adjust(passId, request, principal.requireAdminId())
 }

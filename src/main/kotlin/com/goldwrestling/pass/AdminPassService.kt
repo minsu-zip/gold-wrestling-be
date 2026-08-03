@@ -3,6 +3,7 @@ package com.goldwrestling.pass
 import com.goldwrestling.admin.AdminRepository
 import com.goldwrestling.member.MemberNotFoundException
 import com.goldwrestling.member.MemberRepository
+import com.goldwrestling.pass.dto.AdjustPassRequest
 import com.goldwrestling.pass.dto.PassResponse
 import com.goldwrestling.pass.dto.RegisterPassRequest
 import org.springframework.stereotype.Service
@@ -79,5 +80,59 @@ class AdminPassService(
         }
 
         return PassResponse.from(pass, today)
+    }
+
+    /**
+     * 관리자 수동 가감(`ADMIN_ADJUST`, policies §4.2a, D-056). 사전 판정(엔티티)과 원자적 반영(DB)의
+     * 역할이 다르며 둘 다 필요하다(D-021) — [Pass.validateAdjustment]는 사용자에게 정확한 실패
+     * 사유를 주기 위한 사전 판정일 뿐 방어선이 아니고, 실제 반영과 경쟁 통제는
+     * [PassRepository.adjustRemainingCount]의 조건부 UPDATE가 한다.
+     *
+     * 처리 순서: 조회 → 사전 판정 → 조건부 UPDATE → (반환 0이면 재조회 후 정확한 예외로 변환) →
+     * 재조회한 영속 `Pass`로 `ADMIN_ADJUST` 이력 저장(같은 트랜잭션, CLAUDE.md 규칙 6) → 응답 변환.
+     */
+    @Transactional
+    fun adjust(
+        passId: Long,
+        request: AdjustPassRequest,
+        adminId: Long,
+    ): PassResponse {
+        val pass = passRepository.findById(passId).orElseThrow { PassNotFoundException(passId) }
+        pass.validateAdjustment(request.amount)
+
+        // 벌크 UPDATE(clearAutomatically = true) 호출 전에 이후 필요한 스칼라 값을 지역 변수로
+        // 옮긴다 — 실행 직후 pass가 준영속 상태가 되어 LAZY 연관에 접근하면
+        // LazyInitializationException이 난다(RESEARCH Pitfall 4, TokenService.rotate와 동일 함정).
+        val admin =
+            adminRepository.findById(adminId).orElseThrow {
+                IllegalStateException("이용권을 가감하려는 관리자(id=$adminId)를 찾을 수 없습니다.")
+            }
+        val today = LocalDate.now(clock)
+        val now = OffsetDateTime.now(clock)
+
+        val updated = passRepository.adjustRemainingCount(passId, request.amount)
+        val refreshedPass =
+            if (updated == 0) {
+                // 갱신 행 수 0 = 경쟁에서 졌거나(동시 가감) 사전 판정 이후 상태(취소·잔여)가 바뀐 것.
+                // 재조회 후 판정을 다시 돌려 정확한 도메인 예외로 변환한다.
+                val reloaded = passRepository.findById(passId).orElseThrow { PassNotFoundException(passId) }
+                reloaded.validateAdjustment(request.amount)
+                throw PassStateConflictException("이용권 잔여가 방금 변경되어 가감을 반영하지 못했습니다. 다시 시도해 주세요.")
+            } else {
+                passRepository.findById(passId).orElseThrow { PassNotFoundException(passId) }
+            }
+
+        passTransactionRepository.save(
+            PassTransaction(
+                pass = refreshedPass,
+                amount = request.amount,
+                reason = TransactionReason.ADMIN_ADJUST,
+                note = request.note.trim(),
+                admin = admin,
+                occurredAt = now,
+            ),
+        )
+
+        return PassResponse.from(refreshedPass, today)
     }
 }

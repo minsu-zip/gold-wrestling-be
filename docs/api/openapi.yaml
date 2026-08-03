@@ -108,6 +108,32 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/AdminLoginResponse"
+  /api/admin/passes/{passId}/adjustments:
+    post:
+      tags:
+      - admin-pass
+      summary: 이용권 잔여 횟수 수동 가감 (사유 필수)
+      operationId: adjust
+      parameters:
+      - name: passId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdjustPassRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PassResponse"
   /api/admin/members/{memberId}/rejection:
     post:
       tags:
@@ -489,6 +515,78 @@ components:
         name:
           type: string
           description: 관리자 이름
+    AdjustPassRequest:
+      type: object
+      description: 관리자 수동 가감 요청 — 사유(note) 필수
+      properties:
+        amount:
+          type: number
+          description: 가감 수량(음수면 차감). 형식만 검증 — 가감 단위·음수 잔여 금지는 도메인 규칙
+          example: 1.0
+        note:
+          type: string
+          description: "가감 사유(필수, 500자 이내)"
+          example: 이벤트 보상
+          maxLength: 500
+          minLength: 0
+      required:
+      - amount
+      - note
+    PassResponse:
+      type: object
+      description: 이용권 응답
+      properties:
+        passId:
+          type: integer
+          format: int64
+          description: 이용권 ID
+        memberId:
+          type: integer
+          format: int64
+          description: 회원 ID
+        type:
+          type: string
+          description: 이용권 종류
+          enum:
+          - EVENING_MEMBERSHIP
+          - SESSION_PASS
+          - LESSON_PASS
+        displayStatus:
+          type: string
+          description: "표시 상태(취소 > 만료 > 소진 > 사용가능 우선순위로 계산, D-064)"
+          enum:
+          - USABLE
+          - EXPIRED
+          - EXHAUSTED
+          - CANCELED
+        startDate:
+          type: string
+          format: date
+          description: 시작일
+        endDate:
+          type: string
+          format: date
+          description: 종료일(포함) — 이 날짜까지 사용 가능(D-066)
+        remainingCount:
+          type:
+          - number
+          - "null"
+          description: 잔여 횟수 — 기간제(EVENING_MEMBERSHIP)는 null
+        canceledAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+          description: 취소 시각 — 취소되지 않았으면 null
+        cancelReason:
+          type:
+          - string
+          - "null"
+          description: 취소 사유(관리자 전용) — 취소되지 않았으면 null
+        registeredAt:
+          type: string
+          format: date-time
+          description: 등록 시각
     RejectMemberRequest:
       type: object
       description: 거절 사유. 관리자 전용 정보이며 회원에게 원문이 노출되지 않는다 (D-043)
@@ -588,61 +686,6 @@ components:
           example: 10.0
       required:
       - type
-    PassResponse:
-      type: object
-      description: 이용권 응답
-      properties:
-        passId:
-          type: integer
-          format: int64
-          description: 이용권 ID
-        memberId:
-          type: integer
-          format: int64
-          description: 회원 ID
-        type:
-          type: string
-          description: 이용권 종류
-          enum:
-          - EVENING_MEMBERSHIP
-          - SESSION_PASS
-          - LESSON_PASS
-        displayStatus:
-          type: string
-          description: "표시 상태(취소 > 만료 > 소진 > 사용가능 우선순위로 계산, D-064)"
-          enum:
-          - USABLE
-          - EXPIRED
-          - EXHAUSTED
-          - CANCELED
-        startDate:
-          type: string
-          format: date
-          description: 시작일
-        endDate:
-          type: string
-          format: date
-          description: 종료일(포함) — 이 날짜까지 사용 가능(D-066)
-        remainingCount:
-          type:
-          - number
-          - "null"
-          description: 잔여 횟수 — 기간제(EVENING_MEMBERSHIP)는 null
-        canceledAt:
-          type:
-          - string
-          - "null"
-          format: date-time
-          description: 취소 시각 — 취소되지 않았으면 null
-        cancelReason:
-          type:
-          - string
-          - "null"
-          description: 취소 사유(관리자 전용) — 취소되지 않았으면 null
-        registeredAt:
-          type: string
-          format: date-time
-          description: 등록 시각
     UpdateMemberStatusRequest:
       type: object
       description: 변경할 회원 상태. PENDING으로 되돌리면 거절 사유가 초기화되어 재신청 상태가 된다 (D-034)
