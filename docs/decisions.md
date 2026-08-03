@@ -420,3 +420,9 @@
 - 2026-08 / `TestClockConfiguration`이 프로덕션 `Clock` 빈(`ClockConfig.clock()`)을 테스트에서 대체하는 방식은, 빈 이름을 `clock`으로 맞춰 재정의하는 것이 아니라 **다른 이름(`testClock()`) + `@Primary`** 조합이다.
 - 이유: `@SpringBootTest`가 컴포넌트 스캔으로 찾는 `ClockConfig.clock()`과 테스트에서 `@Import`로 등록한 같은 이름의 `@Bean`이 있으면, Spring Boot(`allow-bean-definition-overriding` 기본값 `false`)가 컨텍스트 로딩 시점에 `BeanDefinitionOverrideException`을 던진다는 것을 실행해 직접 재현·확인했다(교체가 아니라 예외). 다른 이름 + `@Primary`는 이름 충돌 없이 타입 기반 주입 지점 전부가 테스트 빈을 우선 선택하게 한다.
 - 기각 대안: `spring.main.allow-bean-definition-overriding=true` 전역 설정(테스트 전체에서 의도치 않은 다른 빈 충돌도 조용히 통과시켜 버그를 숨길 위험), 매 통합테스트마다 `@TestPropertySource`로 이 플래그를 개별 지정(보일러플레이트가 늘고 까먹기 쉬움).
+
+## D-050. 카카오 최초 로그인 경쟁 복구는 트랜잭션 밖 1회 재시도
+
+- 2026-08 / `MemberRegistrationService.findOrCreateByKakaoId`는 유니크 제약 위반 예외를 잡지 않고 그대로 전파한다. 트랜잭션 애노테이션이 없는 `KakaoAuthService.login`이 이 예외를 잡아 같은 메서드를 새 트랜잭션으로 정확히 1회 재호출한다(02-REVIEW.md CR-01).
+- 이유: PostgreSQL은 제약 위반 시 트랜잭션을 abort해 같은 트랜잭션 내 재조회가 불가능하고("current transaction is aborted"), 예외가 리포지토리 프록시 경계를 넘으면 스프링이 트랜잭션을 rollback-only로 마킹해 커밋이 `UnexpectedRollbackException`으로 실패한다 — 복구는 반드시 트랜잭션 경계 밖이어야 한다.
+- 기각 대안: 같은 트랜잭션 내 catch 후 재조회(02-06의 원래 구현 — PostgreSQL에서 동작 불가), `login` 전체를 `@Transactional`로 묶기(conventions §7 위반 + 재시도가 같은 트랜잭션이 되어 무의미), `REQUIRES_NEW` 전파로 내부 재시도(self-invocation이라 프록시를 거치지 않아 적용되지 않고, 별도 빈을 새로 만들면 호출 체인만 늘어남).
