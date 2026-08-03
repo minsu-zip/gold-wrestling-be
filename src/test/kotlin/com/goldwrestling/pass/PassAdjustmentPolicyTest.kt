@@ -1,15 +1,10 @@
 package com.goldwrestling.pass
 
-import com.goldwrestling.admin.Admin
-import com.goldwrestling.branch.Branch
-import com.goldwrestling.member.Member
-import com.goldwrestling.member.MemberStatus
 import org.assertj.core.api.Assertions.assertThatCode
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 import java.time.LocalDate
-import java.time.OffsetDateTime
 
 /**
  * 관리자 수동 가감 허용 판정 (policies §4.2a, D-056) — 순수 Kotlin 단위테스트.
@@ -91,26 +86,6 @@ class PassAdjustmentPolicyTest {
             .isInstanceOf(PassAlreadyCanceledException::class.java)
     }
 
-    private fun branch(): Branch = Branch(name = "송파점")
-
-    private fun member(): Member =
-        Member(
-            branch = branch(),
-            name = "홍길동",
-            phoneNumber = "01012345678",
-            status = MemberStatus.ACTIVE,
-            kakaoId = 1L,
-            createdAt = FIXED_TIME,
-        )
-
-    private fun admin(): Admin =
-        Admin(
-            name = "관리자",
-            loginId = "admin1",
-            passwordHash = "hash",
-            createdAt = FIXED_TIME,
-        )
-
     /** `Pass` 픽스처 공통부(회원·지점·등록 관리자·시작일·생성 시각)를 모아, 타입별 팩토리가 차이만 넘긴다. */
     private fun pass(
         type: PassType,
@@ -119,34 +94,34 @@ class PassAdjustmentPolicyTest {
         remainingCount: BigDecimal?,
     ): Pass =
         Pass(
-            member = member(),
-            branch = branch(),
-            registeredBy = admin(),
+            member = PassFixtures.member(),
+            branch = PassFixtures.branch(),
+            registeredBy = PassFixtures.admin(),
             type = type,
             status = status,
-            startDate = FIXED_TODAY,
+            startDate = PassFixtures.FIXED_TODAY,
             endDate = endDate,
             remainingCount = remainingCount,
-            createdAt = FIXED_TIME,
+            createdAt = PassFixtures.FIXED_TIME,
         )
 
     private fun eveningMembership(status: PassStatus = PassStatus.ACTIVE): Pass =
-        pass(type = PassType.EVENING_MEMBERSHIP, status = status, endDate = FIXED_TODAY.plusMonths(1), remainingCount = null)
+        pass(
+            type = PassType.EVENING_MEMBERSHIP,
+            status = status,
+            endDate = PassFixtures.FIXED_TODAY.plusMonths(1),
+            remainingCount = null,
+        )
 
     private fun sessionPass(
         remaining: String,
-        endDate: LocalDate = FIXED_TODAY.plusYears(1),
+        endDate: LocalDate = PassFixtures.FIXED_TODAY.plusYears(1),
         status: PassStatus = PassStatus.ACTIVE,
     ): Pass = pass(type = PassType.SESSION_PASS, status = status, endDate = endDate, remainingCount = BigDecimal(remaining))
 
     private fun lessonPass(
         remaining: String,
-        endDate: LocalDate = FIXED_TODAY.plusYears(1),
+        endDate: LocalDate = PassFixtures.FIXED_TODAY.plusYears(1),
         status: PassStatus = PassStatus.ACTIVE,
     ): Pass = pass(type = PassType.LESSON_PASS, status = status, endDate = endDate, remainingCount = BigDecimal(remaining))
-
-    companion object {
-        private val FIXED_TIME: OffsetDateTime = OffsetDateTime.parse("2026-08-01T00:00:00+09:00")
-        private val FIXED_TODAY: LocalDate = LocalDate.of(2026, 8, 1)
-    }
 }
