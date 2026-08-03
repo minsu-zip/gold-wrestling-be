@@ -3,7 +3,6 @@ package com.goldwrestling.member
 import com.goldwrestling.branch.BranchRepository
 import com.goldwrestling.member.dto.MemberSessionResponse
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -28,25 +27,28 @@ class MemberRegistrationService(
     /**
      * [kakaoId]로 기존 회원을 찾고, 없으면 `PENDING` 상태로 새로 만든다(D-047 기본 지점 배정).
      *
-     * **동시 최초 로그인 경쟁 처리:** 같은 카카오 계정이 아주 짧은 간격으로 두 번 로그인을 시도하면(예:
-     * 중복 클릭, 네트워크 재시도), 두 요청이 모두 `findByKakaoId`에서 "없음"을 보고 둘 다 INSERT를
-     * 시도할 수 있다. 이 상태에서 DB 유니크 제약(`uq_member_kakao_id`)이 두 번째 INSERT를 거부하면
-     * [DataIntegrityViolationException]으로 나타난다 — 애플리케이션은 이 실패를 오류가 아니라 "다른
-     * 요청이 먼저 만들었다"는 정상 흐름으로 흡수하고, 다시 조회해 그 결과를 반환한다. 조회-판단-저장
-     * 사이의 경쟁은 애플리케이션 조건문만으로 막을 수 없고, DB 유니크 제약이 마지막 방어선이다(T-02-22).
+     * **동시 최초 로그인 경쟁 처리는 이 메서드의 책임이 아니다.** 같은 카카오 계정이 아주 짧은 간격으로
+     * 두 번 로그인을 시도하면(예: 중복 클릭, 네트워크 재시도), 두 요청이 모두 `findByKakaoId`에서
+     * "없음"을 보고 둘 다 INSERT를 시도할 수 있다. 이 상태에서 DB 유니크 제약(`uq_member_kakao_id`)이
+     * 두 번째 INSERT를 거부하면 유니크 제약 위반 예외(스프링 데이터 접근 예외 계층)가 발생하는데,
+     * 이 메서드는 그 예외를 **잡지 않고 그대로 전파**한다 — 이 트랜잭션이 롤백되며 끝나야 한다.
+     *
+     * 같은 트랜잭션 안에서 잡아 재조회하는 방식이 왜 불가능한가(02-REVIEW.md CR-01): PostgreSQL은
+     * 제약 위반이 난 순간 트랜잭션을 abort하므로, catch 블록에서 다시 `findByKakaoId`를 호출해도
+     * "current transaction is aborted, commands ignored until end of transaction block"으로 실패한다.
+     * 설령 DB가 이를 허용하더라도, 예외가 리포지토리 프록시(`SimpleJpaRepository`) 경계를 통과하는
+     * 순간 스프링이 이 트랜잭션을 rollback-only로 마킹하므로 바깥 경계 커밋 시점에
+     * `UnexpectedRollbackException`이 난다. 즉 같은 트랜잭션 안에서는 복구가 구조적으로 불가능하다.
+     *
+     * 복구(재시도)는 트랜잭션을 갖지 않는 [com.goldwrestling.auth.KakaoAuthService.login]의 책임이다 —
+     * 이 메서드를 새 트랜잭션으로 다시 호출하면 그 시점에는 경쟁 상대의 INSERT가 이미 커밋되어 있어
+     * `findByKakaoId` 조회만으로 끝난다.
      */
     @Transactional
     fun findOrCreateByKakaoId(kakaoId: Long): MemberSessionResponse {
         memberRepository.findByKakaoId(kakaoId)?.let { return MemberSessionResponse.from(it) }
 
-        return try {
-            MemberSessionResponse.from(createPendingMember(kakaoId))
-        } catch (e: DataIntegrityViolationException) {
-            val existing =
-                memberRepository.findByKakaoId(kakaoId)
-                    ?: throw e
-            MemberSessionResponse.from(existing)
-        }
+        return MemberSessionResponse.from(createPendingMember(kakaoId))
     }
 
     private fun createPendingMember(kakaoId: Long): Member {
