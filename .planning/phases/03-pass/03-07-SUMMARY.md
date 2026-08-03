@@ -125,3 +125,13 @@ None - no external service configuration required.
 ---
 *Phase: 03-pass*
 *Completed: 2026-08-03*
+
+## Self-Check: PASSED
+
+- FOUND: src/main/kotlin/com/goldwrestling/pass/dto/AdjustPassRequest.kt
+- FOUND: src/test/kotlin/com/goldwrestling/pass/PassLedgerInvariantTest.kt
+- FOUND: .planning/phases/03-pass/03-07-SUMMARY.md
+- FOUND commit: 5a761de (Task 1)
+- FOUND commit: 69a61b1 (Task 2)
+- FOUND commit: b4a8243 (Task 3)
+- FOUND commit: 1ff4bbc (SUMMARY)
