@@ -104,6 +104,15 @@ None - 외부 서비스 설정 불필요.
 - `PassPeriodChange` 이력 테이블 실제 저장 검증은 03-08 통합테스트가 담당 — 이 플랜은 의도적으로 스프링 컨텍스트를 띄우지 않았다.
 - 특별한 블로커 없음.
 
+## Self-Check: PASSED
+
+- FOUND: src/test/kotlin/com/goldwrestling/pass/PassPeriodChangeTest.kt
+- FOUND: src/test/kotlin/com/goldwrestling/pass/PassCancellationTest.kt
+- FOUND: src/main/kotlin/com/goldwrestling/pass/Pass.kt
+- FOUND commit: 1280ca9 (test)
+- FOUND commit: 1564e7c (feat)
+- FOUND commit: 1b1c53e (refactor)
+
 ---
 *Phase: 03-pass*
 *Completed: 2026-08-03*
