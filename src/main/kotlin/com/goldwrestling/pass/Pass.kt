@@ -25,8 +25,16 @@ import java.time.OffsetDateTime
  * 2종뿐이고 만료·소진은 조회 시점 계산이다(D-064). 타입별 컬럼 규칙(횟수제만 [remainingCount]
  * NOT NULL)은 이 엔티티가 아니라 DB `ck_pass_remaining_count_by_type` CHECK가 강제한다(V4).
  *
- * 도메인 판정 메서드(가감 허용 여부, 만료·소진 계산 등)는 03-03~03-05의 TDD 플랜이 테스트를
- * 먼저 쓰고 채운다(RESEARCH Pattern 1) — [validateAdjustment]가 그 첫 번째 판정이다(03-03).
+ * 도메인 판정 메서드는 03-03~03-05의 TDD 플랜이 테스트를 먼저 쓰고 채웠다(RESEARCH Pattern 1):
+ * - [validateAdjustment] — 관리자 수동 가감 허용 여부 (policies §4.2a, D-056, 03-03)
+ * - [register] — 등록 시 타입별 필수·금지 필드, 종료일 계산 (policies §1, D-055·D-063·D-066, 03-04)
+ * - [displayStatus] — 취소/만료/소진/사용가능 표시 상태 계산 (D-064, 03-04)
+ * - [changePeriod] — 기간·유효기간 수정 판정 (PASS-04·PASS-07, D-062, 03-05)
+ * - [cancel] — 등록 취소 처리·상쇄 수량 산출 (PASS-08, D-059·D-065, 03-05)
+ *
+ * 취소된 이용권에 대한 후속 조작 거부([validateAdjustment]·[changePeriod]·[cancel] 공통)는
+ * [requireNotCanceled]로 모아 둔다 — D-059 "취소된 이용권 재조작 금지"가 세 진입점 모두에서
+ * 같은 예외로 일관되게 강제되게 하기 위해서다.
  */
 @Entity
 @Table(name = "pass")
@@ -78,7 +86,7 @@ class Pass(
      */
     fun validateAdjustment(amount: BigDecimal) {
         // 1. 취소된 이용권은 무엇보다 먼저 거부한다 (D-059)
-        if (status == PassStatus.CANCELED) throw PassAlreadyCanceledException()
+        requireNotCanceled()
 
         // 2. 기간제는 횟수 가감 대상이 아니다 — 기간 수정으로만 조정한다 (policies §4.2a)
         if (type == PassType.EVENING_MEMBERSHIP) throw PassTypeNotAdjustableException()
@@ -138,7 +146,7 @@ class Pass(
         newStartDate: LocalDate?,
         newEndDate: LocalDate,
     ) {
-        if (status == PassStatus.CANCELED) throw PassAlreadyCanceledException()
+        requireNotCanceled()
 
         val resolvedStart = newStartDate ?: startDate
         if (type != PassType.EVENING_MEMBERSHIP && resolvedStart != startDate) {
@@ -167,7 +175,7 @@ class Pass(
         admin: Admin,
         now: OffsetDateTime,
     ): BigDecimal {
-        if (status == PassStatus.CANCELED) throw PassAlreadyCanceledException()
+        requireNotCanceled()
 
         status = PassStatus.CANCELED
         canceledAt = now
@@ -175,6 +183,14 @@ class Pass(
         canceledBy = admin
 
         return remainingCount?.negate() ?: BigDecimal.ZERO
+    }
+
+    /**
+     * 이미 취소된 이용권에 대한 후속 조작을 공통으로 거부한다 (D-059).
+     * [validateAdjustment]·[changePeriod]·[cancel] 세 진입점이 함께 쓴다.
+     */
+    private fun requireNotCanceled() {
+        if (status == PassStatus.CANCELED) throw PassAlreadyCanceledException()
     }
 
     companion object {
