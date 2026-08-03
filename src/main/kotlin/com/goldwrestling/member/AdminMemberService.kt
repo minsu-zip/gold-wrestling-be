@@ -103,9 +103,16 @@ class AdminMemberService(
     }
 
     /**
-     * 회원 상태 변경(MEMBER-03, D-044). 상태 전이 자체에 제약을 두지 않는다 — policies §5.2가
+     * 회원 상태 변경(MEMBER-03, D-044). 상태 전이는 원칙적으로 자유롭게 둔다 — policies §5.2가
      * "승인 취소는 별도 기능 없이 상태 변경으로 갈음한다"고 해, 어느 상태에서든 4종 중 하나로
      * 자유롭게 바꿀 수 있게 두고 관리자 재량을 막지 않는다.
+     *
+     * **단, `ACTIVE` 전환만 유일한 예외다(02-REVIEW.md WR-03).** [approve]가 서버측에서 강제하는
+     * "온보딩 완료" 규칙(policies §5.1)은 목록 필터가 아니라 서비스 계층의 검사다 — 화면 노출 범위는
+     * API 직접 호출로 우회 가능하므로 정책은 항상 서버에서 강제한다(T-02-37). 같은 리소스의 다른
+     * 엔드포인트인 이 메서드가 그 규칙을 열어 두면 [approve]의 강제가 무의미해지므로, `newStatus`가
+     * `ACTIVE`일 때만 같은 검사를 반복한다. `ON_LEAVE`·`INACTIVE`·`PENDING` 복귀 등 ACTIVE가 아닌
+     * 전이는 종전대로 제약이 없다.
      *
      * [MemberStatus.PENDING]으로 되돌리면 거절 사유를 지운다 — D-034의 재신청 처리(관리자가 상태를
      * PENDING으로 되돌리는 것)가 이 메서드로만 가능하다. `UpdateMemberStatusRequest`가 요구사항
@@ -117,6 +124,9 @@ class AdminMemberService(
         newStatus: MemberStatus,
     ): MemberDetailResponse {
         val member = memberRepository.findById(memberId).orElseThrow { MemberNotFoundException(memberId) }
+        if (newStatus == MemberStatus.ACTIVE && !member.isOnboardingCompleted()) {
+            throw MemberStateConflictException("회원이 이름·전화번호를 등록해야 활성 상태로 바꿀 수 있습니다.")
+        }
         member.status = newStatus
         if (newStatus == MemberStatus.PENDING) {
             member.rejectionReason = null

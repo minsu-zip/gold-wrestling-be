@@ -432,3 +432,15 @@
 - 2026-08 / `TokenService.rotate`의 폐기 판단과 기록을 `RefreshTokenRepository.revokeIfUsable` 단일 조건부 UPDATE(`revokedAt is null`일 때만 갱신)로 원자화하고, 갱신 행 수 0을 재사용 신호로 취급한다. `rotate`는 `@Transactional(noRollbackFor = [RefreshTokenInvalidException::class])`로 재사용·만료 실패 응답을 주면서도 그 과정의 폐기를 커밋한다(02-REVIEW.md WR-01).
 - 이유: 조회 → 메모리 판단(`isRevoked()`) → 더티체킹 폐기는 READ COMMITTED에서 같은 refresh 토큰이 동시에 두 번 제시되면 둘 다 미폐기 상태를 읽고 둘 다 회전에 성공시켜(TOCTOU), D-036의 재사용 감지가 정확히 탈취 시나리오에서 무력화된다. 또한 재사용 감지 후 예외(`RefreshTokenInvalidException`은 `RuntimeException` 상속)가 그대로 전파되면 스프링 기본 규칙에 걸려 감지 폐기 자체가 롤백돼 DB에 남지 않는다.
 - 기각 대안: 비관적 락(`SELECT ... FOR UPDATE`)으로 행을 잠금(조건부 UPDATE로 충분한데 대기 비용만 늘어남), `SERIALIZABLE` 격리(전역 성능 비용), 예외를 체크 예외로 바꿔 롤백을 회피(코틀린에는 체크 예외 개념이 없고 이 프로젝트의 `ErrorCode`/`DomainException` 체계와도 어긋남).
+
+## D-052. 상태 변경 API의 ACTIVE 전환도 온보딩 완료를 서버에서 강제
+
+- 2026-08 / `changeStatus`는 `newStatus == ACTIVE`이면서 온보딩(실명·전화번호) 미완료인 회원에 대해 `MEMBER_STATE_CONFLICT`(409)로 거부한다. ACTIVE가 아닌 전이는 종전대로 제한 없음.
+- 이유: `approve()`가 서버에서 강제하는 policies §5.1 규칙을 같은 리소스의 다른 엔드포인트가 우회시키면, 관리자가 회원을 이름·전화번호로 식별한다는 전제(D-025)가 깨진 ACTIVE 회원이 생긴다.
+- 기각 대안: 우회를 허용하고 문서에만 명시(정책이 엔드포인트마다 갈라짐), 모든 전이에 전이표를 도입(policies §5.2가 "승인 취소는 상태 변경으로 갈음"이라 관리자 재량을 남겨 둔 취지와 충돌).
+
+## D-053. 통합 검색어는 정규화 결과가 빈 문자열이면 전화번호 술어를 만들지 않는다
+
+- 2026-08 / `keywordContains`는 `PhoneNumberNormalizer.normalize` 결과가 빈 문자열이면 전화번호 술어를 생성하지 않고 이름 술어만 사용한다. 온보딩 완료 판정 쿼리는 SQL `TRIM` 기준으로 엔티티의 `isNullOrBlank()`와 맞춘다(공백 문자 범위에서 일치).
+- 이유: LIKE 와일드카드 이스케이프만으로는 `"-"` 같은 입력이 `LIKE '%%'`가 되는 경로를 막지 못해 전화번호가 있는 전 회원이 반환된다. 판정 규칙이 엔티티와 쿼리 두 곳에 존재하는 한 한쪽만 고쳐지면 승인 대기 목록이 어긋난다.
+- 기각 대안: 검색어에서 하이픈을 제거한 뒤 blank 검사(이름에 하이픈이 든 검색을 못 하게 됨), 전화번호 컬럼에 함수 인덱스 도입(문제의 원인이 인덱스가 아님).

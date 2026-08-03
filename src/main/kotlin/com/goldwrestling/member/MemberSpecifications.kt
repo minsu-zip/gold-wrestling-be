@@ -27,12 +27,17 @@ object MemberSpecifications {
      *   않도록 이 사실을 여기 남겨 둔다.
      * - 검색어에 `%`·`_`(SQL LIKE 와일드카드)가 포함되면 [escapeLikeWildcards]로 이스케이프한다 —
      *   그렇지 않으면 검색어 하나로 의도치 않게 전체 회원이 매칭되는 논리적 우회가 된다(T-02-34).
+     * - **하이픈만으로 된 검색어(`"-"`, `"--"` 등)는 blank가 아니라 이 함수를 통과하지만,
+     *   [PhoneNumberNormalizer.normalize]를 거치면 빈 문자열이 된다. 빈 문자열로 전화번호 술어를
+     *   만들면 `LIKE '%%'`가 되어 전화번호가 `null`이 아닌 전 회원이 매칭된다 — 이스케이프만으로는
+     *   막히지 않는 두 번째 우회 경로다(T-02-14-02). 그래서 정규화 결과가 빈 문자열이면 전화번호
+     *   술어 자체를 만들지 않는다.**
      */
     fun keywordContains(keyword: String?): Specification<Member>? {
         if (keyword.isNullOrBlank()) return null
         val trimmed = keyword.trim()
         val escapedNameKeyword = escapeLikeWildcards(trimmed).lowercase()
-        val escapedPhoneKeyword = escapeLikeWildcards(PhoneNumberNormalizer.normalize(trimmed))
+        val normalizedPhone = PhoneNumberNormalizer.normalize(trimmed)
 
         return Specification { root, _, criteriaBuilder ->
             val namePredicate =
@@ -41,13 +46,18 @@ object MemberSpecifications {
                     "%$escapedNameKeyword%",
                     LIKE_ESCAPE_CHAR,
                 )
-            val phonePredicate =
-                criteriaBuilder.like(
-                    root.get("phoneNumber"),
-                    "%$escapedPhoneKeyword%",
-                    LIKE_ESCAPE_CHAR,
+            val predicates = mutableListOf(namePredicate)
+            if (normalizedPhone.isNotEmpty()) {
+                val escapedPhoneKeyword = escapeLikeWildcards(normalizedPhone)
+                predicates.add(
+                    criteriaBuilder.like(
+                        root.get("phoneNumber"),
+                        "%$escapedPhoneKeyword%",
+                        LIKE_ESCAPE_CHAR,
+                    ),
                 )
-            criteriaBuilder.or(namePredicate, phonePredicate)
+            }
+            criteriaBuilder.or(*predicates.toTypedArray())
         }
     }
 
@@ -62,11 +72,17 @@ object MemberSpecifications {
     /**
      * 온보딩 완료 여부 필터. `null`이면 조건 없음.
      *
-     * **[Member.isOnboardingCompleted]와 반드시 같은 판정 규칙이어야 한다.** 이름·전화번호가 모두
-     * `null`이 아니고 빈 문자열(`""`)도 아닐 때 완료로 본다. 이 규칙이 엔티티 메서드와 이 함수
-     * 두 곳에 존재하므로, 한쪽만 고치면 **관리자 승인 대기 목록(status=PENDING +
+     * **[Member.isOnboardingCompleted]와 같은 범위에서 같은 판정 규칙을 유지하려 한다.** 이름·전화번호가
+     * 모두 `null`이 아니고 SQL `TRIM` 기준으로 빈 문자열이 아닐 때 완료로 본다. 이 규칙이 엔티티
+     * 메서드와 이 함수 두 곳에 존재하므로, 한쪽만 고치면 **관리자 승인 대기 목록(status=PENDING +
      * onboardingCompleted=true, policies §5.1)이 실제 온보딩 완료 판정과 어긋난다.**
      * `MemberSpecificationTest`의 정합성 테스트가 이 어긋남을 잡는다.
+     *
+     * **완전히 같은 보장은 아니다.** SQL `TRIM`은 기본적으로 **공백 문자(space)만** 제거하지만
+     * 코틀린 `isBlank()`는 탭·개행 등 유니코드 공백 문자를 전부 공백으로 취급한다. 이 프로젝트의
+     * 현재 쓰기 경로(온보딩 제출은 trim + `@NotBlank`로 검증됨)로는 탭·개행이 저장될 수 없어
+     * 도달 가능한 범위(공백 문자만 있는 문자열)에서는 두 판정이 일치한다 — 그 범위를 넘는 보장을
+     * 여기서 주장하지 않는다(WR-05: 과장된 보장 문구 자체가 이 결함의 원인이었다).
      */
     fun onboardingCompleted(flag: Boolean?): Specification<Member>? {
         if (flag == null) return null
@@ -74,12 +90,12 @@ object MemberSpecifications {
             val nameFilled =
                 criteriaBuilder.and(
                     criteriaBuilder.isNotNull(root.get<String>("name")),
-                    criteriaBuilder.notEqual(root.get<String>("name"), ""),
+                    criteriaBuilder.notEqual(criteriaBuilder.trim(root.get<String>("name")), ""),
                 )
             val phoneFilled =
                 criteriaBuilder.and(
                     criteriaBuilder.isNotNull(root.get<String>("phoneNumber")),
-                    criteriaBuilder.notEqual(root.get<String>("phoneNumber"), ""),
+                    criteriaBuilder.notEqual(criteriaBuilder.trim(root.get<String>("phoneNumber")), ""),
                 )
             val completed = criteriaBuilder.and(nameFilled, phoneFilled)
             if (flag) completed else criteriaBuilder.not(completed)

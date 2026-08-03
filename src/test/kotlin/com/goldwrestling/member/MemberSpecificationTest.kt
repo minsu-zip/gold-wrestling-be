@@ -38,13 +38,15 @@ class MemberSpecificationTest {
 
     // ---------- 공통 픽스처 ----------
     // 온보딩 완료 PENDING 2명(m1, m2), 온보딩 미완료 PENDING 1명(m3, name=null), ACTIVE 1명(m4),
-    // ON_LEAVE 1명(m5), 이름이 빈 문자열인 PENDING 1명(m6, 온보딩 미완료).
+    // ON_LEAVE 1명(m5), 이름이 빈 문자열인 PENDING 1명(m6, 온보딩 미완료),
+    // 이름이 공백 한 칸인 PENDING 1명(m7, 온보딩 미완료 — WR-05).
     private lateinit var m1: Member
     private lateinit var m2: Member
     private lateinit var m3: Member
     private lateinit var m4: Member
     private lateinit var m5: Member
     private lateinit var m6: Member
+    private lateinit var m7: Member
 
     private fun setUpFixtures() {
         val branch = songpaBranch()
@@ -54,6 +56,7 @@ class MemberSpecificationTest {
         m4 = persistMember(branch, kakaoId = 9004L, name = "최활성", phoneNumber = "01055556666", status = MemberStatus.ACTIVE)
         m5 = persistMember(branch, kakaoId = 9005L, name = "정휴회", phoneNumber = "01077778888", status = MemberStatus.ON_LEAVE)
         m6 = persistMember(branch, kakaoId = 9006L, name = "", phoneNumber = "01099990000", status = MemberStatus.PENDING)
+        m7 = persistMember(branch, kakaoId = 9007L, name = " ", phoneNumber = "01088887777", status = MemberStatus.PENDING)
     }
 
     // ---------- keywordContains ----------
@@ -124,6 +127,17 @@ class MemberSpecificationTest {
         assertThat(found).isEmpty()
     }
 
+    @Test
+    fun `검색어가 하이픈뿐이면 전화번호 조건이 만들어지지 않아 전 회원이 매칭되지 않는다`() {
+        setUpFixtures()
+
+        val foundSingleHyphen = memberRepository.findAll(MemberSpecifications.keywordContains("-")!!)
+        val foundDoubleHyphen = memberRepository.findAll(MemberSpecifications.keywordContains("--")!!)
+
+        assertThat(foundSingleHyphen).isEmpty()
+        assertThat(foundDoubleHyphen).isEmpty()
+    }
+
     // ---------- hasStatus ----------
 
     @Test
@@ -137,7 +151,7 @@ class MemberSpecificationTest {
 
         val found = memberRepository.findAll(MemberSpecifications.hasStatus(MemberStatus.PENDING)!!)
 
-        assertThat(found.map { it.id }).containsExactlyInAnyOrder(m1.id, m2.id, m3.id, m6.id)
+        assertThat(found.map { it.id }).containsExactlyInAnyOrder(m1.id, m2.id, m3.id, m6.id, m7.id)
     }
 
     // ---------- onboardingCompleted ----------
@@ -162,7 +176,7 @@ class MemberSpecificationTest {
 
         val found = memberRepository.findAll(MemberSpecifications.onboardingCompleted(false)!!)
 
-        assertThat(found.map { it.id }).containsExactlyInAnyOrder(m3.id, m6.id)
+        assertThat(found.map { it.id }).containsExactlyInAnyOrder(m3.id, m6.id, m7.id)
     }
 
     @Test
@@ -172,6 +186,15 @@ class MemberSpecificationTest {
         val found = memberRepository.findAll(MemberSpecifications.onboardingCompleted(false)!!)
 
         assertThat(found.map { it.id }).contains(m6.id)
+    }
+
+    @Test
+    fun `공백만 있는 이름은 온보딩 미완료로 취급된다`() {
+        setUpFixtures()
+
+        val found = memberRepository.findAll(MemberSpecifications.onboardingCompleted(false)!!)
+
+        assertThat(found.map { it.id }).contains(m7.id)
     }
 
     @Test
