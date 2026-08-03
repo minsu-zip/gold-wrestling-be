@@ -80,7 +80,7 @@
   6. 관리자가 이용권 등록을 취소하면 취소 상태 전환 + `REGISTRATION_CANCELED` 상쇄 이력이 남고, 취소된 이용권은 회원 조회에서 숨겨지고 관리자 화면에서는 구분 표시된다 (D-059)
 **Plans**: 11 plans (D-10에 따라 순차 실행 — 플랜 단위 브랜치 → dev PR → 머지 → 다음 플랜. Wave 5의 03-05·03-06만 병렬 가능)
 - [x] 03-01-PLAN.md — 용어·에러코드·설계 결정 문서 정합 + PassExceptions (PASS-01/03/07/08, 경계 산정 체크포인트)
-- [ ] 03-02-PLAN.md — V4 이용권 스키마 + enum·엔티티·리포지토리(조건부 UPDATE) (PASS-01/02/03/04/07/08)
+- [x] 03-02-PLAN.md — V4 이용권 스키마 + enum·엔티티·리포지토리(조건부 UPDATE) (PASS-01/02/03/04/07/08)
 - [ ] 03-03-PLAN.md — [TDD] 수동 가감 정책 `Pass.validateAdjustment` (PASS-03)
 - [ ] 03-04-PLAN.md — [TDD] 등록 유효기간 계산 + 표시 상태 계산 (PASS-01/05)
 - [ ] 03-05-PLAN.md — [TDD] 기간 변경 판정 + 취소 상쇄 산출 (PASS-04/07/08)
@@ -151,7 +151,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 1. 기반 | 3/3 | Complete   | 2026-07-30 |
 | 2. 인증·회원 | 15/15 | Complete   | 2026-08-03 |
-| 3. 이용권 | 1/11 | In Progress|  |
+| 3. 이용권 | 2/11 | In Progress|  |
 | 4. 시간표·예약 | 0/TBD | Not started | - |
 | 5. 배치 | 0/TBD | Not started | - |
 | 6. 운영 | 0/TBD | Not started | - |
