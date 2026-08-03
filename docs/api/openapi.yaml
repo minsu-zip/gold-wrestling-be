@@ -108,6 +108,32 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/AdminLoginResponse"
+  /api/admin/passes/{passId}/cancellation:
+    post:
+      tags:
+      - admin-pass
+      summary: 이용권 등록 취소 (물리 삭제 없이 취소 상태 전환 + 상쇄 이력)
+      operationId: cancel
+      parameters:
+      - name: passId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelPassRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PassResponse"
   /api/admin/passes/{passId}/adjustments:
     post:
       tags:
@@ -161,6 +187,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/MemberDetailResponse"
   /api/admin/members/{memberId}/passes:
+    get:
+      tags:
+      - admin-pass
+      summary: "회원 이용권 목록 조회 (취소 포함, 상태 구분)"
+      operationId: getMemberPasses
+      parameters:
+      - name: memberId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PassResponse"
     post:
       tags:
       - admin-pass
@@ -541,23 +588,18 @@ components:
         name:
           type: string
           description: 관리자 이름
-    AdjustPassRequest:
+    CancelPassRequest:
       type: object
-      description: 관리자 수동 가감 요청 — 사유(note) 필수
+      description: 취소 사유. 관리자 전용 정보이며 pass.cancel_reason과 상쇄 이력 note에 함께 저장된다
       properties:
-        amount:
-          type: number
-          description: 가감 수량(음수면 차감). 형식만 검증 — 가감 단위·음수 잔여 금지는 도메인 규칙
-          example: 1.0
-        note:
+        reason:
           type: string
-          description: "가감 사유(필수, 500자 이내)"
-          example: 이벤트 보상
+          description: "취소 사유(관리자 전용, 500자 이내)"
+          example: 관리자 오등록으로 인한 취소
           maxLength: 500
           minLength: 0
       required:
-      - amount
-      - note
+      - reason
     PassResponse:
       type: object
       description: 이용권 응답
@@ -613,6 +655,23 @@ components:
           type: string
           format: date-time
           description: 등록 시각
+    AdjustPassRequest:
+      type: object
+      description: 관리자 수동 가감 요청 — 사유(note) 필수
+      properties:
+        amount:
+          type: number
+          description: 가감 수량(음수면 차감). 형식만 검증 — 가감 단위·음수 잔여 금지는 도메인 규칙
+          example: 1.0
+        note:
+          type: string
+          description: "가감 사유(필수, 500자 이내)"
+          example: 이벤트 보상
+          maxLength: 500
+          minLength: 0
+      required:
+      - amount
+      - note
     RejectMemberRequest:
       type: object
       description: 거절 사유. 관리자 전용 정보이며 회원에게 원문이 노출되지 않는다 (D-043)

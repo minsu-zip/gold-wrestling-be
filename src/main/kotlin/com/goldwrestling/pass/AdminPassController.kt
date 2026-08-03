@@ -2,6 +2,7 @@ package com.goldwrestling.pass
 
 import com.goldwrestling.auth.AuthenticatedPrincipal
 import com.goldwrestling.pass.dto.AdjustPassRequest
+import com.goldwrestling.pass.dto.CancelPassRequest
 import com.goldwrestling.pass.dto.ChangePassPeriodRequest
 import com.goldwrestling.pass.dto.PassResponse
 import com.goldwrestling.pass.dto.RegisterPassRequest
@@ -11,6 +12,7 @@ import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -70,4 +72,20 @@ class AdminPassController(
         @Valid @RequestBody request: ChangePassPeriodRequest,
         @AuthenticationPrincipal principal: AuthenticatedPrincipal,
     ): PassResponse = adminPassService.changePeriod(passId, request, principal.requireAdminId())
+
+    // 일회성 상태 전이라 단수형 POST(`/approval`·`/rejection` 관례, PASS-08).
+    @PostMapping("/passes/{passId}/cancellation")
+    @Operation(summary = "이용권 등록 취소 (물리 삭제 없이 취소 상태 전환 + 상쇄 이력)")
+    fun cancel(
+        @PathVariable passId: Long,
+        @Valid @RequestBody request: CancelPassRequest,
+        @AuthenticationPrincipal principal: AuthenticatedPrincipal,
+    ): PassResponse = adminPassService.cancel(passId, request, principal.requireAdminId())
+
+    // 조회 전용이라 주체(관리자 ID)가 필요 없다 — `/api/admin` 프리픽스로 인가만 강제된다(D-040).
+    @GetMapping("/members/{memberId}/passes")
+    @Operation(summary = "회원 이용권 목록 조회 (취소 포함, 상태 구분)")
+    fun getMemberPasses(
+        @PathVariable memberId: Long,
+    ): List<PassResponse> = adminPassService.getMemberPasses(memberId)
 }
