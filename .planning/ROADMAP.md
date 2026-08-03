@@ -60,7 +60,7 @@
 - [x] 02-11-PLAN.md — phase 마감: 전체 검증·문서 정합 + 실제 카카오 E2E 수동 확인 (전 요구사항)
 - [x] 02-12-PLAN.md — [갭] CR-01: 동시 최초 로그인 경쟁 복구를 트랜잭션 밖으로 + 동시성 테스트 (AUTH-01)
 - [x] 02-13-PLAN.md — [갭] WR-01: refresh 회전 폐기 원자화(조건부 UPDATE) + 재사용 감지 폐기 커밋 (AUTH-02)
-- [ ] 02-14-PLAN.md — [갭] WR-03/04/05: 상태변경 ACTIVE 우회 차단 + 검색어·온보딩 판정 정합 (MEMBER-01/02/03)
+- [x] 02-14-PLAN.md — [갭] WR-03/04/05: 상태변경 ACTIVE 우회 차단 + 검색어·온보딩 판정 정합 (MEMBER-01/02/03)
 - [ ] 02-15-PLAN.md — [갭] WR-06: 회원 목록 쿼리 파라미터를 개별 파라미터로 기술(@ParameterObject) (MEMBER-02)
 
 **Note**: `src/main/kotlin/com/goldwrestling/config/SecurityConfig.kt`의 현재 전체 `permitAll` 뼈대는 이 phase에서 실제 인가 규칙으로 교체된다 (02-05).
@@ -126,7 +126,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. 기반 | 3/3 | Complete   | 2026-07-30 |
-| 2. 인증·회원 | 13/15 | In Progress|  |
+| 2. 인증·회원 | 14/15 | In Progress|  |
 | 3. 이용권 | 0/TBD | Not started | - |
 | 4. 시간표·예약 | 0/TBD | Not started | - |
 | 5. 배치 | 0/TBD | Not started | - |
