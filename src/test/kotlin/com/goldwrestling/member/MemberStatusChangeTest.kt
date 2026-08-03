@@ -249,6 +249,47 @@ class MemberStatusChangeTest {
             .andExpect(jsonPath("$.code").value("MEMBER_NOT_ACTIVE"))
     }
 
+    // ---------- ACTIVE 전환의 온보딩 완료 강제 (WR-03, 02-REVIEW.md) ----------
+
+    @Test
+    fun `이름·전화번호가 없는 회원을 ACTIVE로 바꾸면 409와 MEMBER_STATE_CONFLICT이고 상태는 그대로 PENDING이다`() {
+        val member =
+            persistMember(kakaoId = 9213L, status = MemberStatus.PENDING, name = null, phoneNumber = null)
+        val adminToken = adminAccessToken(loginId = "admin-status-active-onboarding-block")
+
+        mockMvc
+            .perform(statusRequest(member.id!!, adminToken, "ACTIVE"))
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("MEMBER_STATE_CONFLICT"))
+
+        val reloaded = memberRepository.findById(member.id!!).orElseThrow()
+        assertThat(reloaded.status).isEqualTo(MemberStatus.PENDING)
+    }
+
+    @Test
+    fun `온보딩을 마친 회원을 ACTIVE로 바꾸면 200이고 상태가 ACTIVE가 된다`() {
+        val member =
+            persistMember(kakaoId = 9214L, status = MemberStatus.PENDING, name = "김온보딩", phoneNumber = "01099998888")
+        val adminToken = adminAccessToken(loginId = "admin-status-active-onboarding-ok")
+
+        mockMvc
+            .perform(statusRequest(member.id!!, adminToken, "ACTIVE"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.status").value("ACTIVE"))
+    }
+
+    @Test
+    fun `온보딩 미완료 회원을 ON_LEAVE·INACTIVE·PENDING으로 바꾸는 것은 막지 않는다`() {
+        val toOnLeave = persistMember(kakaoId = 9215L, status = MemberStatus.PENDING, name = null, phoneNumber = null)
+        val toInactive = persistMember(kakaoId = 9216L, status = MemberStatus.PENDING, name = null, phoneNumber = null)
+        val toPending = persistMember(kakaoId = 9217L, status = MemberStatus.INACTIVE, name = null, phoneNumber = null)
+        val adminToken = adminAccessToken(loginId = "admin-status-active-onboarding-allow-others")
+
+        mockMvc.perform(statusRequest(toOnLeave.id!!, adminToken, "ON_LEAVE")).andExpect(status().isOk)
+        mockMvc.perform(statusRequest(toInactive.id!!, adminToken, "INACTIVE")).andExpect(status().isOk)
+        mockMvc.perform(statusRequest(toPending.id!!, adminToken, "PENDING")).andExpect(status().isOk)
+    }
+
     private fun statusRequest(
         memberId: Long,
         token: String,
@@ -269,12 +310,14 @@ class MemberStatusChangeTest {
         kakaoId: Long,
         status: MemberStatus,
         rejectionReason: String? = null,
+        name: String? = "회원$kakaoId",
+        phoneNumber: String? = "010$kakaoId",
     ): Member =
         memberRepository.saveAndFlush(
             Member(
                 branch = songpaBranch(),
-                name = "회원$kakaoId",
-                phoneNumber = "010$kakaoId",
+                name = name,
+                phoneNumber = phoneNumber,
                 status = status,
                 kakaoId = kakaoId,
                 rejectionReason = rejectionReason,
