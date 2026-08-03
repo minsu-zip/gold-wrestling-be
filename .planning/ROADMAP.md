@@ -84,7 +84,7 @@
 - [x] 03-03-PLAN.md — [TDD] 수동 가감 정책 `Pass.validateAdjustment` (PASS-03)
 - [x] 03-04-PLAN.md — [TDD] 등록 유효기간 계산 + 표시 상태 계산 (PASS-01/05)
 - [x] 03-05-PLAN.md — [TDD] 기간 변경 판정 + 취소 상쇄 산출 (PASS-04/07/08)
-- [ ] 03-06-PLAN.md — 관리자 이용권 등록 API + INITIAL_GRANT 이력 (PASS-01/02)
+- [x] 03-06-PLAN.md — 관리자 이용권 등록 API + INITIAL_GRANT 이력 (PASS-01/02)
 - [ ] 03-07-PLAN.md — 관리자 수동 가감 API + "잔여 = 이력 합계" 불변식 테스트 (PASS-02/03)
 - [ ] 03-08-PLAN.md — 기간·유효기간 수정 통합 API + PassPeriodChange 이력 (PASS-04/07)
 - [ ] 03-09-PLAN.md — 등록 취소 API + 관리자 이용권 목록(취소 구분) (PASS-08/02)
@@ -151,7 +151,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 1. 기반 | 3/3 | Complete   | 2026-07-30 |
 | 2. 인증·회원 | 15/15 | Complete   | 2026-08-03 |
-| 3. 이용권 | 5/11 | In Progress|  |
+| 3. 이용권 | 6/11 | In Progress|  |
 | 4. 시간표·예약 | 0/TBD | Not started | - |
 | 5. 배치 | 0/TBD | Not started | - |
 | 6. 운영 | 0/TBD | Not started | - |
