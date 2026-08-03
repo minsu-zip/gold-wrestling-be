@@ -16,7 +16,7 @@
 
 - [x] **Phase 1: 기반** - 공통 에러 포맷(ProblemDetail), 초기 스키마(Branch/Member/Admin/AdminBranch), openapi.yaml 재생성 파이프라인 (completed 2026-07-30)
 - [x] **Phase 2: 인증·회원** - 카카오 로그인, 온보딩, JWT, 관리자 ID/PW 인증, 가입 승인, 회원 관리 (본 작업 완료 2026-08-02 / 검증 갭 클로저 진행 중 — 02-12~02-15) (completed 2026-08-03)
-- [ ] **Phase 3: 이용권** - Pass 3종 등록, PassTransaction 이력, 수동 가감·기간 수정, 본인 조회
+- [x] **Phase 3: 이용권** - Pass 3종 등록, PassTransaction 이력, 수동 가감·기간 수정, 본인 조회 (completed 2026-08-03)
 - [ ] **Phase 4: 시간표·예약** - ClassSchedule/ClassSession, 예약 생성·취소·변경 + 즉시 차감/복구, 동시성 보장, 관리자 예약 관리·휴강, Notification 스키마·알림 레코드 생성
 - [ ] **Phase 5: 배치** - 2주 미사용 차감, 유효기간 만료 처리, 멱등 실행
 - [ ] **Phase 6: 운영** - 출석 체크, 공지사항, 관리자 알림·활동 피드
@@ -89,7 +89,7 @@
 - [x] 03-08-PLAN.md — 기간·유효기간 수정 통합 API + PassPeriodChange 이력 (PASS-04/07)
 - [x] 03-09-PLAN.md — 등록 취소 API + 관리자 이용권 목록(취소 구분) (PASS-08/02)
 - [x] 03-10-PLAN.md — 회원 본인 이용권·이력 조회 (PASS-05/06)
-- [ ] 03-11-PLAN.md — phase 마감: 전체 검증·문서 정합 + 관리자 흐름 수동 확인 (PASS-01~08)
+- [x] 03-11-PLAN.md — phase 마감: 전체 검증·문서 정합 + 관리자 흐름 수동 확인 (PASS-01~08)
 
 **Note (API 표면)**: 이 phase가 여는 엔드포인트는 7개다 — `POST /api/admin/members/{memberId}/passes`,
 `GET /api/admin/members/{memberId}/passes`, `POST /api/admin/passes/{passId}/adjustments`,
@@ -151,7 +151,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 1. 기반 | 3/3 | Complete   | 2026-07-30 |
 | 2. 인증·회원 | 15/15 | Complete   | 2026-08-03 |
-| 3. 이용권 | 10/11 | In Progress|  |
+| 3. 이용권 | 11/11 | Complete   | 2026-08-03 |
 | 4. 시간표·예약 | 0/TBD | Not started | - |
 | 5. 배치 | 0/TBD | Not started | - |
 | 6. 운영 | 0/TBD | Not started | - |
