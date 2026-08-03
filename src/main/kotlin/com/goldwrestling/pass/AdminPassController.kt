@@ -2,6 +2,7 @@ package com.goldwrestling.pass
 
 import com.goldwrestling.auth.AuthenticatedPrincipal
 import com.goldwrestling.pass.dto.AdjustPassRequest
+import com.goldwrestling.pass.dto.ChangePassPeriodRequest
 import com.goldwrestling.pass.dto.PassResponse
 import com.goldwrestling.pass.dto.RegisterPassRequest
 import io.swagger.v3.oas.annotations.Operation
@@ -10,6 +11,7 @@ import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -58,4 +60,14 @@ class AdminPassController(
         @Valid @RequestBody request: AdjustPassRequest,
         @AuthenticationPrincipal principal: AuthenticatedPrincipal,
     ): PassResponse = adminPassService.adjust(passId, request, principal.requireAdminId())
+
+    // 저녁반 회비 기간 수정(PASS-04)과 횟수권 유효기간 수정(PASS-07)을 이 하나의 엔드포인트가 모두
+    // 담당한다(D-062) — 타입별 차이(횟수권은 종료일만)는 서버(`Pass.changePeriod`)가 강제한다.
+    @PatchMapping("/passes/{passId}/period")
+    @Operation(summary = "이용권 기간·유효기간 수정 (저녁반은 시작·종료, 횟수권은 종료일만)")
+    fun changePeriod(
+        @PathVariable passId: Long,
+        @Valid @RequestBody request: ChangePassPeriodRequest,
+        @AuthenticationPrincipal principal: AuthenticatedPrincipal,
+    ): PassResponse = adminPassService.changePeriod(passId, request, principal.requireAdminId())
 }
