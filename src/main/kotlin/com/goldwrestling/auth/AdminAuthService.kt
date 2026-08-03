@@ -27,8 +27,18 @@ class AdminAuthService(
     private val tokenService: TokenService,
 ) {
     /**
+     * loginId가 존재하지 않을 때도 아래 [login]이 bcrypt 비교를 정확히 1회 수행하게 하는 더미 해시.
+     * 어떤 실제 비밀번호도 이 값과 일치하지 않는다 — 빈 계정 대신 비교 대상으로만 쓴다.
+     */
+    private val dummyPasswordHash: String =
+        passwordEncoder.encode("timing-equalization-dummy-${System.identityHashCode(this)}")!!
+
+    /**
      * loginId가 없는 경우와 비밀번호가 틀린 경우 **완전히 같은 예외(같은 메시지)** 를 던진다 —
      * 응답만으로 "어느 loginId가 실제로 존재하는지"를 유추할 수 있는 계정 열거 공격을 막는다(T-02-24).
+     *
+     * 같은 이유로 bcrypt 비교는 loginId 존재 여부와 무관하게 **항상 1회** 실행한다(WR-02) —
+     * 미존재 계정에서 비교를 건너뛰면 응답 시간 차이만으로 유효한 loginId가 드러난다.
      */
     @Transactional
     fun login(
@@ -36,7 +46,8 @@ class AdminAuthService(
         rawPassword: String,
     ): AdminLoginResponse {
         val admin = adminRepository.findByLoginId(loginId)
-        if (admin == null || !passwordEncoder.matches(rawPassword, admin.passwordHash)) {
+        val passwordMatches = passwordEncoder.matches(rawPassword, admin?.passwordHash ?: dummyPasswordHash)
+        if (admin == null || !passwordMatches) {
             logger.warn("관리자 로그인 실패: loginId={}", loginId)
             throw InvalidCredentialsException()
         }
