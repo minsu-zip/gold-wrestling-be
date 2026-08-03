@@ -128,3 +128,12 @@ None - 외부 서비스 설정 불필요.
 ---
 *Phase: 03-pass*
 *Completed: 2026-08-03*
+
+## Self-Check: PASSED
+
+- FOUND: src/main/kotlin/com/goldwrestling/pass/PassExceptions.kt
+- FOUND: .planning/phases/03-pass/03-01-SUMMARY.md
+- FOUND: PASS_NOT_FOUND in ErrorCode.kt
+- FOUND commit: e87da81 (Task 2 docs)
+- FOUND commit: e31c85d (Task 3 feat)
+- FOUND commit: 88b6e3b (SUMMARY)
