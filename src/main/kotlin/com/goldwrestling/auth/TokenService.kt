@@ -95,38 +95,67 @@ class TokenService(
     /**
      * refresh 토큰을 회전한다. 이미 폐기된 토큰이 다시 제시되면 재사용으로 간주해 그 주체의
      * 미폐기 refresh를 전부 폐기한 뒤 거부한다(T-02-10). 만료된 토큰은 그 행만 폐기하고 거부한다.
+     *
+     * `noRollbackFor`를 붙인 이유: 재사용 감지·만료 처리는 실패 응답([RefreshTokenInvalidException])을
+     * 주면서도 그 과정에서 실행한 폐기는 DB에 남아야 하는 경로다. 이 예외는 [RuntimeException]을
+     * 상속하는 [com.goldwrestling.common.error.DomainException]이라, 스프링 기본 규칙(런타임 예외 =
+     * 롤백 대상)에 걸리면 방금 실행한 폐기까지 통째로 롤백된다 — D-036이 명시한 재사용 감지가
+     * 로그만 남기고 실제로는 아무것도 폐기하지 않는 결과가 된다. `rotate`는 이 메서드 안에서
+     * 폐기 외의 다른 상태를 바꾸지 않으므로, 실패 응답 경로에서 커밋해도 절반만 반영되는 위험이 없다.
      */
-    @Transactional
+    @Transactional(noRollbackFor = [RefreshTokenInvalidException::class])
     fun rotate(rawRefreshToken: String): TokenPair {
         val existing =
             refreshTokenRepository.findByTokenHash(hash(rawRefreshToken))
                 ?: throw RefreshTokenInvalidException()
         val now = OffsetDateTime.now(clock)
 
-        if (existing.isRevoked()) {
+        // 벌크 UPDATE(clearAutomatically = true)는 실행되는 즉시 영속성 컨텍스트를 비운다.
+        // 그 이후 existing은 준영속 상태가 되어 LAZY 연관(member/admin)에 접근하면
+        // LazyInitializationException이 난다 — 그 전에 필요한 값을 전부 지역 변수로 옮겨 둔다.
+        val id = existing.id!!
+        val principalType = existing.principalType()
+        val principalId = existing.principalId()
+        val alreadyRevoked = existing.isRevoked()
+        val expired = existing.isExpired(now)
+
+        if (alreadyRevoked) {
             logger.warn(
                 "폐기된 refresh 토큰 재사용 감지 — 해당 주체의 모든 refresh를 폐기합니다. principalType={}, principalId={}",
-                existing.principalType(),
-                existing.principalId(),
+                principalType,
+                principalId,
             )
-            revokeAllUsableFor(existing, now)
+            revokeAllUsableFor(principalType, principalId, now)
             throw RefreshTokenInvalidException()
         }
 
-        if (existing.isExpired(now)) {
-            existing.revoke(now)
+        if (expired) {
+            refreshTokenRepository.revokeIfUsable(id, now)
             throw RefreshTokenInvalidException()
         }
 
-        existing.revoke(now)
-        return issueTokenPair(existing.principalType(), existing.principalId())
+        // 갱신 행 수 0 = 이 트랜잭션이 경쟁에서 졌다 = 다른 트랜잭션이 방금 이 토큰을 폐기했다.
+        // 스냅샷(alreadyRevoked)은 false였지만 그 사이 다른 요청이 같은 토큰으로 먼저 회전에
+        // 성공했다는 뜻이므로, 이 요청은 재사용 시도로 취급해 주체의 나머지 refresh까지 폐기한다.
+        if (refreshTokenRepository.revokeIfUsable(id, now) == 0) {
+            logger.warn(
+                "회전 경쟁에서 패배 — 재사용으로 간주해 해당 주체의 모든 refresh를 폐기합니다. principalType={}, principalId={}",
+                principalType,
+                principalId,
+            )
+            revokeAllUsableFor(principalType, principalId, now)
+            throw RefreshTokenInvalidException()
+        }
+
+        // 준영속이 된 existing을 다시 만지지 않고, 미리 담아 둔 값으로 새 토큰 쌍을 발급한다.
+        return issueTokenPair(principalType, principalId)
     }
 
     /** 로그아웃. 존재하지 않는 토큰이어도 조용히 반환한다 — 로그아웃은 항상 성공해야 한다(멱등). */
     @Transactional
     fun revoke(rawRefreshToken: String) {
-        val existing = refreshTokenRepository.findByTokenHash(hash(rawRefreshToken)) ?: return
-        existing.revoke(OffsetDateTime.now(clock))
+        val target = refreshTokenRepository.findByTokenHash(hash(rawRefreshToken)) ?: return
+        target.revoke(OffsetDateTime.now(clock))
     }
 
     /** 강제 로그아웃(D-044) — 회원 상태 변경이 `ACTIVE`가 아니게 될 때 호출된다. 회원이 없으면 조용히 반환한다. */
@@ -137,16 +166,21 @@ class TokenService(
         refreshTokenRepository.findAllByMemberAndRevokedAtIsNull(member).forEach { it.revoke(now) }
     }
 
+    /**
+     * 주체의 미폐기 refresh를 전부 조건부 벌크 UPDATE로 폐기한다. 엔티티가 아니라
+     * principalType/principalId를 받는 이유: 벌크 UPDATE([RefreshTokenRepository.revokeIfUsable])
+     * 이후 호출자([rotate])의 `existing`은 이미 준영속 상태라, 여기서 그 엔티티의 LAZY 연관
+     * (`member`/`admin`)을 만지면 LazyInitializationException이 난다.
+     */
     private fun revokeAllUsableFor(
-        refreshToken: RefreshToken,
+        principalType: PrincipalType,
+        principalId: Long,
         at: OffsetDateTime,
     ) {
-        val usableTokens =
-            when (refreshToken.principalType()) {
-                PrincipalType.MEMBER -> refreshTokenRepository.findAllByMemberAndRevokedAtIsNull(refreshToken.member!!)
-                PrincipalType.ADMIN -> refreshTokenRepository.findAllByAdminAndRevokedAtIsNull(refreshToken.admin!!)
-            }
-        usableTokens.forEach { it.revoke(at) }
+        when (principalType) {
+            PrincipalType.MEMBER -> refreshTokenRepository.revokeAllUsableByMemberId(principalId, at)
+            PrincipalType.ADMIN -> refreshTokenRepository.revokeAllUsableByAdminId(principalId, at)
+        }
     }
 
     private fun issueAccessToken(
