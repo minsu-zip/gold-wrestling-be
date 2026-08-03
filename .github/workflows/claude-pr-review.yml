@@ -77,5 +77,6 @@ jobs:
             - 위반이 없으면 "규칙 위반 없음"과 함께 이 PR에서 잘한 점 1~2개를 남긴다
             - 확실하지 않은 추측성 지적은 Info로 낮추고 그 이유를 밝힌다
           claude_args: |
-            --max-turns 10
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --max-turns 40
             --model claude-sonnet-5
