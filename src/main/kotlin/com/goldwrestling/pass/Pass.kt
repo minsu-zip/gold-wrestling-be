@@ -99,7 +99,94 @@ class Pass(
         }
     }
 
+    /**
+     * 이용권 표시 상태 계산 (D-064) — 저장하지 않고 조회 시점마다 다시 계산한다.
+     * 우선순위: 취소 → 만료 → 소진 → 사용가능(policies §1). 잔여가 남아 있어도 취소가 우선이고,
+     * 잔여 0이어도 만료가 소진보다 우선한다 — 순서를 바꾸면 이 두 복합 케이스의 표시가 달라진다.
+     */
+    fun displayStatus(today: LocalDate): PassDisplayStatus =
+        when {
+            status == PassStatus.CANCELED -> PassDisplayStatus.CANCELED
+            isExpired(today) -> PassDisplayStatus.EXPIRED
+            isExhausted() -> PassDisplayStatus.EXHAUSTED
+            else -> PassDisplayStatus.USABLE
+        }
+
+    /**
+     * 유효기간 만료 판정 (D-066): `endDate`는 종료일 포함이라 `!today.isAfter(endDate)`가 유효 —
+     * 그 반대인 `today.isAfter(endDate)`가 만료다. Phase 5 만료 배치가 이 식을 재사용한다.
+     */
+    private fun isExpired(today: LocalDate): Boolean = today.isAfter(endDate)
+
+    /**
+     * 소진 판정: 횟수제이며 잔여가 0 이하. 기간제는 [remainingCount]가 항상 null이라 소진 개념이 없다.
+     */
+    private fun isExhausted(): Boolean = remainingCount?.let { it.compareTo(BigDecimal.ZERO) <= 0 } ?: false
+
     companion object {
         private val HALF_SESSION = BigDecimal("0.5")
+
+        /**
+         * 이용권 등록 팩토리 (policies §1, D-055, D-063, D-066).
+         *
+         * `startDate` 기본값(오늘) 채우기는 서비스가 `Clock`으로 하고, 이 팩토리는 항상 확정된
+         * 날짜를 받는다. 타입별 필수·금지 필드는 `when (type)` 한 곳에 모아 "이 타입에 무엇이
+         * 필수이고 무엇이 금지인지"가 한 화면에 보이게 한다.
+         */
+        fun register(
+            member: Member,
+            branch: Branch,
+            type: PassType,
+            startDate: LocalDate,
+            term: EveningMembershipTerm?,
+            initialCount: BigDecimal?,
+            registeredBy: Admin,
+            now: OffsetDateTime,
+        ): Pass {
+            val (endDate, remainingCount) =
+                when (type) {
+                    // 기간제: 개월 수는 저장하지 않고 종료일 계산에만 쓴다 (D-063). 종료일은
+                    // 종료일 포함 계산식을 쓴다 (D-066).
+                    PassType.EVENING_MEMBERSHIP -> {
+                        if (initialCount != null) throw PassTypeNotAdjustableException()
+                        if (term == null) {
+                            throw InvalidPassPeriodException("저녁반 회비는 기간(1/3/6개월)을 지정해야 합니다.")
+                        }
+                        startDate.plusMonths(term.months).minusDays(1) to null
+                    }
+
+                    // 횟수제: 초기 횟수는 0.5 단위 자유 입력이다 (D-055). 유효기간은 시작일 기준
+                    // 1년, 종료일 포함 계산식을 쓴다 (D-066).
+                    PassType.SESSION_PASS, PassType.LESSON_PASS -> {
+                        if (term != null) {
+                            throw InvalidPassPeriodException("횟수권·레슨권은 회비 기간 단위를 지정할 수 없습니다.")
+                        }
+                        val count = initialCount ?: throw InvalidAdjustmentUnitException()
+                        validateInitialCount(count)
+                        startDate.plusYears(1).minusDays(1) to count
+                    }
+                }
+
+            return Pass(
+                member = member,
+                branch = branch,
+                registeredBy = registeredBy,
+                type = type,
+                status = PassStatus.ACTIVE,
+                startDate = startDate,
+                endDate = endDate,
+                remainingCount = remainingCount,
+                createdAt = now,
+            )
+        }
+
+        /** 초기 횟수는 양수이며 0.5 단위여야 한다 (policies §1, D-055). */
+        private fun validateInitialCount(initialCount: BigDecimal) {
+            if (initialCount.compareTo(BigDecimal.ZERO) <= 0 ||
+                initialCount.remainder(HALF_SESSION).compareTo(BigDecimal.ZERO) != 0
+            ) {
+                throw InvalidAdjustmentUnitException()
+            }
+        }
     }
 }
