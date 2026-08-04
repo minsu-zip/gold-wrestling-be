@@ -229,7 +229,9 @@ class Pass(
                         if (term != null) {
                             throw InvalidPassPeriodException("횟수권·레슨권은 회비 기간 단위를 지정할 수 없습니다.")
                         }
-                        val count = initialCount ?: throw InvalidAdjustmentUnitException()
+                        // 누락과 단위 위반은 원인이 다르다 — 누락은 MissingInitialCountException(WR-02),
+                        // 단위 위반은 validateInitialCount의 InvalidAdjustmentUnitException.
+                        val count = initialCount ?: throw MissingInitialCountException()
                         validateInitialCount(count)
                         startDate.plusYears(1).minusDays(1) to count
                     }

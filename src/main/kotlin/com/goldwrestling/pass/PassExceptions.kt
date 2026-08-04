@@ -25,6 +25,20 @@ class InvalidAdjustmentUnitException :
     )
 
 /**
+ * 횟수권·레슨권 등록에 초기 횟수가 누락됐을 때(D-055, 리뷰 WR-02).
+ *
+ * DTO의 `@Valid`로는 "타입이 횟수제일 때만 필수"라는 조건부 필수를 표현할 수 없어 도메인에서
+ * 검증한다. 의미상 요청 형식 문제이므로 새 코드를 만들지 않고 [ErrorCode.VALIDATION_FAILED]를
+ * 재사용한다 — 단위 위반([InvalidAdjustmentUnitException])과 원인이 다르므로 예외를 분리해
+ * 사용자 대면 문구가 실제 원인("누락")을 말하게 한다.
+ */
+class MissingInitialCountException :
+    DomainException(
+        ErrorCode.VALIDATION_FAILED,
+        "횟수권·레슨권은 초기 횟수를 지정해야 합니다.",
+    )
+
+/**
  * 가감 결과 잔여가 음수가 될 때(policies §4.2a "결과 잔여가 음수가 되는 가감은 거부").
  */
 class InsufficientPassCountException :

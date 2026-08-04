@@ -116,6 +116,13 @@ class PassRegistrationTest {
     }
 
     @Test
+    fun `횟수권에 초기 횟수를 지정하지 않으면 등록이 거부된다`() {
+        assertThatThrownBy {
+            registerSessionPass(initialCount = null)
+        }.isInstanceOf(MissingInitialCountException::class.java)
+    }
+
+    @Test
     fun `횟수권에 회비 기간 단위를 지정하면 등록이 거부된다`() {
         assertThatThrownBy {
             Pass.register(

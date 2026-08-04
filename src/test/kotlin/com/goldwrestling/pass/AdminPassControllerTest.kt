@@ -191,6 +191,21 @@ class AdminPassControllerTest {
     }
 
     @Test
+    fun `횟수권에 initialCount를 지정하지 않으면 400과 VALIDATION_FAILED를 반환한다`() {
+        val member = persistMember()
+        val token = adminAccessToken()
+
+        mockMvc
+            .perform(
+                post("/api/admin/members/${member.id}/passes")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"type":"SESSION_PASS"}"""),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+    }
+
+    @Test
     fun `횟수권에 initialCount 0-3을 주면 400과 INVALID_ADJUSTMENT_UNIT을 반환한다`() {
         val member = persistMember()
         val token = adminAccessToken()
