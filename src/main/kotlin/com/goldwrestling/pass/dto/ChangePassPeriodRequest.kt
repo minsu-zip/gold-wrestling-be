@@ -10,8 +10,8 @@ import java.time.LocalDate
  * 기간·유효기간 통합 수정 요청(`PATCH /api/admin/passes/{passId}/period`, PASS-04·PASS-07, D-062).
  *
  * **형식만 검증한다**(conventions §6) — "횟수권은 시작일을 바꿀 수 없다", "종료일은 시작일보다
- * 앞설 수 없다" 같은 도메인 규칙은 여기 넣지 않는다. `Pass.changePeriod`가 그 전부를 판정하므로,
- * DTO에 같은 규칙을 중복해서 넣으면 두 곳이 어긋날 때 어느 쪽이 맞는지 알 수 없게 된다.
+ * 앞설 수 없다" 같은 도메인 규칙은 여기 넣지 않는다. `Pass.resolvePeriodChange`가 그 전부를
+ * 판정하므로, DTO에 같은 규칙을 중복해서 넣으면 두 곳이 어긋날 때 어느 쪽이 맞는지 알 수 없게 된다.
  */
 @Schema(description = "기간·유효기간 수정 요청 — 저녁반은 시작·종료 모두, 횟수권은 종료일만 반영된다(D-062)")
 data class ChangePassPeriodRequest(

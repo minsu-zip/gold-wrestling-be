@@ -280,21 +280,25 @@ class MemberPassControllerTest {
         endDate: LocalDate = LocalDate.now(clock).plusYears(1).minusDays(1),
         status: PassStatus = PassStatus.ACTIVE,
     ): Pass {
+        // ck_pass_cancellation(V4)이 CANCELED를 canceled_at/cancel_reason/canceled_by_admin_id
+        // 3종 동시 존재와 묶어 강제한다 — `Pass.resolveCancellationOffset`은 더 이상 상태를 바꾸지
+        // 않으므로(D-072), CANCELED 픽스처는 생성자에서 3종을 함께 채워 만든다.
+        val isCanceled = status == PassStatus.CANCELED
         val pass =
             Pass(
                 member = member,
                 branch = songpaBranch(),
                 registeredBy = admin,
                 type = type,
-                status = PassStatus.ACTIVE,
+                status = status,
                 startDate = startDate,
                 endDate = endDate,
                 remainingCount = remaining,
+                canceledBy = if (isCanceled) admin else null,
+                canceledAt = if (isCanceled) OffsetDateTime.now(clock) else null,
+                cancelReason = if (isCanceled) "테스트 사전 취소" else null,
                 createdAt = OffsetDateTime.now(clock),
             )
-        if (status == PassStatus.CANCELED) {
-            pass.cancel(reason = "테스트 사전 취소", admin = admin, now = OffsetDateTime.now(clock))
-        }
         return passRepository.saveAndFlush(pass)
     }
 }

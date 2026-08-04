@@ -134,18 +134,23 @@ class Pass(
     /**
      * 기간·유효기간 수정 판정 (PASS-04·PASS-07, D-062).
      *
+     * **이 메서드는 판정·계산만 하며 상태를 바꾸지 않는다(D-072).** 실제 반영은
+     * `PassRepository.changePeriodIfUnchanged`의 조건부 UPDATE(compare-and-swap)가 한다 — 다음에
+     * 이 메서드를 읽는 사람이 여기에 `startDate =`/`endDate =` 대입문을 추가하지 않는다. 두
+     * 관리자가 동시에 기간을 수정하면 이 판정은 둘 다 통과할 수 있지만, 반영은 조건부 UPDATE가
+     * "조회 시점 전값과 DB의 현재 값이 같을 때만" 반영해 한쪽만 성공시킨다.
+     *
      * [newStartDate]가 null이면 기존 [startDate]를 유지한다. 횟수제(`SESSION_PASS`/`LESSON_PASS`)는
      * 시작일이 고정이라 기존과 다른 값이 들어오면 거부한다 — 같은 값 재전송(변경 없음)은 허용한다.
      * 기간제(`EVENING_MEMBERSHIP`)만 시작일도 함께 수정할 수 있다.
      *
-     * **변경 전 값은 이 메서드가 대입하기 전 상태를 호출부가 지역 변수로 미리 보관해야 한다** —
-     * 이 메서드는 반환값이 없고, 호출부가 그 전값·후값으로 같은 트랜잭션에서 `PassPeriodChange`
-     * 이력을 남긴다(D-057).
+     * 반환값은 **적용될 (시작일, 종료일)** 쌍이다. 호출부가 이 값과 호출 전 보관해 둔 전값으로
+     * 같은 트랜잭션에서 `PassPeriodChange` 이력을 남긴다(D-057).
      */
-    fun changePeriod(
+    fun resolvePeriodChange(
         newStartDate: LocalDate?,
         newEndDate: LocalDate,
-    ) {
+    ): Pair<LocalDate, LocalDate> {
         requireNotCanceled()
 
         val resolvedStart = newStartDate ?: startDate
@@ -156,31 +161,24 @@ class Pass(
             throw InvalidPassPeriodException("종료일은 시작일보다 앞설 수 없습니다.")
         }
 
-        startDate = resolvedStart
-        endDate = newEndDate
+        return resolvedStart to newEndDate
     }
 
     /**
-     * 등록 취소 처리 (PASS-08, D-059).
+     * 등록 취소 판정 + 원장에 남길 상쇄 수량 산출 (PASS-08, D-059).
      *
-     * 상태를 [PassStatus.CANCELED]로 전환하고 취소 시각·사유·주체를 함께 기록한다. 반환값은
-     * **원장(`PassTransaction`)에 남길 상쇄 수량**이다 — 0이면 호출부가 상쇄 이력을 남기지
-     * 않는다(D-065). **잔여 횟수를 여기서 0으로 만들지 않는다** — 그 반영은
-     * `PassRepository.zeroRemainingCount`의 조건부 UPDATE가 하고, 이 메서드는 상쇄 수량만
-     * 돌려준다(D-021). [reason]의 공백 여부는 서비스/DTO의 `@NotBlank` 책임이며, 이 메서드는
-     * `reason.trim()` 결과를 그대로 저장한다.
+     * **이 메서드는 판정·계산만 하며 상태를 바꾸지 않는다(D-072).** [PassStatus.CANCELED] 전환과
+     * 취소 시각·사유·주체 기록은 `PassRepository.cancelIfNotCanceled`의 조건부 UPDATE가 한다 —
+     * 다음에 이 메서드를 읽는 사람이 여기에 `status =`/`canceledAt =` 같은 대입문을 추가하지
+     * 않는다. 두 관리자가 동시에 취소하면 이 판정은 둘 다 통과할 수 있지만, 실제 전환은 조건부
+     * UPDATE가 정확히 한 트랜잭션만 반영하고 나머지는 반환 행 수 0으로 알려 호출부가
+     * [PassAlreadyCanceledException]으로 변환한다.
+     *
+     * 반환값은 **원장(`PassTransaction`)에 남길 상쇄 수량**이다 — 0이면 호출부가 상쇄 이력을 남기지
+     * 않는다(D-065).
      */
-    fun cancel(
-        reason: String,
-        admin: Admin,
-        now: OffsetDateTime,
-    ): BigDecimal {
+    fun resolveCancellationOffset(): BigDecimal {
         requireNotCanceled()
-
-        status = PassStatus.CANCELED
-        canceledAt = now
-        cancelReason = reason.trim()
-        canceledBy = admin
 
         return remainingCount?.negate() ?: BigDecimal.ZERO
     }

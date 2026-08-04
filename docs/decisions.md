@@ -556,3 +556,9 @@
 - 2026-08 / `MemberPassService.getMyPasses`·`getMyTransactions`(PASS-05·PASS-06)는 `MemberStateGate.requireActive`를 호출하지 않는다 — `ON_LEAVE`(휴회)·`PENDING`·`INACTIVE` 회원도 본인 이용권과 이력을 조회할 수 있다. **[사용자 확정, 2026-08-04 phase 3 검증 AskUserQuestion — "휴회도 조회 허용" 선택]**
 - 이유: policies §5가 휴회를 "정상적으로 로그인해 쓰는 상태"로 정의하므로 복귀 전 잔여 확인이 가능해야 하고, 등록이 회원 상태를 가리지 않으므로(D-068) 어떤 상태든 본인 이용권은 본인이 볼 수 있어야 한다. `MemberProfileService.getMyProfile`이 같은 이유로 게이트를 걸지 않은 선례를 따른다. 응답은 본인 스코프로만 한정되어 상태 제한 없이도 새어나갈 데이터가 없다.
 - 기각 대안: `ACTIVE`만 허용(휴회 회원이 복귀 전 잔여를 확인할 수 없어 policies §5와 충돌 — 초기 구현이 이 형태였고 phase 3 검증에서 발견되어 수정됨).
+
+## D-072. 이용권 취소·기간수정도 조건부 UPDATE로 상태 전환한다(D-021 확장)
+
+- 2026-08 / `AdminPassService.cancel`·`changePeriod`는 더 이상 엔티티를 mutate한 뒤 dirty-checking flush로 반영하지 않는다. `Pass.resolveCancellationOffset`·`Pass.resolvePeriodChange`는 판정·계산만 하고 상태를 바꾸지 않으며, 실제 상태 전환은 `PassRepository.cancelIfNotCanceled`(상태<>CANCELED 조건)·`changePeriodIfUnchanged`(전값 compare-and-swap) 조건부 UPDATE가 한다. 반환 행 수 0을 각각 `PassAlreadyCanceledException`·`PassStateConflictException`(기존 코드 재사용, 신규 코드 없음)으로 변환한다.
+- 이유: 두 관리자가 같은 이용권을 동시에 취소·기간수정하면 read→mutate→save 경로는 조회-판단-저장 사이에 다른 트랜잭션이 끼어들 수 있어(T-03-38·WF-03-01, 03-REVIEW.md WR-03·WR-04) 둘 다 200을 받고 나중 커밋이 취소 사유·기간 전값을 조용히 덮어쓸 수 있었다. 특히 취소의 상쇄 수량 0 분기(기간제·잔여 0 횟수권)는 종전 코드에서 조건부 경로를 아예 타지 않아 그 분기만 경쟁에 완전히 노출돼 있었다.
+- 기각 대안: `@Version` 낙관적 락(이 프로젝트가 D-021에서 이미 기각 — 재시도 로직 필요, 경쟁 폭증 시나리오에서 재시도 폭증), 애플리케이션 레벨 동기화(다중 인스턴스 무효).

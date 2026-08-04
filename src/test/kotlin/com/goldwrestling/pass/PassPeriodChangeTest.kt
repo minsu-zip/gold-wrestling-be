@@ -1,16 +1,17 @@
 package com.goldwrestling.pass
 
 import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.assertThatCode
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 import java.time.LocalDate
 
 /**
- * 기간·유효기간 수정 판정 (PASS-04·PASS-07, D-062) — 순수 Kotlin 단위테스트.
- * 스프링 컨텍스트 없이 `Pass.changePeriod` 엔티티 메서드만 검증한다 (add-domain-test §1).
+ * 기간·유효기간 수정 판정 (PASS-04·PASS-07, D-062·D-072) — 순수 Kotlin 단위테스트.
+ * 스프링 컨텍스트 없이 `Pass.resolvePeriodChange` 엔티티 메서드만 검증한다 (add-domain-test §1).
  *
+ * `resolvePeriodChange`는 상태를 바꾸지 않고 적용될 (시작일, 종료일) 쌍만 반환한다(D-072) —
+ * 실제 반영은 `PassRepository.changePeriodIfUnchanged`의 조건부 UPDATE가 한다.
  * `PassPeriodChange` 이력 행이 실제로 저장되는지는 03-08의 통합테스트가 본다 — 여기서는
  * "무엇을 반영·거부하는가"라는 엔티티 판정만 본다.
  */
@@ -19,27 +20,30 @@ class PassPeriodChangeTest {
     fun `저녁반 회비는 시작일과 종료일을 모두 수정할 수 있다`() {
         val pass = eveningMembership(startDate = LocalDate.of(2026, 3, 1), endDate = LocalDate.of(2026, 4, 1))
 
-        pass.changePeriod(LocalDate.of(2026, 3, 15), LocalDate.of(2026, 5, 15))
+        val (newStartDate, newEndDate) = pass.resolvePeriodChange(LocalDate.of(2026, 3, 15), LocalDate.of(2026, 5, 15))
 
-        assertThat(pass.startDate).isEqualTo(LocalDate.of(2026, 3, 15))
-        assertThat(pass.endDate).isEqualTo(LocalDate.of(2026, 5, 15))
+        assertThat(newStartDate).isEqualTo(LocalDate.of(2026, 3, 15))
+        assertThat(newEndDate).isEqualTo(LocalDate.of(2026, 5, 15))
+        // 판정만 하고 엔티티 자체는 바뀌지 않는다(D-072).
+        assertThat(pass.startDate).isEqualTo(LocalDate.of(2026, 3, 1))
+        assertThat(pass.endDate).isEqualTo(LocalDate.of(2026, 4, 1))
     }
 
     @Test
     fun `횟수권은 종료일만 수정할 수 있고 시작일은 유지된다`() {
         val pass = sessionPass(startDate = LocalDate.of(2026, 3, 1), endDate = LocalDate.of(2027, 2, 28))
 
-        pass.changePeriod(null, LocalDate.of(2027, 6, 30))
+        val (newStartDate, newEndDate) = pass.resolvePeriodChange(null, LocalDate.of(2027, 6, 30))
 
-        assertThat(pass.startDate).isEqualTo(LocalDate.of(2026, 3, 1))
-        assertThat(pass.endDate).isEqualTo(LocalDate.of(2027, 6, 30))
+        assertThat(newStartDate).isEqualTo(LocalDate.of(2026, 3, 1))
+        assertThat(newEndDate).isEqualTo(LocalDate.of(2027, 6, 30))
     }
 
     @Test
     fun `횟수권의 시작일을 기존과 다른 값으로 바꾸려 하면 거부된다`() {
         val pass = sessionPass(startDate = LocalDate.of(2026, 3, 1), endDate = LocalDate.of(2027, 2, 28))
 
-        assertThatThrownBy { pass.changePeriod(LocalDate.of(2026, 4, 1), LocalDate.of(2027, 2, 28)) }
+        assertThatThrownBy { pass.resolvePeriodChange(LocalDate.of(2026, 4, 1), LocalDate.of(2027, 2, 28)) }
             .isInstanceOf(InvalidPassPeriodException::class.java)
     }
 
@@ -47,16 +51,17 @@ class PassPeriodChangeTest {
     fun `횟수권 시작일을 기존과 같은 값으로 재전송하면 허용된다`() {
         val pass = sessionPass(startDate = LocalDate.of(2026, 3, 1), endDate = LocalDate.of(2027, 2, 28))
 
-        assertThatCode { pass.changePeriod(LocalDate.of(2026, 3, 1), LocalDate.of(2027, 6, 30)) }
-            .doesNotThrowAnyException()
-        assertThat(pass.endDate).isEqualTo(LocalDate.of(2027, 6, 30))
+        val (newStartDate, newEndDate) = pass.resolvePeriodChange(LocalDate.of(2026, 3, 1), LocalDate.of(2027, 6, 30))
+
+        assertThat(newStartDate).isEqualTo(LocalDate.of(2026, 3, 1))
+        assertThat(newEndDate).isEqualTo(LocalDate.of(2027, 6, 30))
     }
 
     @Test
     fun `종료일이 시작일보다 앞서는 기간 수정은 거부된다`() {
         val pass = eveningMembership(startDate = LocalDate.of(2026, 3, 1), endDate = LocalDate.of(2026, 4, 1))
 
-        assertThatThrownBy { pass.changePeriod(null, LocalDate.of(2026, 2, 1)) }
+        assertThatThrownBy { pass.resolvePeriodChange(null, LocalDate.of(2026, 2, 1)) }
             .isInstanceOf(InvalidPassPeriodException::class.java)
     }
 
@@ -64,9 +69,9 @@ class PassPeriodChangeTest {
     fun `만료된 횟수권의 유효기간도 연장할 수 있다`() {
         val pass = sessionPass(startDate = LocalDate.of(2019, 1, 1), endDate = LocalDate.of(2020, 1, 1))
 
-        assertThatCode { pass.changePeriod(null, LocalDate.of(2027, 12, 31)) }
-            .doesNotThrowAnyException()
-        assertThat(pass.endDate).isEqualTo(LocalDate.of(2027, 12, 31))
+        val (_, newEndDate) = pass.resolvePeriodChange(null, LocalDate.of(2027, 12, 31))
+
+        assertThat(newEndDate).isEqualTo(LocalDate.of(2027, 12, 31))
     }
 
     @Test
@@ -78,7 +83,7 @@ class PassPeriodChangeTest {
                 status = PassStatus.CANCELED,
             )
 
-        assertThatThrownBy { pass.changePeriod(null, LocalDate.of(2027, 6, 30)) }
+        assertThatThrownBy { pass.resolvePeriodChange(null, LocalDate.of(2027, 6, 30)) }
             .isInstanceOf(PassAlreadyCanceledException::class.java)
     }
 

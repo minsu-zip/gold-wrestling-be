@@ -828,15 +828,16 @@ class AdminPassControllerTest {
                     branch = songpaBranch(),
                     registeredBy = admin,
                     type = PassType.SESSION_PASS,
-                    status = PassStatus.ACTIVE,
+                    status = PassStatus.CANCELED,
                     startDate = LocalDate.now(clock),
                     endDate = LocalDate.now(clock).plusYears(1).minusDays(1),
                     remainingCount = BigDecimal("2.0"),
+                    canceledBy = admin,
+                    canceledAt = OffsetDateTime.now(clock),
+                    cancelReason = "사전 취소",
                     createdAt = OffsetDateTime.now(clock),
                 ),
             )
-        canceledPass.cancel(reason = "사전 취소", admin = admin, now = OffsetDateTime.now(clock))
-        passRepository.saveAndFlush(canceledPass)
         val token = adminAccessToken()
 
         val responseBody =
@@ -927,24 +928,25 @@ class AdminPassControllerTest {
     ): Pass {
         val member = persistMember()
         val admin = persistAdmin()
+        // ck_pass_cancellation(V4)이 CANCELED를 canceled_at/cancel_reason/canceled_by_admin_id
+        // 3종 동시 존재와 묶어 강제한다 — `Pass.resolveCancellationOffset`은 더 이상 상태를 바꾸지
+        // 않으므로(D-072), CANCELED 픽스처는 생성자에서 3종을 함께 채워 만든다.
+        val isCanceled = status == PassStatus.CANCELED
         val pass =
             Pass(
                 member = member,
                 branch = songpaBranch(),
                 registeredBy = admin,
                 type = type,
-                // ck_pass_cancellation(V4)이 CANCELED를 canceled_at/cancel_reason/canceled_by_admin_id
-                // 3종 동시 존재와 묶어 강제한다 — 우선 ACTIVE로 저장하고, CANCELED가 필요하면 아래에서
-                // `Pass.cancel`로 3종을 함께 채운다.
-                status = PassStatus.ACTIVE,
+                status = status,
                 startDate = startDate,
                 endDate = endDate,
                 remainingCount = remaining,
+                canceledBy = if (isCanceled) admin else null,
+                canceledAt = if (isCanceled) OffsetDateTime.now(clock) else null,
+                cancelReason = if (isCanceled) "테스트 사전 취소" else null,
                 createdAt = OffsetDateTime.now(clock),
             )
-        if (status == PassStatus.CANCELED) {
-            pass.cancel(reason = "테스트 사전 취소", admin = admin, now = OffsetDateTime.now(clock))
-        }
         return passRepository.saveAndFlush(pass)
     }
 }

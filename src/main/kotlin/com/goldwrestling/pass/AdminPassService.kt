@@ -142,13 +142,15 @@ class AdminPassService(
 
     /**
      * 기간·유효기간 통합 수정(PASS-04·PASS-07, D-057, D-062). 저녁반 기간·횟수권 유효기간 수정이
-     * 이 하나의 메서드로 처리된다 — 타입별 차이는 `Pass.changePeriod`가 서버에서 강제한다.
+     * 이 하나의 메서드로 처리된다 — 타입별 차이는 `Pass.resolvePeriodChange`가 서버에서 강제한다.
      *
-     * 처리 순서: 조회 → **`changePeriod` 호출 전 전값 보관**(호출 후에는 되찾을 방법이 없다) →
-     * `pass.changePeriod` 호출(규칙 위반은 여기서 예외) → 전값·후값이 하나라도 달라졌으면 같은
-     * 트랜잭션에서 `PassPeriodChange` 이력 저장(D-069 — 변화가 없으면 이력을 남기지 않는다) →
-     * 응답 변환. `pass`는 영속 상태라 변경 감지로 flush되므로 별도 `passRepository.save`를 넣지
-     * 않는다.
+     * 두 관리자의 동시 기간 수정(WF-03-01)을 D-021 관례(조건부 갱신)로 막는다 — 사전 판정
+     * (`Pass.resolvePeriodChange`)은 정확한 실패 사유를 주기 위한 것일 뿐 방어선이 아니고, 실제
+     * 반영과 경쟁 통제는 `PassRepository.changePeriodIfUnchanged`의 compare-and-swap 조건부
+     * UPDATE가 한다(D-072). 처리 순서: 조회 → 전값 보관 → 사전 판정으로 적용될 (시작일, 종료일)
+     * 계산 → 변화 없음(D-069)이면 DB를 건드리지 않고 반환 → 조건부 UPDATE → 반환 0이면 재조회해
+     * 취소됐는지/경쟁에서 졌는지 구분해 정확한 예외로 변환 → 재조회한 영속 `Pass`로
+     * `PassPeriodChange` 이력 저장(같은 트랜잭션) → 응답 변환.
      */
     @Transactional
     fun changePeriod(
@@ -167,38 +169,66 @@ class AdminPassService(
         val previousStartDate = pass.startDate
         val previousEndDate = pass.endDate
 
-        pass.changePeriod(request.newStartDate, request.newEndDate)
+        val (newStartDate, newEndDate) = pass.resolvePeriodChange(request.newStartDate, request.newEndDate)
 
-        if (previousStartDate != pass.startDate || previousEndDate != pass.endDate) {
-            passPeriodChangeRepository.save(
-                PassPeriodChange(
-                    pass = pass,
-                    previousStartDate = previousStartDate,
-                    previousEndDate = previousEndDate,
-                    newStartDate = pass.startDate,
-                    newEndDate = pass.endDate,
-                    reason = request.reason.trim(),
-                    admin = admin,
-                    occurredAt = now,
-                ),
-            )
+        if (newStartDate == previousStartDate && newEndDate == previousEndDate) {
+            // 변화 없음 재전송(D-069) — DB를 건드리지 않고 그대로 반환한다.
+            return PassResponse.from(pass, today)
         }
 
-        return PassResponse.from(pass, today)
+        val updated =
+            passRepository.changePeriodIfUnchanged(
+                id = passId,
+                newStartDate = newStartDate,
+                newEndDate = newEndDate,
+                expectedStartDate = previousStartDate,
+                expectedEndDate = previousEndDate,
+            )
+        if (updated == 0) {
+            // 반환 0의 원인은 둘 중 하나 — 그 사이 취소됐거나(경쟁), 다른 트랜잭션이 기간을
+            // 먼저 바꿨다(동시 수정). 재조회해서 원인을 구분한다.
+            val reloaded = passRepository.findById(passId).orElseThrow { PassNotFoundException(passId) }
+            if (reloaded.status == PassStatus.CANCELED) {
+                throw PassAlreadyCanceledException()
+            }
+            throw PassStateConflictException("이용권 기간이 방금 변경되어 반영하지 못했습니다. 다시 시도해 주세요.")
+        }
+
+        // 벌크 UPDATE(clearAutomatically = true) 직후 pass는 준영속 상태다 — 재조회한 영속
+        // 엔티티로 이력을 저장한다(RESEARCH Pitfall 4, TokenService.rotate와 동일 함정).
+        val refreshed = passRepository.findById(passId).orElseThrow { PassNotFoundException(passId) }
+        passPeriodChangeRepository.save(
+            PassPeriodChange(
+                pass = refreshed,
+                previousStartDate = previousStartDate,
+                previousEndDate = previousEndDate,
+                newStartDate = newStartDate,
+                newEndDate = newEndDate,
+                reason = request.reason.trim(),
+                admin = admin,
+                occurredAt = now,
+            ),
+        )
+
+        return PassResponse.from(refreshed, today)
     }
 
     /**
      * 등록 취소(PASS-08, D-059, D-065). 물리 삭제를 하지 않고 상태 전환 + 상쇄 이력으로 처리해
      * "잔여 = 이력 합계" 불변식을 취소된 이용권에도 유지한다.
      *
-     * 처리 순서: 조회 → `pass.cancel`로 상태·취소 메타데이터 대입 + 상쇄 수량 산출(잔여는 아직
-     * 안 바뀜) → 상쇄 수량이 0(기간제 또는 잔여 0인 횟수권, D-065)이면 잔여 갱신도 이력 저장도
-     * 하지 않고 그대로 반환 → 0이 아니면 `zeroRemainingCount`로 잔여를 조건부로 0으로 만들고(이
-     * 호출은 `flushAutomatically`로 방금 대입한 취소 메타데이터를 먼저 flush하므로
-     * `ck_pass_cancellation` CHECK를 만족한 상태에서 UPDATE가 실행된다) → 반환 0이면 그 사이
-     * 잔여가 바뀐 것이므로 [PassStateConflictException] → `clearAutomatically`로 준영속이 된
-     * 엔티티 대신 재조회한 영속 `Pass`로 `REGISTRATION_CANCELED` 상쇄 이력을 저장한다(같은
-     * 트랜잭션, CLAUDE.md 규칙 6).
+     * 두 관리자의 동시 취소(T-03-38)를 D-021 관례(조건부 갱신)로 막는다 — 사전 판정
+     * (`Pass.resolveCancellationOffset`)은 정확한 실패 사유를 주기 위한 것일 뿐 방어선이 아니고,
+     * 실제 상태 전환과 경쟁 통제는 `PassRepository.cancelIfNotCanceled`의 조건부 UPDATE가
+     * 한다(D-072) — 상쇄 수량이 0인 분기(기간제·잔여 0 횟수권)도 예외 없이 이 조건부 UPDATE를
+     * 거친다.
+     *
+     * 처리 순서: 조회 → 사전 판정으로 상쇄 수량 산출(잔여는 아직 안 바뀜) →
+     * `cancelIfNotCanceled`로 상태·취소 메타데이터를 조건부 반영(반환 0이면 경쟁 패배 →
+     * [PassAlreadyCanceledException]) → 상쇄 수량이 0이 아니면 `zeroRemainingCount`로 잔여를
+     * 조건부로 0으로 만듦(반환 0이면 그 사이 잔여가 바뀐 것이므로 [PassStateConflictException],
+     * 트랜잭션 롤백으로 상태 전환도 함께 되돌아간다) → 재조회한 영속 `Pass`로
+     * `REGISTRATION_CANCELED` 상쇄 이력을 저장한다(같은 트랜잭션, CLAUDE.md 규칙 6).
      */
     @Transactional
     fun cancel(
@@ -213,32 +243,41 @@ class AdminPassService(
             }
         val today = LocalDate.now(clock)
         val now = OffsetDateTime.now(clock)
+        val reason = request.reason.trim()
 
-        val offset = pass.cancel(request.reason, admin, now)
+        val offset = pass.resolveCancellationOffset()
 
-        if (offset.compareTo(BigDecimal.ZERO) == 0) {
-            return PassResponse.from(pass, today)
+        val statusUpdated = passRepository.cancelIfNotCanceled(passId, reason, admin, now)
+        if (statusUpdated == 0) {
+            // 사전 판정 이후 다른 트랜잭션이 먼저 취소를 확정한 것 — 경쟁 패배.
+            throw PassAlreadyCanceledException()
         }
 
-        val expectedRemaining = offset.negate()
-        val updated = passRepository.zeroRemainingCount(passId, expectedRemaining)
-        if (updated == 0) {
-            throw PassStateConflictException("이용권 잔여가 방금 변경되어 취소를 완료하지 못했습니다. 다시 시도해 주세요.")
+        if (offset.compareTo(BigDecimal.ZERO) != 0) {
+            val expectedRemaining = offset.negate()
+            val updated = passRepository.zeroRemainingCount(passId, expectedRemaining)
+            if (updated == 0) {
+                throw PassStateConflictException("이용권 잔여가 방금 변경되어 취소를 완료하지 못했습니다. 다시 시도해 주세요.")
+            }
         }
 
-        // 벌크 UPDATE(clearAutomatically = true) 직후 pass는 준영속 상태다 — 재조회한 영속
-        // 엔티티로 상쇄 이력을 저장한다(RESEARCH Pitfall 4, TokenService.rotate와 동일 함정).
+        // 조건부 UPDATE(clearAutomatically = true) 이후 pass는 준영속 상태다 — 재조회한 영속
+        // 엔티티로 응답을 만들고, 상쇄 이력이 있다면 그 엔티티로 저장한다(RESEARCH Pitfall 4,
+        // TokenService.rotate와 동일 함정).
         val refreshed = passRepository.findById(passId).orElseThrow { PassNotFoundException(passId) }
-        passTransactionRepository.save(
-            PassTransaction(
-                pass = refreshed,
-                amount = offset,
-                reason = TransactionReason.REGISTRATION_CANCELED,
-                note = request.reason.trim(),
-                admin = admin,
-                occurredAt = now,
-            ),
-        )
+
+        if (offset.compareTo(BigDecimal.ZERO) != 0) {
+            passTransactionRepository.save(
+                PassTransaction(
+                    pass = refreshed,
+                    amount = offset,
+                    reason = TransactionReason.REGISTRATION_CANCELED,
+                    note = reason,
+                    admin = admin,
+                    occurredAt = now,
+                ),
+            )
+        }
 
         return PassResponse.from(refreshed, today)
     }
