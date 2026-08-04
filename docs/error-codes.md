@@ -7,7 +7,7 @@
 
 | 코드 | HTTP 상태 | 의미 | 발생 지점 |
 |---|---|---|---|
-| `VALIDATION_FAILED` | 400 | 요청 값 형식 검증 실패 (`@Valid`, 파라미터 제약) | `MethodArgumentNotValidException`, `HandlerMethodValidationException` |
+| `VALIDATION_FAILED` | 400 | 요청 값 형식 검증 실패 (`@Valid`, 파라미터 제약, 타입 조건부 필수) | `MethodArgumentNotValidException`, `HandlerMethodValidationException`, `MissingInitialCountException`(`Pass.register` — 횟수권 초기 횟수 누락, `@Valid`로 표현 불가한 조건부 필수) |
 | `MALFORMED_REQUEST` | 400 | 본문 파싱 실패, 타입 불일치, 필수 파라미터·헤더 누락 | `HttpMessageNotReadableException`, `MethodArgumentTypeMismatchException`, `MissingServletRequestParameterException`, `ServletRequestBindingException`(필수 헤더 누락 등) |
 | `RESOURCE_NOT_FOUND` | 404 | 매핑되지 않은 경로 또는 대상 리소스 없음 | `NoResourceFoundException`, `NoHandlerFoundException` |
 | `METHOD_NOT_ALLOWED` | 405 | 해당 경로가 지원하지 않는 HTTP 메서드 | `HttpRequestMethodNotSupportedException` |
