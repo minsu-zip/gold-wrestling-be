@@ -104,6 +104,33 @@ class MemberPassTransactionControllerTest {
             .andExpect(jsonPath("$.totalPages").exists())
     }
 
+    @Test
+    fun `취소된 이용권의 이력은 응답에 없다 - 본인 이용권 목록과 노출 범위 일치(D-073)`() {
+        val member = persistMember(status = MemberStatus.ACTIVE)
+        val admin = persistAdmin()
+        val activePass = persistPass(member, admin)
+        val canceledPass = persistPass(member, admin, status = PassStatus.CANCELED)
+        val visibleTransaction = persistTransaction(activePass, admin)
+        persistTransaction(canceledPass, admin, reason = TransactionReason.INITIAL_GRANT)
+        persistTransaction(canceledPass, admin, reason = TransactionReason.REGISTRATION_CANCELED)
+        val token = memberAccessToken(member)
+
+        mockMvc
+            .perform(get("/api/members/me/pass-transactions").header(HttpHeaders.AUTHORIZATION, "Bearer $token"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.totalElements").value(1))
+            .andExpect(jsonPath("$.content[0].transactionId").value(visibleTransaction.id))
+
+        // passId 필터로 직접 지정해도 취소된 이용권의 이력은 비어 있다
+        mockMvc
+            .perform(
+                get("/api/members/me/pass-transactions")
+                    .param("passId", canceledPass.id.toString())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token"),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.totalElements").value(0))
+    }
+
     // ---------- 페이지네이션 ----------
 
     @Test
@@ -351,20 +378,28 @@ class MemberPassTransactionControllerTest {
         member: Member,
         admin: Admin,
         remaining: BigDecimal = BigDecimal("10.0"),
-    ): Pass =
-        passRepository.saveAndFlush(
+        status: PassStatus = PassStatus.ACTIVE,
+    ): Pass {
+        // ck_pass_cancellation(V4)이 CANCELED를 취소 메타데이터 3종 동시 존재와 묶어 강제한다
+        // (`MemberPassControllerTest.persistPass`와 동일 패턴).
+        val isCanceled = status == PassStatus.CANCELED
+        return passRepository.saveAndFlush(
             Pass(
                 member = member,
                 branch = songpaBranch(),
                 registeredBy = admin,
                 type = PassType.SESSION_PASS,
-                status = PassStatus.ACTIVE,
+                status = status,
                 startDate = LocalDate.now(clock),
                 endDate = LocalDate.now(clock).plusYears(1).minusDays(1),
                 remainingCount = remaining,
+                canceledBy = if (isCanceled) admin else null,
+                canceledAt = if (isCanceled) OffsetDateTime.now(clock) else null,
+                cancelReason = if (isCanceled) "테스트 사전 취소" else null,
                 createdAt = OffsetDateTime.now(clock),
             ),
         )
+    }
 
     /** `PassTransaction`은 append-only 원장이라(`PassTransaction.kt` KDoc) 이력 자체를 직접 저장한다. */
     private fun persistTransaction(

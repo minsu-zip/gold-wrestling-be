@@ -72,6 +72,8 @@ class MemberPassService(
             Specification.allOf<PassTransaction>(
                 listOfNotNull(
                     PassTransactionSpecifications.ownedByMember(memberId),
+                    // 취소된 이용권의 이력은 본인 이용권 목록(D-058)과 노출 범위를 맞춰 숨긴다 (D-073).
+                    PassTransactionSpecifications.passNotCanceled(),
                     PassTransactionSpecifications.hasPassId(condition.passId),
                 ),
             )

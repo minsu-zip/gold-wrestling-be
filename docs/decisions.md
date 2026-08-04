@@ -562,3 +562,9 @@
 - 2026-08 / `AdminPassService.cancel`·`changePeriod`는 더 이상 엔티티를 mutate한 뒤 dirty-checking flush로 반영하지 않는다. `Pass.resolveCancellationOffset`·`Pass.resolvePeriodChange`는 판정·계산만 하고 상태를 바꾸지 않으며, 실제 상태 전환은 `PassRepository.cancelIfNotCanceled`(상태<>CANCELED 조건)·`changePeriodIfUnchanged`(전값 compare-and-swap) 조건부 UPDATE가 한다. 반환 행 수 0을 각각 `PassAlreadyCanceledException`·`PassStateConflictException`(기존 코드 재사용, 신규 코드 없음)으로 변환한다.
 - 이유: 두 관리자가 같은 이용권을 동시에 취소·기간수정하면 read→mutate→save 경로는 조회-판단-저장 사이에 다른 트랜잭션이 끼어들 수 있어(T-03-38·WF-03-01, 03-REVIEW.md WR-03·WR-04) 둘 다 200을 받고 나중 커밋이 취소 사유·기간 전값을 조용히 덮어쓸 수 있었다. 특히 취소의 상쇄 수량 0 분기(기간제·잔여 0 횟수권)는 종전 코드에서 조건부 경로를 아예 타지 않아 그 분기만 경쟁에 완전히 노출돼 있었다.
 - 기각 대안: `@Version` 낙관적 락(이 프로젝트가 D-021에서 이미 기각 — 재시도 로직 필요, 경쟁 폭증 시나리오에서 재시도 폭증), 애플리케이션 레벨 동기화(다중 인스턴스 무효).
+
+## D-073. 회원 본인 이력 조회에서 취소된 이용권의 이력을 제외한다
+
+- 2026-08 / 본인 차감/복구 이력 조회(PASS-06)는 취소(`CANCELED`)된 이용권의 이력(INITIAL_GRANT·ADMIN_ADJUST·REGISTRATION_CANCELED 상쇄 포함)을 응답에서 제외한다. `PassTransactionSpecifications.passNotCanceled()`가 non-null 필수 조건으로 항상 결합된다. **[사용자 확정, 2026-08-04 — 리뷰 WR-05 분석 후 "숨김" 방향 채택]**
+- 이유: 본인 이용권 목록(D-058)이 취소 이용권을 숨기므로, 이력만 노출되면 회원 화면에 "목록에 없는 passId"의 행이 나타나 혼란을 유발한다. D-059가 취소를 "오등록 정정(없었던 것처럼)"으로 정의한 취지와도 일치. 관리자 화면은 반대로 전부 보이므로 감사 가능성은 유지된다.
+- 기각 대안: 이력도 그대로 노출(목록·이력의 노출 범위 불일치로 FE 조인 깨짐), reason 코드별 선별 노출(규칙이 복잡해지고 FE 분기 증가).
