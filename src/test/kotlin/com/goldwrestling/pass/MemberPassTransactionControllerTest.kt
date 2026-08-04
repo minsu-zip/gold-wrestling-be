@@ -284,14 +284,13 @@ class MemberPassTransactionControllerTest {
     // ---------- 인가 ----------
 
     @Test
-    fun `PENDING 회원 토큰으로 호출하면 403과 MEMBER_NOT_ACTIVE를 반환한다`() {
-        val member = persistMember(status = MemberStatus.PENDING)
+    fun `ON_LEAVE 회원도 본인 이력을 조회할 수 있다 - 상태 게이트 없음(D-071)`() {
+        val member = persistMember(status = MemberStatus.ON_LEAVE)
         val token = memberAccessToken(member)
 
         mockMvc
             .perform(get("/api/members/me/pass-transactions").header(HttpHeaders.AUTHORIZATION, "Bearer $token"))
-            .andExpect(status().isForbidden)
-            .andExpect(jsonPath("$.code").value("MEMBER_NOT_ACTIVE"))
+            .andExpect(status().isOk)
     }
 
     @Test

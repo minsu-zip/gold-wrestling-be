@@ -190,14 +190,31 @@ class MemberPassControllerTest {
     }
 
     @Test
-    fun `PENDING 회원 토큰으로 호출하면 403과 MEMBER_NOT_ACTIVE를 반환한다`() {
+    fun `ON_LEAVE 회원도 본인 이용권을 조회할 수 있다`() {
+        val member = persistMember(status = MemberStatus.ON_LEAVE)
+        val admin = persistAdmin()
+        val pass = persistPass(member, admin, remaining = BigDecimal("3.0"))
+        val token = memberAccessToken(member)
+
+        val body =
+            mockMvc
+                .perform(get("/api/members/me/passes").header(HttpHeaders.AUTHORIZATION, "Bearer $token"))
+                .andExpect(status().isOk)
+                .andReturn()
+                .response.contentAsString
+
+        val passIds: List<Long> = objectMapper.readTree(body).toList().map { it.get("passId").asLong() }
+        assertThat(passIds).contains(pass.id)
+    }
+
+    @Test
+    fun `PENDING 회원도 본인 이용권을 조회할 수 있다 - 상태 게이트 없음(D-071)`() {
         val member = persistMember(status = MemberStatus.PENDING)
         val token = memberAccessToken(member)
 
         mockMvc
             .perform(get("/api/members/me/passes").header(HttpHeaders.AUTHORIZATION, "Bearer $token"))
-            .andExpect(status().isForbidden)
-            .andExpect(jsonPath("$.code").value("MEMBER_NOT_ACTIVE"))
+            .andExpect(status().isOk)
     }
 
     @Test

@@ -1,7 +1,6 @@
 package com.goldwrestling.pass
 
 import com.goldwrestling.auth.AuthenticatedPrincipal
-import com.goldwrestling.member.MemberStateGate
 import com.goldwrestling.member.dto.PageResponse
 import com.goldwrestling.pass.dto.PassResponse
 import com.goldwrestling.pass.dto.PassTransactionResponse
@@ -20,13 +19,18 @@ import java.time.LocalDate
  * **경로에 `memberId`를 받지 않는다.** 두 메서드 모두 [AuthenticatedPrincipal.requireMemberId]로만
  * 스코프를 얻는다 — `MemberProfileService`와 동일한 형태다(T-03-41). 조회 전용이라 변경 메서드가
  * 없으므로 `@Transactional` 오버라이드가 없다.
+ *
+ * **의도적으로 `MemberStateGate`를 호출하지 않는다(D-071).** 휴회(`ON_LEAVE`)는 policies §5가
+ * "정상적으로 로그인해 쓰는 상태"로 정의하므로 복귀 전 잔여 확인이 가능해야 하고, 등록 자체가
+ * 회원 상태를 가리지 않으므로(D-068) 어떤 상태든 본인 이용권은 본인이 볼 수 있어야 한다 —
+ * `MemberProfileService.getMyProfile`과 같은 판단이다. 응답은 본인 스코프로만 한정되어
+ * 상태 제한 없이도 새어나갈 데이터가 없다.
  */
 @Service
 @Transactional(readOnly = true)
 class MemberPassService(
     private val passRepository: PassRepository,
     private val passTransactionRepository: PassTransactionRepository,
-    private val memberStateGate: MemberStateGate,
     private val clock: Clock,
 ) {
     /**
@@ -41,7 +45,6 @@ class MemberPassService(
      * 안에서 끝나야 한다.
      */
     fun getMyPasses(principal: AuthenticatedPrincipal): List<PassResponse> {
-        memberStateGate.requireActive(principal)
         val memberId = principal.requireMemberId()
         val today = LocalDate.now(clock)
         return passRepository
@@ -63,7 +66,6 @@ class MemberPassService(
         principal: AuthenticatedPrincipal,
         condition: PassTransactionSearchCondition,
     ): PageResponse<PassTransactionResponse> {
-        memberStateGate.requireActive(principal)
         val memberId = principal.requireMemberId()
 
         val specification =
