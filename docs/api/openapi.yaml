@@ -12,6 +12,10 @@ tags:
   description: 서버 상태·환경 확인
 - name: auth
   description: 인증·토큰
+- name: admin-pass
+  description: 관리자 이용권 관리
+- name: member-pass
+  description: 회원 본인 이용권·이력 조회
 - name: member
   description: 회원 본인 정보
 paths:
@@ -106,6 +110,58 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/AdminLoginResponse"
+  /api/admin/passes/{passId}/cancellation:
+    post:
+      tags:
+      - admin-pass
+      summary: 이용권 등록 취소 (물리 삭제 없이 취소 상태 전환 + 상쇄 이력)
+      operationId: cancel
+      parameters:
+      - name: passId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelPassRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PassResponse"
+  /api/admin/passes/{passId}/adjustments:
+    post:
+      tags:
+      - admin-pass
+      summary: 이용권 잔여 횟수 수동 가감 (사유 필수)
+      operationId: adjust
+      parameters:
+      - name: passId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdjustPassRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PassResponse"
   /api/admin/members/{memberId}/rejection:
     post:
       tags:
@@ -132,6 +188,53 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/MemberDetailResponse"
+  /api/admin/members/{memberId}/passes:
+    get:
+      tags:
+      - admin-pass
+      summary: "회원 이용권 목록 조회 (취소 포함, 상태 구분)"
+      operationId: getMemberPasses
+      parameters:
+      - name: memberId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PassResponse"
+    post:
+      tags:
+      - admin-pass
+      summary: 이용권 등록 (저녁반 회비 / 예약제 횟수권 / 1:1 레슨권)
+      operationId: register
+      parameters:
+      - name: memberId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterPassRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PassResponse"
   /api/admin/members/{memberId}/approval:
     post:
       tags:
@@ -152,6 +255,32 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/MemberDetailResponse"
+  /api/admin/passes/{passId}/period:
+    patch:
+      tags:
+      - admin-pass
+      summary: "이용권 기간·유효기간 수정 (저녁반은 시작·종료, 횟수권은 종료일만)"
+      operationId: changePeriod
+      parameters:
+      - name: passId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePassPeriodRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PassResponse"
   /api/admin/members/{memberId}/status:
     patch:
       tags:
@@ -204,6 +333,64 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/MyProfileResponse"
+  /api/members/me/passes:
+    get:
+      tags:
+      - member-pass
+      summary: "본인 이용권 목록 조회 (만료·소진 포함, 취소 제외)"
+      operationId: getMyPasses
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PassResponse"
+  /api/members/me/pass-transactions:
+    get:
+      tags:
+      - member-pass
+      summary: "본인 차감·복구 이력 조회 (이용권별 필터, 페이지네이션)"
+      operationId: getMyTransactions
+      parameters:
+      - name: passId
+        in: query
+        description: 이용권 ID 필터 — 본인 이용권이 아니면 결과가 비어 있다
+        required: false
+        schema:
+          type: integer
+          format: int64
+          description: 이용권 ID 필터 — 본인 이용권이 아니면 결과가 비어 있다
+      - name: page
+        in: query
+        description: 페이지 번호(0부터 시작)
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          description: 페이지 번호(0부터 시작)
+          minimum: 0
+      - name: size
+        in: query
+        description: 페이지 크기(1~100)
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          description: 페이지 크기(1~100)
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageResponsePassTransactionResponse"
   /api/admin/members:
     get:
       tags:
@@ -461,6 +648,90 @@ components:
         name:
           type: string
           description: 관리자 이름
+    CancelPassRequest:
+      type: object
+      description: 취소 사유. 관리자 전용 정보이며 pass.cancel_reason과 상쇄 이력 note에 함께 저장된다
+      properties:
+        reason:
+          type: string
+          description: "취소 사유(관리자 전용, 500자 이내)"
+          example: 관리자 오등록으로 인한 취소
+          maxLength: 500
+          minLength: 0
+      required:
+      - reason
+    PassResponse:
+      type: object
+      description: 이용권 응답
+      properties:
+        passId:
+          type: integer
+          format: int64
+          description: 이용권 ID
+        memberId:
+          type: integer
+          format: int64
+          description: 회원 ID
+        type:
+          type: string
+          description: 이용권 종류
+          enum:
+          - EVENING_MEMBERSHIP
+          - SESSION_PASS
+          - LESSON_PASS
+        displayStatus:
+          type: string
+          description: "표시 상태(취소 > 만료 > 소진 > 사용가능 우선순위로 계산, D-064)"
+          enum:
+          - USABLE
+          - EXPIRED
+          - EXHAUSTED
+          - CANCELED
+        startDate:
+          type: string
+          format: date
+          description: 시작일
+        endDate:
+          type: string
+          format: date
+          description: 종료일(포함) — 이 날짜까지 사용 가능(D-066)
+        remainingCount:
+          type:
+          - number
+          - "null"
+          description: 잔여 횟수 — 기간제(EVENING_MEMBERSHIP)는 null
+        canceledAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+          description: 취소 시각 — 취소되지 않았으면 null
+        cancelReason:
+          type:
+          - string
+          - "null"
+          description: 취소 사유(관리자 전용) — 취소되지 않았으면 null
+        registeredAt:
+          type: string
+          format: date-time
+          description: 등록 시각
+    AdjustPassRequest:
+      type: object
+      description: 관리자 수동 가감 요청 — 사유(note) 필수
+      properties:
+        amount:
+          type: number
+          description: 가감 수량(음수면 차감). 형식만 검증 — 가감 단위·음수 잔여 금지는 도메인 규칙
+          example: 1.0
+        note:
+          type: string
+          description: "가감 사유(필수, 500자 이내)"
+          example: 이벤트 보상
+          maxLength: 500
+          minLength: 0
+      required:
+      - amount
+      - note
     RejectMemberRequest:
       type: object
       description: 거절 사유. 관리자 전용 정보이며 회원에게 원문이 노출되지 않는다 (D-043)
@@ -521,6 +792,70 @@ components:
           type: string
           format: date-time
           description: 가입 신청 시각
+    RegisterPassRequest:
+      type: object
+      description: 이용권 등록 요청 — 저녁반 회비 / 예약제 횟수권 / 1:1 레슨권 공통
+      properties:
+        type:
+          type: string
+          description: 이용권 종류
+          enum:
+          - EVENING_MEMBERSHIP
+          - SESSION_PASS
+          - LESSON_PASS
+          example: SESSION_PASS
+        startDate:
+          type:
+          - string
+          - "null"
+          format: date
+          description: 시작일. 지정하지 않으면 오늘로 채워진다(D-055). 과거 날짜도 그대로 등록된다 — 별도 검증 없음
+          example: 2026-08-01
+        term:
+          type:
+          - string
+          - "null"
+          description: 저녁반 회비 기간(1/3/6개월). EVENING_MEMBERSHIP에만 필요 — 횟수권·레슨권에 지정하면
+            거부된다
+          enum:
+          - ONE_MONTH
+          - THREE_MONTHS
+          - SIX_MONTHS
+          example: ONE_MONTH
+        initialCount:
+          type:
+          - number
+          - "null"
+          description: 횟수권·레슨권의 초기 횟수(0.5 단위). SESSION_PASS·LESSON_PASS에만 필요 — EVENING_MEMBERSHIP에
+            지정하면 거부된다
+          example: 10.0
+      required:
+      - type
+    ChangePassPeriodRequest:
+      type: object
+      description: "기간·유효기간 수정 요청 — 저녁반은 시작·종료 모두, 횟수권은 종료일만 반영된다(D-062)"
+      properties:
+        newStartDate:
+          type:
+          - string
+          - "null"
+          format: date
+          description: 새 시작일. 저녁반 회비만 변경 가능하다. 횟수권은 생략하거나 기존 시작일과 같은 값이어야 한다(D-062)
+          example: 2026-03-15
+        newEndDate:
+          type: string
+          format: date
+          description: 새 종료일(유효기간)
+          example: 2026-05-15
+        reason:
+          type: string
+          description: "변경 사유(필수, 500자 이내)"
+          example: 휴회 보상 연장
+          maxLength: 500
+          minLength: 0
+      required:
+      - newEndDate
+      - reason
     UpdateMemberStatusRequest:
       type: object
       description: 변경할 회원 상태. PENDING으로 되돌리면 거절 사유가 초기화되어 재신청 상태가 된다 (D-034)
@@ -546,6 +881,69 @@ components:
           format: date-time
         timeZone:
           type: string
+    PageResponsePassTransactionResponse:
+      type: object
+      description: 페이지네이션 응답
+      properties:
+        content:
+          type: array
+          description: 현재 페이지의 항목 목록
+          items:
+            $ref: "#/components/schemas/PassTransactionResponse"
+        page:
+          type: integer
+          format: int32
+          description: 현재 페이지 번호(0부터 시작)
+        size:
+          type: integer
+          format: int32
+          description: 페이지 크기
+        totalElements:
+          type: integer
+          format: int64
+          description: 전체 항목 수
+        totalPages:
+          type: integer
+          format: int32
+          description: 전체 페이지 수
+    PassTransactionResponse:
+      type: object
+      description: 회원 본인 차감/복구 이력 항목
+      properties:
+        transactionId:
+          type: integer
+          format: int64
+          description: 이력 ID
+        passId:
+          type: integer
+          format: int64
+          description: 이용권 ID
+        passType:
+          type: string
+          description: 이용권 종류
+          enum:
+          - EVENING_MEMBERSHIP
+          - SESSION_PASS
+          - LESSON_PASS
+        amount:
+          type: number
+          description: "증감 수량(+차감/복구, 부호로 방향 구분)"
+        reason:
+          type: string
+          description: 차감/복구 사유 코드
+          enum:
+          - RESERVE
+          - CANCEL_REFUND
+          - ADMIN_ADJUST
+          - EVENING_HALF
+          - INACTIVITY
+          - CLASS_CANCELED_REFUND
+          - INITIAL_GRANT
+          - REGISTRATION_CANCELED
+        occurredAt:
+          type: string
+          format: date-time
+          description: 발생 시각
     MemberSummaryResponse:
       type: object
       description: 관리자 회원 목록 항목

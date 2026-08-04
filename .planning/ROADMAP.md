@@ -16,7 +16,7 @@
 
 - [x] **Phase 1: 기반** - 공통 에러 포맷(ProblemDetail), 초기 스키마(Branch/Member/Admin/AdminBranch), openapi.yaml 재생성 파이프라인 (completed 2026-07-30)
 - [x] **Phase 2: 인증·회원** - 카카오 로그인, 온보딩, JWT, 관리자 ID/PW 인증, 가입 승인, 회원 관리 (본 작업 완료 2026-08-02 / 검증 갭 클로저 진행 중 — 02-12~02-15) (completed 2026-08-03)
-- [ ] **Phase 3: 이용권** - Pass 3종 등록, PassTransaction 이력, 수동 가감·기간 수정, 본인 조회
+- [x] **Phase 3: 이용권** - Pass 3종 등록, PassTransaction 이력, 수동 가감·기간 수정, 본인 조회 (completed 2026-08-03)
 - [ ] **Phase 4: 시간표·예약** - ClassSchedule/ClassSession, 예약 생성·취소·변경 + 즉시 차감/복구, 동시성 보장, 관리자 예약 관리·휴강, Notification 스키마·알림 레코드 생성
 - [ ] **Phase 5: 배치** - 2주 미사용 차감, 유효기간 만료 처리, 멱등 실행
 - [ ] **Phase 6: 운영** - 출석 체크, 공지사항, 관리자 알림·활동 피드
@@ -70,14 +70,38 @@
 ### Phase 3: 이용권
 **Goal**: 관리자가 회원에게 이용권을 등록·조정하고, 모든 변경이 감사 가능한 이력으로 남으며, 회원이 본인 이용권 현황을 확인할 수 있다.
 **Depends on**: Phase 2 (이용권은 승인된 회원을 전제)
-**Requirements**: PASS-01, PASS-02, PASS-03, PASS-04, PASS-05, PASS-06
+**Requirements**: PASS-01, PASS-02, PASS-03, PASS-04, PASS-05, PASS-06, PASS-07, PASS-08
 **Success Criteria** (what must be TRUE):
-  1. 관리자가 회원에게 저녁반 회비(1/3/6개월)·예약제 횟수권·1:1 레슨권을 등록할 수 있고, 횟수권의 유효기간은 등록일로부터 1년으로 자동 설정된다
+  1. 관리자가 회원에게 저녁반 회비(1/3/6개월)·예약제 횟수권·1:1 레슨권을 시작일 지정(기본 오늘, 과거 허용)으로 등록할 수 있고, 횟수권의 유효기간은 시작일로부터 1년으로 자동 설정되며, 초기 횟수 부여도 `INITIAL_GRANT` 이력으로 남는다 (D-055)
   2. 관리자가 사유를 입력해 잔여 횟수를 수동 가감하면(`ADMIN_ADJUST`) 즉시 반영되고, 모든 차감/복구가 `PassTransaction`(이용권/±수량/사유/주체/시각) 이력으로 남는다 — 이력 없는 잔여 변경은 불가능하다
-  3. 관리자가 저녁반 회비 기간을 수정·연장할 수 있다
-  4. 회원이 본인이 보유한 모든 이용권의 잔여 횟수·유효기간을 조회할 수 있다
+  3. 관리자가 저녁반 회비 기간과 횟수권 유효기간을 수정할 수 있고, 모든 기간 변경이 `PassPeriodChange`(전값/후값/사유/주체/시각) 이력으로 남는다 (D-056·D-057)
+  4. 회원이 본인이 보유한 모든 이용권의 잔여 횟수·유효기간을 조회할 수 있다 — 만료·소진 이용권 포함(상태 구분), 취소된 이용권 제외 (D-058)
   5. 회원이 본인의 차감/복구 이력(시각·사유·수량)을 조회할 수 있다
-**Plans**: TBD
+  6. 관리자가 이용권 등록을 취소하면 취소 상태 전환 + `REGISTRATION_CANCELED` 상쇄 이력이 남고, 취소된 이용권은 회원 조회에서 숨겨지고 관리자 화면에서는 구분 표시된다 (D-059)
+**Plans**: 11 plans (D-10에 따라 순차 실행 — 플랜 단위 브랜치 → dev PR → 머지 → 다음 플랜. Wave 5의 03-05·03-06만 병렬 가능)
+- [x] 03-01-PLAN.md — 용어·에러코드·설계 결정 문서 정합 + PassExceptions (PASS-01/03/07/08, 경계 산정 체크포인트)
+- [x] 03-02-PLAN.md — V4 이용권 스키마 + enum·엔티티·리포지토리(조건부 UPDATE) (PASS-01/02/03/04/07/08)
+- [x] 03-03-PLAN.md — [TDD] 수동 가감 정책 `Pass.validateAdjustment` (PASS-03)
+- [x] 03-04-PLAN.md — [TDD] 등록 유효기간 계산 + 표시 상태 계산 (PASS-01/05)
+- [x] 03-05-PLAN.md — [TDD] 기간 변경 판정 + 취소 상쇄 산출 (PASS-04/07/08)
+- [x] 03-06-PLAN.md — 관리자 이용권 등록 API + INITIAL_GRANT 이력 (PASS-01/02)
+- [x] 03-07-PLAN.md — 관리자 수동 가감 API + "잔여 = 이력 합계" 불변식 테스트 (PASS-02/03)
+- [x] 03-08-PLAN.md — 기간·유효기간 수정 통합 API + PassPeriodChange 이력 (PASS-04/07)
+- [x] 03-09-PLAN.md — 등록 취소 API + 관리자 이용권 목록(취소 구분) (PASS-08/02)
+- [x] 03-10-PLAN.md — 회원 본인 이용권·이력 조회 (PASS-05/06)
+- [x] 03-11-PLAN.md — phase 마감: 전체 검증·문서 정합 + 관리자 흐름 수동 확인 (PASS-01~08)
+
+**Note (API 표면)**: 이 phase가 여는 엔드포인트는 7개다 — `POST /api/admin/members/{memberId}/passes`,
+`GET /api/admin/members/{memberId}/passes`, `POST /api/admin/passes/{passId}/adjustments`,
+`PATCH /api/admin/passes/{passId}/period`, `POST /api/admin/passes/{passId}/cancellation`,
+`GET /api/members/me/passes`, `GET /api/members/me/pass-transactions`.
+관리자 이용권 목록 조회는 요구사항 목록(PASS-01~08)에는 없지만 **성공기준 6의 "관리자 화면에서 구분 표시"**를
+FE가 구현할 수 있게 하는 데이터 경로라 03-09에 포함했다.
+
+**Note (Phase 4·5·6와의 경계)**: `TransactionReason` 8종을 모두 선언하되 이 phase가 실제로 쓰는 것은
+`INITIAL_GRANT`·`ADMIN_ADJUST`·`REGISTRATION_CANCELED` 3종이다. `RESERVE`/`CANCEL_REFUND`/`CLASS_CANCELED_REFUND`는
+Phase 4, `INACTIVITY`는 Phase 5, `EVENING_HALF`는 Phase 6이 쓴다. `PassTransaction`의 주체 컬럼은
+`admin_id NOT NULL` 하나만 둔다 — Phase 4가 회원 주체를 추가할 때 새 마이그레이션으로 nullable 컬럼을 붙인다(D-030).
 
 ### Phase 4: 시간표·예약
 **Goal**: 회원이 주간 시간표를 보고 예약제 수업·1:1 레슨을 예약·취소·변경하면 이용권이 즉시 차감/복구되고, 동시 경쟁 상황에서도 정원을 초과하지 않으며, 관리자가 시간표와 예약 전반을 운영한다.
@@ -127,7 +151,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 1. 기반 | 3/3 | Complete   | 2026-07-30 |
 | 2. 인증·회원 | 15/15 | Complete   | 2026-08-03 |
-| 3. 이용권 | 0/TBD | Not started | - |
+| 3. 이용권 | 11/11 | Complete    | 2026-08-04 |
 | 4. 시간표·예약 | 0/TBD | Not started | - |
 | 5. 배치 | 0/TBD | Not started | - |
 | 6. 운영 | 0/TBD | Not started | - |

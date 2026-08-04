@@ -33,4 +33,18 @@ data class AuthenticatedPrincipal(
         }
         return principalId
     }
+
+    /**
+     * 관리자 전용 서비스 로직에서 관리자 id가 필요할 때 쓴다. [requireMemberId]와 대칭이다.
+     *
+     * 이 경로도 `SecurityConfig`의 URL 인가 규칙(`hasRole("ADMIN")`)이 이미 회원 접근을 막고
+     * 있으므로, 여기서 던지는 예외는 사용자 대면 오류가 아니라 "인가 규칙과 서비스 코드가
+     * 어긋났다"는 프로그래밍 오류 신호다.
+     */
+    fun requireAdminId(): Long {
+        check(principalType == PrincipalType.ADMIN) {
+            "관리자 전용 경로에 회원 주체가 들어왔습니다."
+        }
+        return principalId
+    }
 }

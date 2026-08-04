@@ -19,8 +19,19 @@
 | 예약                       | `Reservation`                              | 회원 ↔ ClassSession                                            |
 | 출석                       | `Attendance`                               | ClassSession별 참여 기록 (참고용)                              |
 | 차감/복구 이력             | `PassTransaction`                          | ±수량, 사유, 주체, 시각                                        |
+| 기간 변경 이력             | `PassPeriodChange`                         | 저녁반 기간·횟수권 유효기간 변경의 전값/후값/사유/주체/시각 (D-057) |
 | 공지사항                   | `Notice`                                   |                                                                |
 | 알림                       | `Notification`                             | 관리자 인앱 알림                                               |
+
+## 이용권 (Phase 3)
+
+| 한국어                 | 코드 네이밍               | 설명                                                                                          |
+| ---------------------- | -------------------------- | ----------------------------------------------------------------------------------------------- |
+| 이용권 저장 상태       | `PassStatus`                | `ACTIVE` / `CANCELED` — DB에 저장되는 값은 이 2종뿐                                             |
+| 이용권 표시 상태       | `PassDisplayStatus`         | `USABLE` / `EXPIRED` / `EXHAUSTED` / `CANCELED` — 저장하지 않고 조회 시점에 계산 (D-064)        |
+| 저녁반 회비 기간 단위  | `EveningMembershipTerm`     | `ONE_MONTH` / `THREE_MONTHS` / `SIX_MONTHS` — 등록 요청의 닫힌 집합, 저장하지 않음 (D-063)       |
+| 가감 사유 메모         | `note`                       | DB `pass_transaction.note` — 사유 **코드** `reason`(`TransactionReason`)과 분리된 자유 텍스트 (D-061) |
+| 이용권 등록 주체       | `registeredBy`               | DB `pass.registered_by_admin_id` — 이용권을 등록한 관리자                                       |
 
 ## 수업 종류 (ClassType)
 
@@ -63,6 +74,8 @@
 | `EVENING_HALF`          | 횟수권 회원 저녁반 참여 0.5회 차감 |
 | `INACTIVITY`            | 2주 미사용 자동 차감               |
 | `CLASS_CANCELED_REFUND` | 휴강으로 인한 복구                 |
+| `INITIAL_GRANT`         | 이용권 등록 시 초기 횟수 부여 (D-055) |
+| `REGISTRATION_CANCELED` | 등록 취소(오등록 정정) 시 잔여를 0으로 상쇄 (D-059) |
 
 ## 기타 규칙
 
