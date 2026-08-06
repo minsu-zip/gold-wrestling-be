@@ -46,9 +46,9 @@ class Member(
     var rejectionReason: String? = null,
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: OffsetDateTime,
-    @Column(name = "kakao_nickname", length = 100)
+    @Column(name = "kakao_nickname", length = MAX_KAKAO_NICKNAME_LENGTH)
     var kakaoNickname: String? = null,
-    @Column(name = "kakao_profile_image_url", length = 500)
+    @Column(name = "kakao_profile_image_url", length = MAX_KAKAO_PROFILE_IMAGE_URL_LENGTH)
     var kakaoProfileImageUrl: String? = null,
 ) {
     @Id
@@ -77,12 +77,30 @@ class Member(
      * "값이 바뀌었는지" 비교 분기를 두지 않는다. JPA 변경 감지는 로딩 시점 스냅샷과 필드를 비교하므로
      * 같은 값을 다시 대입하면 UPDATE 자체가 나가지 않는다 — 단순 대입만으로 "실제로 바뀐 경우에만
      * UPDATE"가 성립한다.
+     *
+     * **컬럼 길이를 넘는 값도 `null`로 취급한다(PR #7 리뷰 Info).** 카카오가 정책(닉네임 20자 내외)을
+     * 벗어난 값을 주면, 대입은 성공하고 트랜잭션 커밋 시점의 UPDATE에서야 제약 위반으로 터진다 —
+     * 그 예외는 로그인 흐름 전체를 500으로 만든다. 동의항목이 없어도 로그인이 죽지 않게 설계한 것과
+     * 같은 이유로, 예상 밖 응답은 여기서 "값 없음"이라는 **이미 정상인 상태**로 흡수한다.
+     * 잘라 저장하지 않는 이유: 닉네임은 틀린 이름이 남고, URL은 깨진 주소가 남아 FE가 깨진 이미지를
+     * 렌더링한다. 둘 다 "값이 없다"보다 나쁘다.
      */
     fun applyKakaoProfile(
         nickname: String?,
         profileImageUrl: String?,
     ) {
-        kakaoNickname = nickname?.takeIf { it.isNotBlank() }
-        kakaoProfileImageUrl = profileImageUrl?.takeIf { it.isNotBlank() }
+        kakaoNickname = nickname.normalizeOrNull(MAX_KAKAO_NICKNAME_LENGTH)
+        kakaoProfileImageUrl = profileImageUrl.normalizeOrNull(MAX_KAKAO_PROFILE_IMAGE_URL_LENGTH)
+    }
+
+    /** 공백뿐이거나 [maxLength]를 넘는 값은 "값 없음"과 같이 취급한다. */
+    private fun String?.normalizeOrNull(maxLength: Int): String? = this?.takeIf { it.isNotBlank() && it.length <= maxLength }
+
+    companion object {
+        /** `member.kakao_nickname` 컬럼 길이 — 애노테이션과 검증이 갈라지지 않도록 한 곳에서만 정의한다. */
+        const val MAX_KAKAO_NICKNAME_LENGTH = 100
+
+        /** `member.kakao_profile_image_url` 컬럼 길이. */
+        const val MAX_KAKAO_PROFILE_IMAGE_URL_LENGTH = 500
     }
 }

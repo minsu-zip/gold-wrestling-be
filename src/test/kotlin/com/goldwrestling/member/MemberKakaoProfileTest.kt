@@ -76,6 +76,46 @@ class MemberKakaoProfileTest {
         assertThat(member.kakaoProfileImageUrl).isNull()
     }
 
+    @Test
+    fun `닉네임이 컬럼 길이를 넘으면 잘라내지 않고 null로 취급한다`() {
+        // given — 카카오 정책(20자 내외)을 벗어난 이상 응답. 잘라 저장하면 "틀린 닉네임"이 남는다
+        val member = member(nickname = "예전닉")
+
+        // when
+        member.applyKakaoProfile("가".repeat(Member.MAX_KAKAO_NICKNAME_LENGTH + 1), "https://k.kakaocdn.test/p.jpg")
+
+        // then — 컬럼 제약 위반으로 로그인 트랜잭션이 깨지는 대신, 값 없음(정상 상태)으로 떨어진다
+        assertThat(member.kakaoNickname).isNull()
+        assertThat(member.kakaoProfileImageUrl).isEqualTo("https://k.kakaocdn.test/p.jpg")
+    }
+
+    @Test
+    fun `프로필 이미지 URL이 컬럼 길이를 넘으면 잘라내지 않고 null로 취급한다`() {
+        // given — URL은 잘라 저장하면 깨진 주소가 되어 FE가 깨진 이미지를 렌더링한다
+        val member = member(profileImageUrl = "https://k.kakaocdn.test/old.jpg")
+        val tooLongUrl = "https://k.kakaocdn.test/" + "a".repeat(Member.MAX_KAKAO_PROFILE_IMAGE_URL_LENGTH)
+
+        // when
+        member.applyKakaoProfile("골드레슬러", tooLongUrl)
+
+        // then
+        assertThat(member.kakaoNickname).isEqualTo("골드레슬러")
+        assertThat(member.kakaoProfileImageUrl).isNull()
+    }
+
+    @Test
+    fun `컬럼 길이와 정확히 같은 값은 그대로 저장된다`() {
+        // given — 경계값: 길이 제한은 "초과"에만 걸려야 한다
+        val member = member()
+        val exactNickname = "가".repeat(Member.MAX_KAKAO_NICKNAME_LENGTH)
+
+        // when
+        member.applyKakaoProfile(exactNickname, null)
+
+        // then
+        assertThat(member.kakaoNickname).isEqualTo(exactNickname)
+    }
+
     private fun member(
         nickname: String? = null,
         profileImageUrl: String? = null,
