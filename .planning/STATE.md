@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 Phase: 4
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-08-04
+Last activity: 2026-08-06 - Completed quick task 260806-und: D-083 카카오 프로필 수집·저장 및 MyProfileResponse 노출
 
 Progress: [██████████] 100%
 
@@ -84,6 +84,12 @@ None yet.
 ### Blockers/Concerns
 
 - REQUIREMENTS.md 문서 상단의 "v1 requirements: 36 total" 표기가 실제 v1 목록(FOUND~NOTIF, 42건)과 불일치했음. 로드맵 작성 시 실제 목록 42건 전부를 매핑하고 Coverage 섹션을 42로 정정함 — 원 문서(docs/)와의 스펙 차이가 아니라 REQUIREMENTS.md 자체의 집계 오류로 판단.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260806-und | D-083 카카오 프로필(닉네임·프로필 이미지) 수집·저장 및 MyProfileResponse 노출 | 2026-08-06 | 7f363a9 | [260806-und-d-083-myprofileresponse](./quick/260806-und-d-083-myprofileresponse/) |
 
 ## Deferred Items
 
