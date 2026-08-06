@@ -631,8 +631,10 @@
 - 이유: 외부 오리진 스크립트는 `window.Kakao`로 앱과 같은 권한을 갖기 때문에 SRI 없이 로드하면 CDN 변조가 그대로 앱 권한이 된다. 카카오 공식 문서도 "버전과 integrity 값을 정확히 입력"을 요구한다. 색값은 카카오가 지정한 정확한 브랜드 값이라 oklch로 변환하지 않고 hex 그대로 둔다(변환하면 브랜드 규정 색이 아니게 된다). `#191919` on `#FEE500` 대비는 14.9:1로 본문 기준 4.5:1을 통과한다. 사용처를 1곳으로 묶는 이유는 노랑을 다른 곳에 흘리면 "액센트 남용"으로 위계가 무너지기 때문이다.
 - 기각 대안: `kauth.kakao.com/oauth/authorize`를 직접 조립(authorize의 `client_id`가 REST API 키인데 FE에는 JS 키만 있고, 카카오톡 앱 간편로그인을 잃는다 — D-01이 SDK로 확정), SRI 없이 CDN 로드(공급망 변조 무방비), 카카오 심볼 로고 에셋 추가(lucide에 없고 임의 SVG·이모지는 금지 — 텍스트 라벨만 쓴다. 카카오 심사에서 로고가 요구되면 그때 예외를 기록하고 추가한다).
 
-## D-083. [FE 요청 — BE 미확정] 카카오 프로필(닉네임·사진)을 회원 프로필 응답에 추가
+## D-083. 카카오 프로필(닉네임·사진)을 회원 프로필 응답에 추가
 
-- 2026-08 / FE 요청사항 (M2 수동 검증 중 사용자 요청 발생, 2026-08-06). `/me` 내 정보 화면에 카카오 닉네임·프로필 사진을 표시하고 싶다. 필요한 BE 변경: ① 카카오 로그인 시 `kakao_account.profile`에서 닉네임·프로필 이미지 URL 수집·저장, ② `MyProfileResponse`에 `kakaoNickname`·`kakaoProfileImageUrl` 필드 추가(각각 nullable — 동의 거부 가능), ③ 카카오 개발자 콘솔 동의항목에 `profile_nickname`·`profile_image` 추가. **[FE 요청, 2026-08-06 — BE 검토·확정 대기]**
-- 이유: 현재 `MyProfileResponse`는 실명·전화번호·상태만 담고 있어 FE가 표시할 수단이 없다(FE는 계약에 없는 API를 구현하지 않는다는 원칙). 계약 반영 후 FE는 `pnpm api:types` 재생성만으로 후속 페이즈에서 표시할 수 있다.
-- 참고: 체육관 운영 기준 신원은 온보딩 실명·전화번호가 정본이고 카카오 프로필은 표시용 보조 정보다. 동의항목 추가는 기존 회원의 재동의 흐름을 유발할 수 있으므로 BE에서 시점을 판단한다.
+- 2026-08 / FE 요청(M2 수동 검증 중, 2026-08-06)을 BE에서 확정·구현했다. 카카오 로그인 시 `/v2/user/me`의 `kakao_account.profile`에서 닉네임·프로필 이미지 URL을 수집해 `member.kakao_nickname`·`member.kakao_profile_image_url`(둘 다 nullable, V5 마이그레이션)에 저장하고, `MyProfileResponse`에 `kakaoNickname`·`kakaoProfileImageUrl`을 nullable로 노출한다. **[BE 확정, 2026-08-06]**
+- 확정 내용: ① **매 로그인마다 카카오가 준 값으로 갱신**한다(최초 가입 시점에만 채우면 기존 회원이 영원히 null로 남는다). ② 카카오가 값을 주지 않으면(동의항목 미추가·동의 거부·사후 철회) **저장값을 null로 덮어쓴다** — 회원이 철회했는데 우리 DB가 계속 보관하는 상태를 만들지 않는다. ③ 노출 범위는 `MyProfileResponse`(`GET /api/members/me`)뿐이고 관리자 응답(`MemberDetailResponse`·`MemberSummaryResponse`)·로그인 요약(`MemberLoginSummaryResponse`)에는 넣지 않는다. ④ 이미지 URL은 640px `profile_image_url`을 저장한다(110px `thumbnail_image_url`은 매핑만 해 두고 쓰지 않는다). ⑤ 카카오 개발자 콘솔 동의항목(`profile_nickname`·`profile_image`) 추가는 **운영자가 콘솔에서 직접 처리**하며, 동의항목이 없어도 코드는 정상 동작한다(두 값이 null일 뿐 로그인은 200으로 성공한다).
+- 이유: 현재 `MyProfileResponse`는 실명·전화번호·상태만 담고 있어 FE가 표시할 수단이 없다(FE는 계약에 없는 API를 구현하지 않는다는 원칙). 계약 반영 후 FE는 `pnpm api:types` 재생성만으로 표시할 수 있다. 카카오 응답의 중간 노드(`kakao_account`·`profile`)를 전부 nullable로 매핑한 이유는, 동의항목이 없을 때 그 객체들이 응답에서 통째로 빠지기 때문이다 — non-null로 두면 역직렬화 실패로 로그인 전체가 막힌다.
+- 참고: 체육관 운영 기준 신원은 온보딩 실명·전화번호가 정본이고 카카오 프로필은 표시용 보조 정보다. 프로필 값은 로그에 남기지 않는다(개인정보 성격, T-02-19 연장선).
+- 기각 대안: 최초 가입 시에만 저장(기존 회원 공백), 동의 철회 시 기존 값 유지(철회 의사와 어긋남), 관리자 응답에도 추가(요구 범위 밖으로 개인정보 노출면만 넓어짐).
