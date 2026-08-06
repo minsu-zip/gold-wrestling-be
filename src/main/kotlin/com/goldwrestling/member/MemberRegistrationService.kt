@@ -43,15 +43,36 @@ class MemberRegistrationService(
      * 복구(재시도)는 트랜잭션을 갖지 않는 [com.goldwrestling.auth.KakaoAuthService.login]의 책임이다 —
      * 이 메서드를 새 트랜잭션으로 다시 호출하면 그 시점에는 경쟁 상대의 INSERT가 이미 커밋되어 있어
      * `findByKakaoId` 조회만으로 끝난다.
+     *
+     * **카카오 프로필([kakaoNickname]·[kakaoProfileImageUrl])은 매 로그인마다 카카오가 준 값 그대로
+     * 반영하며, 값이 없으면 `null`로 덮어쓴다(D-083).** 기존 회원 경로에서는 별도 `save()`·`flush()`를
+     * 부르지 않는다 — 이 메서드가 트랜잭션 안이므로 JPA 변경 감지가 커밋 시점에 UPDATE를 만든다
+     * (값이 그대로면 UPDATE 자체가 나가지 않는다).
+     *
+     * 인자를 `KakaoUserProfile`이 아니라 원시 값 두 개로 받는 이유: `member` 패키지가 `auth.kakao`
+     * 패키지(외부 계약 전용)에 의존하지 않게 하기 위해서다(conventions §1).
      */
     @Transactional
-    fun findOrCreateByKakaoId(kakaoId: Long): MemberLoginSummaryResponse {
-        memberRepository.findByKakaoId(kakaoId)?.let { return MemberLoginSummaryResponse.from(it) }
+    fun findOrCreateByKakaoId(
+        kakaoId: Long,
+        kakaoNickname: String?,
+        kakaoProfileImageUrl: String?,
+    ): MemberLoginSummaryResponse {
+        memberRepository.findByKakaoId(kakaoId)?.let {
+            it.applyKakaoProfile(kakaoNickname, kakaoProfileImageUrl)
+            return MemberLoginSummaryResponse.from(it)
+        }
 
-        return MemberLoginSummaryResponse.from(createPendingMember(kakaoId))
+        return MemberLoginSummaryResponse.from(
+            createPendingMember(kakaoId, kakaoNickname, kakaoProfileImageUrl),
+        )
     }
 
-    private fun createPendingMember(kakaoId: Long): Member {
+    private fun createPendingMember(
+        kakaoId: Long,
+        kakaoNickname: String?,
+        kakaoProfileImageUrl: String?,
+    ): Member {
         val branch =
             branchRepository.findByName(defaultBranchName)
                 ?: throw IllegalStateException(
@@ -68,6 +89,10 @@ class MemberRegistrationService(
                 rejectionReason = null,
                 createdAt = OffsetDateTime.now(clock),
             )
+        // 생성 시점에도 같은 정규화(빈 문자열·공백 → null)를 거치도록 생성자 인자로 직접 넣지 않고
+        // applyKakaoProfile을 통과시킨다 — DB에 빈 문자열이 들어가면 FE가 null 분기와 빈 문자열 분기를
+        // 둘 다 다뤄야 한다.
+        member.applyKakaoProfile(kakaoNickname, kakaoProfileImageUrl)
         return memberRepository.saveAndFlush(member)
     }
 }

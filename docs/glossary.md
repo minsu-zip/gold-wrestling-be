@@ -63,6 +63,8 @@
 | 온보딩 완료 여부       | `onboardingCompleted`          | 별도 상태 컬럼이 아니라 `name`·`phoneNumber` 입력 여부로 판정한다 (D-025)                       |
 | 회원 상태 게이트       | `MemberStateGate`              | 엔드포인트가 요구하는 회원 상태를 DB 현재 값 기준으로 검사하는 컴포넌트 (D-033 노트)             |
 | 로그인 회원 요약       | `MemberLoginSummaryResponse`   | 카카오 로그인 응답에 담기는 최소 요약 — FE가 온보딩/승인대기/거절 화면을 분기한다 (금지어 `Session`을 피한 이름) |
+| 카카오 닉네임          | `kakaoNickname`                | 카카오 프로필 닉네임 (DB `kakao_nickname`). 표시용 보조 정보 — 운영 기준 신원은 온보딩 실명이다. 매 로그인마다 카카오 값으로 갱신되며 동의가 없으면 null (D-083) |
+| 카카오 프로필 이미지   | `kakaoProfileImageUrl`         | 카카오 프로필 사진 URL (DB `kakao_profile_image_url`). 640px `profile_image_url`을 저장한다. 동의가 없으면 null (D-083) |
 
 ## 차감 사유 (TransactionReason)
 

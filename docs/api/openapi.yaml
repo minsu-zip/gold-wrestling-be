@@ -528,6 +528,17 @@ components:
         rejected:
           type: boolean
           description: 가입 거절 여부(D-034) — true면 거절 안내 화면. 사유 원문은 담지 않는다(D-043)
+        kakaoNickname:
+          type:
+          - string
+          - "null"
+          description: 카카오 프로필 닉네임 — 표시용 보조 정보이며 운영 기준 신원은 name이다(D-083). 카카오 동의항목에
+            동의하지 않았거나 철회했으면 null
+        kakaoProfileImageUrl:
+          type:
+          - string
+          - "null"
+          description: 카카오 프로필 이미지 URL(640px) — 카카오 동의항목에 동의하지 않았거나 철회했으면 null(D-083)
     RefreshTokenRequest:
       type: object
       description: access 토큰 갱신 요청

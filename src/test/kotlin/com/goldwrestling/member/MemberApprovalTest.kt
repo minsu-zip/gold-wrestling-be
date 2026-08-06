@@ -7,6 +7,7 @@ import com.goldwrestling.auth.PrincipalType
 import com.goldwrestling.auth.TokenService
 import com.goldwrestling.auth.kakao.KakaoApiClient
 import com.goldwrestling.auth.kakao.KakaoTokenResponse
+import com.goldwrestling.auth.kakao.KakaoUserProfile
 import com.goldwrestling.branch.Branch
 import com.goldwrestling.branch.BranchRepository
 import com.goldwrestling.support.MutableTestClock
@@ -225,7 +226,7 @@ class MemberApprovalTest {
         mockMvc.perform(rejectRequest(member.id!!, adminToken, "자격 미달")).andExpect(status().isOk)
 
         given(kakaoApiClient.exchangeToken(anyString())).willReturn(dummyTokenResponse())
-        given(kakaoApiClient.fetchKakaoId(anyString())).willReturn(9103L)
+        given(kakaoApiClient.fetchUserProfile(anyString())).willReturn(KakaoUserProfile(9103L, null, null))
 
         mockMvc
             .perform(
