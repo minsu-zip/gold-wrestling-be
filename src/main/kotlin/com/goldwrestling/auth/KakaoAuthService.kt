@@ -3,6 +3,7 @@ package com.goldwrestling.auth
 import com.goldwrestling.auth.dto.KakaoLoginResponse
 import com.goldwrestling.auth.dto.TokenPairResponse
 import com.goldwrestling.auth.kakao.KakaoApiClient
+import com.goldwrestling.auth.kakao.KakaoUserProfile
 import com.goldwrestling.member.MemberRegistrationService
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
@@ -24,8 +25,8 @@ class KakaoAuthService(
 ) {
     /**
      * 1. 카카오 인가 코드 → 카카오 액세스 토큰(트랜잭션 없음)
-     * 2. 카카오 액세스 토큰 → 카카오 회원번호(kakaoId, 트랜잭션 없음)
-     * 3. kakaoId 기준 회원 find-or-create(`MemberRegistrationService`의 짧은 트랜잭션) — 동시 최초
+     * 2. 카카오 액세스 토큰 → 카카오 회원번호(kakaoId)와 프로필(닉네임·이미지 URL, D-083, 트랜잭션 없음)
+     * 3. kakaoId 기준 회원 find-or-create + 프로필 반영(`MemberRegistrationService`의 짧은 트랜잭션) — 동시 최초
      *    로그인 경쟁(중복 클릭·네트워크 재시도)으로 유니크 제약 위반이 나면 트랜잭션 밖에서 정확히
      *    1회 재시도한다(02-REVIEW.md CR-01)
      * 4. 우리 자체 access/refresh 토큰 쌍 발급(`TokenService`의 짧은 트랜잭션)
@@ -44,9 +45,9 @@ class KakaoAuthService(
 
         val memberSummary =
             try {
-                memberRegistrationService.findOrCreateByKakaoId(kakaoUser.kakaoId)
+                findOrCreateMember(kakaoUser)
             } catch (e: DataIntegrityViolationException) {
-                memberRegistrationService.findOrCreateByKakaoId(kakaoUser.kakaoId)
+                findOrCreateMember(kakaoUser)
             }
         val tokenPair = tokenService.issueTokenPair(PrincipalType.MEMBER, memberSummary.memberId)
 
@@ -55,4 +56,19 @@ class KakaoAuthService(
             member = memberSummary,
         )
     }
+
+    /**
+     * find-or-create 호출을 한 곳에 묶는다 — 위 재시도 경로가 **같은 프로필 값**으로 호출되도록 보장하기
+     * 위해서다(두 곳에 인자를 나눠 적으면 한쪽만 고쳐지는 사고가 난다).
+     *
+     * 닉네임·이미지 URL이 둘 다 `String?`이라 위치 인자로는 조용히 뒤바뀔 수 있으므로 **named argument**로
+     * 넘긴다. 이 헬퍼는 다른 빈([MemberRegistrationService])을 호출하므로 self-invocation으로 트랜잭션
+     * 프록시를 건너뛰는 문제가 없다 — 호출마다 그 빈의 새 트랜잭션이 시작된다(위 KDoc 참고).
+     */
+    private fun findOrCreateMember(kakaoUser: KakaoUserProfile) =
+        memberRegistrationService.findOrCreateByKakaoId(
+            kakaoId = kakaoUser.kakaoId,
+            kakaoNickname = kakaoUser.nickname,
+            kakaoProfileImageUrl = kakaoUser.profileImageUrl,
+        )
 }

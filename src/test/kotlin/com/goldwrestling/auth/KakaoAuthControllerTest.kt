@@ -12,6 +12,7 @@ import com.goldwrestling.member.MemberRepository
 import com.goldwrestling.member.MemberStatus
 import com.goldwrestling.support.TestClockConfiguration
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.BDDMockito.given
@@ -21,6 +22,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
+import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
@@ -53,6 +55,9 @@ class KakaoAuthControllerTest {
 
     @Autowired
     private lateinit var clock: Clock
+
+    @Autowired
+    private lateinit var jdbcClient: JdbcClient
 
     @MockitoBean
     private lateinit var kakaoApiClient: KakaoApiClient
@@ -165,6 +170,68 @@ class KakaoAuthControllerTest {
             .andExpect(jsonPath("$.member.rejected").value(false))
     }
 
+    // ---------- 카카오 프로필 수집·갱신 (D-083) ----------
+
+    @Test
+    fun `카카오가 프로필을 주면 최초 로그인으로 생성된 회원 행에 닉네임과 이미지 URL이 저장된다`() {
+        stubKakaoLogin(kakaoId = 3101L, nickname = "골드레슬러", profileImageUrl = "https://k.kakaocdn.test/p640.jpg")
+
+        mockMvc.perform(loginRequest("auth-code")).andExpect(status().isOk)
+
+        val (nickname, imageUrl) = storedKakaoProfile(3101L)
+        assertEquals("골드레슬러", nickname)
+        assertEquals("https://k.kakaocdn.test/p640.jpg", imageUrl)
+    }
+
+    @Test
+    fun `카카오가 프로필을 주지 않아도 로그인은 200이고 두 컬럼은 null이다`() {
+        stubKakaoLogin(kakaoId = 3102L)
+
+        mockMvc.perform(loginRequest("auth-code")).andExpect(status().isOk)
+
+        val (nickname, imageUrl) = storedKakaoProfile(3102L)
+        assertNull(nickname)
+        assertNull(imageUrl)
+    }
+
+    @Test
+    fun `이미 프로필이 저장된 회원이 프로필 없이 재로그인하면 저장값이 null로 덮어써진다`() {
+        persistMember(
+            kakaoId = 3103L,
+            name = "홍길동",
+            phoneNumber = "01012345678",
+            status = MemberStatus.ACTIVE,
+            kakaoNickname = "예전닉",
+            kakaoProfileImageUrl = "https://k.kakaocdn.test/old.jpg",
+        )
+        stubKakaoLogin(kakaoId = 3103L)
+
+        mockMvc.perform(loginRequest("auth-code")).andExpect(status().isOk)
+
+        val (nickname, imageUrl) = storedKakaoProfile(3103L)
+        assertNull(nickname)
+        assertNull(imageUrl)
+    }
+
+    @Test
+    fun `이미 프로필이 저장된 회원이 바뀐 닉네임으로 재로그인하면 새 값으로 갱신된다`() {
+        persistMember(
+            kakaoId = 3104L,
+            name = "홍길동",
+            phoneNumber = "01012345678",
+            status = MemberStatus.ACTIVE,
+            kakaoNickname = "예전닉",
+            kakaoProfileImageUrl = "https://k.kakaocdn.test/old.jpg",
+        )
+        stubKakaoLogin(kakaoId = 3104L, nickname = "새닉네임", profileImageUrl = "https://k.kakaocdn.test/new.jpg")
+
+        mockMvc.perform(loginRequest("auth-code")).andExpect(status().isOk)
+
+        val (nickname, imageUrl) = storedKakaoProfile(3104L)
+        assertEquals("새닉네임", nickname)
+        assertEquals("https://k.kakaocdn.test/new.jpg", imageUrl)
+    }
+
     @Test
     fun `code가 비어 있으면 400과 VALIDATION_FAILED를 반환한다`() {
         mockMvc
@@ -217,9 +284,28 @@ class KakaoAuthControllerTest {
         assertEquals(before, memberRepository.count())
     }
 
-    private fun stubKakaoLogin(kakaoId: Long) {
+    private fun stubKakaoLogin(
+        kakaoId: Long,
+        nickname: String? = null,
+        profileImageUrl: String? = null,
+    ) {
         given(kakaoApiClient.exchangeToken(anyString())).willReturn(dummyTokenResponse())
-        given(kakaoApiClient.fetchUserProfile(anyString())).willReturn(KakaoUserProfile(kakaoId, null, null))
+        given(kakaoApiClient.fetchUserProfile(anyString()))
+            .willReturn(KakaoUserProfile(kakaoId, nickname, profileImageUrl))
+    }
+
+    /**
+     * 카카오 프로필 컬럼의 **실제 DB 값**을 읽는다. `MemberRegistrationService`는 dirty checking에 기대
+     * 별도 `save()`를 호출하지 않고, 이 테스트 트랜잭션은 커밋되지 않으므로(`@Transactional` 롤백)
+     * 명시적 flush 없이는 UPDATE가 DB로 나가지 않는다([com.goldwrestling.member.MemberProfileTest] 주석 참고).
+     */
+    private fun storedKakaoProfile(kakaoId: Long): Pair<String?, String?> {
+        memberRepository.flush()
+        return jdbcClient
+            .sql("select kakao_nickname, kakao_profile_image_url from member where kakao_id = :kakaoId")
+            .param("kakaoId", kakaoId)
+            .query { rs, _ -> rs.getString("kakao_nickname") to rs.getString("kakao_profile_image_url") }
+            .single()
     }
 
     private fun dummyTokenResponse(): KakaoTokenResponse =
@@ -237,6 +323,8 @@ class KakaoAuthControllerTest {
         phoneNumber: String?,
         status: MemberStatus,
         rejectionReason: String? = null,
+        kakaoNickname: String? = null,
+        kakaoProfileImageUrl: String? = null,
     ): Member {
         val branch = branchRepository.findByName("송파점")!!
         return memberRepository.saveAndFlush(
@@ -248,6 +336,8 @@ class KakaoAuthControllerTest {
                 kakaoId = kakaoId,
                 rejectionReason = rejectionReason,
                 createdAt = OffsetDateTime.now(clock),
+                kakaoNickname = kakaoNickname,
+                kakaoProfileImageUrl = kakaoProfileImageUrl,
             ),
         )
     }

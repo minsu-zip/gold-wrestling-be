@@ -159,6 +159,39 @@ class MemberProfileTest {
             .andExpect(jsonPath("$.memberId").value(member.id))
     }
 
+    @Test
+    fun `카카오 프로필이 저장된 회원의 GET api-members-me 응답에 kakaoNickname과 kakaoProfileImageUrl이 나온다`() {
+        val member =
+            persistMember(
+                kakaoId = 5006L,
+                name = "강감찬",
+                phoneNumber = "01033334444",
+                status = MemberStatus.ACTIVE,
+                kakaoNickname = "골드레슬러",
+                kakaoProfileImageUrl = "https://k.kakaocdn.test/p640.jpg",
+            )
+        val token = accessTokenFor(member)
+
+        mockMvc
+            .perform(get("/api/members/me").header(HttpHeaders.AUTHORIZATION, "Bearer $token"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.kakaoNickname").value("골드레슬러"))
+            .andExpect(jsonPath("$.kakaoProfileImageUrl").value("https://k.kakaocdn.test/p640.jpg"))
+    }
+
+    @Test
+    fun `카카오 프로필이 없는 회원의 GET api-members-me 응답에는 두 필드가 없다`() {
+        val member =
+            persistMember(kakaoId = 5007L, name = "을지문덕", phoneNumber = "01044445555", status = MemberStatus.ACTIVE)
+        val token = accessTokenFor(member)
+
+        mockMvc
+            .perform(get("/api/members/me").header(HttpHeaders.AUTHORIZATION, "Bearer $token"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.kakaoNickname").doesNotExist())
+            .andExpect(jsonPath("$.kakaoProfileImageUrl").doesNotExist())
+    }
+
     // ---------- POST /api/members/me/onboarding ----------
 
     @Test
@@ -343,6 +376,8 @@ class MemberProfileTest {
         phoneNumber: String?,
         status: MemberStatus,
         rejectionReason: String? = null,
+        kakaoNickname: String? = null,
+        kakaoProfileImageUrl: String? = null,
     ): Member =
         memberRepository.saveAndFlush(
             Member(
@@ -353,6 +388,8 @@ class MemberProfileTest {
                 kakaoId = kakaoId,
                 rejectionReason = rejectionReason,
                 createdAt = OffsetDateTime.now(clock),
+                kakaoNickname = kakaoNickname,
+                kakaoProfileImageUrl = kakaoProfileImageUrl,
             ),
         )
 }
