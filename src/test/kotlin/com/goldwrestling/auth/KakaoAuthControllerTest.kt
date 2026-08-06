@@ -5,6 +5,7 @@ import com.goldwrestling.auth.kakao.KakaoApiClient
 import com.goldwrestling.auth.kakao.KakaoAuthFailedException
 import com.goldwrestling.auth.kakao.KakaoTokenResponse
 import com.goldwrestling.auth.kakao.KakaoUnavailableException
+import com.goldwrestling.auth.kakao.KakaoUserProfile
 import com.goldwrestling.branch.BranchRepository
 import com.goldwrestling.member.Member
 import com.goldwrestling.member.MemberRepository
@@ -114,7 +115,7 @@ class KakaoAuthControllerTest {
     @Test
     fun `온보딩을 마친 PENDING 회원이 로그인하면 onboardingCompleted true, status PENDING, rejected false다`() {
         val member = persistMember(kakaoId = 3004L, name = "홍길동", phoneNumber = "01012345678", status = MemberStatus.PENDING)
-        given(kakaoApiClient.fetchKakaoId(anyString())).willReturn(member.kakaoId)
+        given(kakaoApiClient.fetchUserProfile(anyString())).willReturn(KakaoUserProfile(member.kakaoId, null, null))
         given(kakaoApiClient.exchangeToken(anyString())).willReturn(dummyTokenResponse())
 
         mockMvc
@@ -135,7 +136,7 @@ class KakaoAuthControllerTest {
                 status = MemberStatus.INACTIVE,
                 rejectionReason = "내부 관리자 메모: 자격 미달",
             )
-        given(kakaoApiClient.fetchKakaoId(anyString())).willReturn(member.kakaoId)
+        given(kakaoApiClient.fetchUserProfile(anyString())).willReturn(KakaoUserProfile(member.kakaoId, null, null))
         given(kakaoApiClient.exchangeToken(anyString())).willReturn(dummyTokenResponse())
 
         mockMvc
@@ -155,7 +156,7 @@ class KakaoAuthControllerTest {
                 status = MemberStatus.INACTIVE,
                 rejectionReason = null,
             )
-        given(kakaoApiClient.fetchKakaoId(anyString())).willReturn(member.kakaoId)
+        given(kakaoApiClient.fetchUserProfile(anyString())).willReturn(KakaoUserProfile(member.kakaoId, null, null))
         given(kakaoApiClient.exchangeToken(anyString())).willReturn(dummyTokenResponse())
 
         mockMvc
@@ -218,7 +219,7 @@ class KakaoAuthControllerTest {
 
     private fun stubKakaoLogin(kakaoId: Long) {
         given(kakaoApiClient.exchangeToken(anyString())).willReturn(dummyTokenResponse())
-        given(kakaoApiClient.fetchKakaoId(anyString())).willReturn(kakaoId)
+        given(kakaoApiClient.fetchUserProfile(anyString())).willReturn(KakaoUserProfile(kakaoId, null, null))
     }
 
     private fun dummyTokenResponse(): KakaoTokenResponse =

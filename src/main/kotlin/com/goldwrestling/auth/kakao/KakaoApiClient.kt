@@ -57,8 +57,22 @@ class KakaoApiClient(
         }
     }
 
-    /** 카카오 액세스 토큰으로 사용자 정보를 조회해 카카오 회원번호([KakaoUserResponse.id])만 반환한다. */
-    fun fetchKakaoId(kakaoAccessToken: String): Long {
+    /**
+     * 카카오 액세스 토큰으로 사용자 정보를 조회해 카카오 회원번호와 프로필(닉네임·프로필 이미지 URL)을
+     * 평탄화한 [KakaoUserProfile]로 반환한다(D-083).
+     *
+     * 프로필 값은 **없을 수 있다** — 동의항목 미추가·동의 거부·사후 철회 시 `kakao_account`나 `profile`이
+     * 응답에서 통째로 빠진다. 그 경우 예외를 던지지 않고 `null`을 담아 돌려준다(로그인은 계속돼야 한다).
+     * 빈 문자열·공백만 문자열도 "값 없음"과 같은 뜻이므로 `null`로 정규화한다.
+     *
+     * 이미지 URL은 640px `profile_image_url`을 쓴다 — FE 요청이 "내 정보 화면의 프로필 사진"이라 큰
+     * 쪽을 기본으로 한다. 110px `thumbnail_image_url`은 [KakaoUserResponse.Profile]에 매핑만 해 두고
+     * 사용하지 않는다(목록형 화면이 생기면 그때 전환할 수 있게).
+     *
+     * **닉네임·프로필 URL 값을 로그에 남기지 않는다**(T-083-01) — 개인정보 성격이고, 이 클래스의 기존
+     * 로깅 정책(실패 사실과 HTTP 상태만)을 그대로 유지한다.
+     */
+    fun fetchUserProfile(kakaoAccessToken: String): KakaoUserProfile {
         val user =
             callKakao("사용자 조회") {
                 kakaoRestClient
@@ -69,7 +83,12 @@ class KakaoApiClient(
                     .withKakaoErrorHandling()
                     .requiredBody(KakaoUserResponse::class.java)
             }
-        return user.id
+        val profile = user.kakaoAccount?.profile
+        return KakaoUserProfile(
+            kakaoId = user.id,
+            nickname = profile?.nickname?.takeIf { it.isNotBlank() },
+            profileImageUrl = profile?.profileImageUrl?.takeIf { it.isNotBlank() },
+        )
     }
 
     /** 4xx/5xx는 [RestClient.ResponseSpec.onStatus]가 이미 도메인 예외로 바꿔 던진다 — 여기서는

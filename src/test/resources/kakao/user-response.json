@@ -1,4 +1,11 @@
 {
   "id": 1234567890,
-  "connected_at": "2026-08-02T00:00:00Z"
+  "connected_at": "2026-08-02T00:00:00Z",
+  "kakao_account": {
+    "profile": {
+      "nickname": "골드레슬러",
+      "profile_image_url": "https://k.kakaocdn.test/profile_640.jpg",
+      "thumbnail_image_url": "https://k.kakaocdn.test/profile_110.jpg"
+    }
+  }
 }

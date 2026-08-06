@@ -7,6 +7,7 @@ import org.hamcrest.MatcherAssert.assertThat
 import org.hamcrest.Matchers.containsString
 import org.hamcrest.Matchers.not
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.springframework.http.HttpMethod
@@ -102,7 +103,7 @@ class KakaoApiClientTest {
             .andExpect(header("Authorization", "Bearer kakao-access-token-xyz"))
             .andRespond(withSuccess(USER_RESPONSE_BODY, MediaType.APPLICATION_JSON))
 
-        client.fetchKakaoId("kakao-access-token-xyz")
+        client.fetchUserProfile("kakao-access-token-xyz")
 
         server.verify()
     }
@@ -114,9 +115,92 @@ class KakaoApiClientTest {
             .expect(requestTo(kakaoProperties.userInfoUri))
             .andRespond(withSuccess(USER_RESPONSE_BODY, MediaType.APPLICATION_JSON))
 
-        val kakaoId = client.fetchKakaoId("kakao-access-token-xyz")
+        val profile = client.fetchUserProfile("kakao-access-token-xyz")
 
-        assertEquals(9876543210L, kakaoId)
+        assertEquals(9876543210L, profile.kakaoId)
+    }
+
+    @Test
+    fun `kakao_account profile 이 있으면 닉네임과 프로필 이미지 URL 을 읽는다`() {
+        val (client, server) = newClient()
+        server
+            .expect(requestTo(kakaoProperties.userInfoUri))
+            .andRespond(withSuccess(USER_RESPONSE_BODY, MediaType.APPLICATION_JSON))
+
+        val profile = client.fetchUserProfile("kakao-access-token-xyz")
+
+        assertEquals("골드레슬러", profile.nickname)
+        assertEquals("https://k.kakaocdn.test/profile_640.jpg", profile.profileImageUrl)
+    }
+
+    @Test
+    fun `kakao_account 자체가 응답에 없으면 예외 없이 닉네임과 이미지가 null 이다`() {
+        val (client, server) = newClient()
+        server
+            .expect(requestTo(kakaoProperties.userInfoUri))
+            .andRespond(withSuccess("""{"id":9876543210}""", MediaType.APPLICATION_JSON))
+
+        val profile = client.fetchUserProfile("kakao-access-token-xyz")
+
+        assertEquals(9876543210L, profile.kakaoId)
+        assertNull(profile.nickname)
+        assertNull(profile.profileImageUrl)
+    }
+
+    @Test
+    fun `kakao_account 는 있지만 profile 이 없으면 닉네임과 이미지가 null 이다`() {
+        val (client, server) = newClient()
+        server
+            .expect(requestTo(kakaoProperties.userInfoUri))
+            .andRespond(
+                withSuccess(
+                    """{"id":9876543210,"kakao_account":{"profile_nickname_needs_agreement":true}}""",
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        val profile = client.fetchUserProfile("kakao-access-token-xyz")
+
+        assertNull(profile.nickname)
+        assertNull(profile.profileImageUrl)
+    }
+
+    @Test
+    fun `profile 은 있지만 nickname 키가 없으면 닉네임만 null 이고 이미지는 읽힌다`() {
+        val (client, server) = newClient()
+        server
+            .expect(requestTo(kakaoProperties.userInfoUri))
+            .andRespond(
+                withSuccess(
+                    """{"id":9876543210,"kakao_account":{"profile":""" +
+                        """{"profile_image_url":"https://k.kakaocdn.test/only_image.jpg"}}}""",
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        val profile = client.fetchUserProfile("kakao-access-token-xyz")
+
+        assertNull(profile.nickname)
+        assertEquals("https://k.kakaocdn.test/only_image.jpg", profile.profileImageUrl)
+    }
+
+    @Test
+    fun `닉네임이 빈 문자열이면 null 로 정규화된다`() {
+        val (client, server) = newClient()
+        server
+            .expect(requestTo(kakaoProperties.userInfoUri))
+            .andRespond(
+                withSuccess(
+                    """{"id":9876543210,"kakao_account":{"profile":""" +
+                        """{"nickname":"  ","profile_image_url":"https://k.kakaocdn.test/image.jpg"}}}""",
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        val profile = client.fetchUserProfile("kakao-access-token-xyz")
+
+        assertNull(profile.nickname)
+        assertEquals("https://k.kakaocdn.test/image.jpg", profile.profileImageUrl)
     }
 
     @Test
@@ -154,7 +238,7 @@ class KakaoApiClientTest {
         val (client, server) = newClient()
         KakaoApiMockSupport.expectServerError(server, kakaoProperties.userInfoUri)
 
-        assertThrows(KakaoUnavailableException::class.java) { client.fetchKakaoId("access-token") }
+        assertThrows(KakaoUnavailableException::class.java) { client.fetchUserProfile("access-token") }
     }
 
     @Test
@@ -184,6 +268,9 @@ class KakaoApiClientTest {
         const val TOKEN_RESPONSE_BODY =
             """{"token_type":"bearer","access_token":"kakao-access-token-for-test","expires_in":21599,""" +
                 """"refresh_token":"kakao-refresh-token-for-test","scope":"account_email profile_nickname"}"""
-        const val USER_RESPONSE_BODY = """{"id":9876543210,"connected_at":"2026-08-02T00:00:00Z"}"""
+        const val USER_RESPONSE_BODY =
+            """{"id":9876543210,"connected_at":"2026-08-02T00:00:00Z","kakao_account":{"profile":""" +
+                """{"nickname":"골드레슬러","profile_image_url":"https://k.kakaocdn.test/profile_640.jpg",""" +
+                """"thumbnail_image_url":"https://k.kakaocdn.test/profile_110.jpg"}}}"""
     }
 }

@@ -3,6 +3,7 @@ package com.goldwrestling.auth
 import com.goldwrestling.TestcontainersConfiguration
 import com.goldwrestling.auth.kakao.KakaoApiClient
 import com.goldwrestling.auth.kakao.KakaoTokenResponse
+import com.goldwrestling.auth.kakao.KakaoUserProfile
 import com.goldwrestling.member.MemberRepository
 import com.goldwrestling.support.TestClockConfiguration
 import org.assertj.core.api.Assertions.assertThat
@@ -114,7 +115,7 @@ class KakaoLoginConcurrencyTest {
 
     private fun stubKakaoLogin(kakaoId: Long) {
         given(kakaoApiClient.exchangeToken(anyString())).willReturn(dummyTokenResponse())
-        given(kakaoApiClient.fetchKakaoId(anyString())).willReturn(kakaoId)
+        given(kakaoApiClient.fetchUserProfile(anyString())).willReturn(KakaoUserProfile(kakaoId, null, null))
     }
 
     private fun dummyTokenResponse(): KakaoTokenResponse =
