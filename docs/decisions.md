@@ -568,3 +568,71 @@
 - 2026-08 / 본인 차감/복구 이력 조회(PASS-06)는 취소(`CANCELED`)된 이용권의 이력(INITIAL_GRANT·ADMIN_ADJUST·REGISTRATION_CANCELED 상쇄 포함)을 응답에서 제외한다. `PassTransactionSpecifications.passNotCanceled()`가 non-null 필수 조건으로 항상 결합된다. **[사용자 확정, 2026-08-04 — 리뷰 WR-05 분석 후 "숨김" 방향 채택]**
 - 이유: 본인 이용권 목록(D-058)이 취소 이용권을 숨기므로, 이력만 노출되면 회원 화면에 "목록에 없는 passId"의 행이 나타나 혼란을 유발한다. D-059가 취소를 "오등록 정정(없었던 것처럼)"으로 정의한 취지와도 일치. 관리자 화면은 반대로 전부 보이므로 감사 가능성은 유지된다.
 - 기각 대안: 이력도 그대로 노출(목록·이력의 노출 범위 불일치로 FE 조인 깨짐), reason 코드별 선별 노출(규칙이 복잡해지고 FE 분기 증가).
+
+## D-074. 회원 데스크탑 내비는 상단 헤더, 관리자는 좌측 사이드바
+
+- 2026-08 / FE 내비게이션 확정: 회원용은 모바일 하단 탭 + 데스크탑 상단 헤더, 관리자용은 모바일 하단 탭 + 데스크탑 좌측 사이드바. design-system 스킬 반응형 표의 "내비게이션" 행을 회원/관리자 2행으로 분리해 ROADMAP("상단·사이드")과의 표기 불일치를 해소했다. **[사용자 확정, 2026-08-04 FE discuss-phase 1]**
+- 이유: 회원 화면은 메뉴가 적고(홈·내 예약·이용권·공지) 소비자 서비스 관례상 상단 헤더가 자연스럽다. 관리자 화면은 메뉴가 많고 매일 장시간 쓰는 운영 도구라 좌측 사이드바가 정보 밀도·확장성에 맞는다.
+- 기각 대안: 회원도 좌측 사이드바(메뉴 4개에 사이드바는 과함, 콘텐츠 폭 손실), 양쪽 모두 상단 헤더(관리자 메뉴 확장 시 수용 불가).
+
+## D-075. M1에서 로그인 라우트 분리와 가드 전체 동작까지 구현한다
+
+- 2026-08 / M1(FE Phase 1)에서 회원 `/login`·관리자 `/admin/login` 라우트를 분리하고, 껍데기 로그인 페이지 + 라우트 가드의 전체 동작(미인증→로그인 리다이렉트, PENDING·온보딩 미완료→해당 안내 화면 라우팅)까지 구현한다. 실제 카카오/관리자 인증 연동은 M2·M3에서 채운다. **[사용자 확정, 2026-08-04 FE discuss-phase 1]**
+- 이유: 가드는 이후 모든 페이즈가 올라타는 구조라 M1에서 확정해야 M2·M3가 화면만 얹을 수 있다. 회원 상태(PENDING·온보딩)는 서버 데이터이므로 가드 판정은 로그인 요약 쿼리(TanStack Query) 기준으로 하고 Zustand에 복제하지 않으며, M1에서는 MSW 목으로 동작을 검증한다.
+- 기각 대안: 가드를 미인증 리다이렉트만 두고 상태 분기는 M2로 미룸(M2에서 라우팅 구조 재작업 발생), 로그인 라우트 통합(회원 카카오·관리자 ID/PW의 UI·플로우가 달라 분리가 자연스러움).
+
+## D-076. 401 refresh 회전은 M1에서 실제 구현하고, 에러 메시지는 중앙 code→메시지 맵으로 관리한다
+
+- 2026-08 / FE API 클라이언트의 401 처리(`POST /api/auth/refresh` 계약 기준 refresh 회전, 동시 요청 시 중복 refresh 방지 포함)를 M1에서 실제 구현한다. 에러 사용자 문구는 중앙 code→메시지 맵 하나로 관리하되 feature별 override가 가능한 구조로 한다. 계약상 refresh 토큰이 응답 본문(TokenPairResponse)으로 오므로 authStore가 accessToken과 함께 refreshToken도 보관하도록 확장한다. **[사용자 확정, 2026-08-04 FE discuss-phase 1]**
+- 이유: refresh 계약이 이미 openapi.yaml에 있어 자리만 남기면 M2에서 클라이언트 미들웨어를 재작업하게 된다. 중복 refresh 방지는 동시 쿼리가 기본인 TanStack Query 환경에서 필수. 메시지 맵 중앙화는 error-codes.md가 유일한 에러 계약이라는 원칙과 일치하고, feature override는 같은 코드가 문맥별로 다른 안내(예: 예약 화면의 정원 마감)를 요구하는 경우를 수용한다.
+- 기각 대안: M1은 자리만(M2 재작업), feature별 분산 메시지(코드 계약과 문구가 흩어져 일관성 붕괴).
+
+## D-077. M1 공통 컴포넌트는 FOUND-01 필수 4종만 만든다
+
+- 2026-08 / M1의 `components/common/`은 PageHeader, EmptyState, ErrorState, 확인 다이얼로그 4종만 만든다. ResponsiveDialog(Sheet↔Dialog 전환)·DataTable은 두 번째 사용처가 생기는 시점(M3 예상)에 만든다. **[사용자 확정, 2026-08-04 FE discuss-phase 1]**
+- 이유: fe-architecture 스킬의 "처음부터 공용으로 만들지 않는다 — 두 번째 사용처가 생겼을 때 올린다" 원칙 준수. 실사용처 없이 선제작하면 실제 요구와 어긋난 API가 고정된다.
+- 기각 대안: M1에서 전부 선제작(사용처 없는 추측 설계, M1 범위 비대화).
+
+## D-078. M2 FE 신규 의존성 4건 — react-hook-form + zod 4 + @hookform/resolvers 5 + sonner
+
+- 2026-08 / FE(M2)에서 아래 4개를 `pnpm add react-hook-form zod @hookform/resolvers sonner`로 추가한다. **[CLAUDE.md 규칙 "새 의존성은 근거와 함께 제안하고 decisions.md에 기록한 뒤 추가"에 따른 선기록, D-16·D-21 이행]**
+
+| 패키지                | 버전(2026-08-06 확인) | 용도                                       | 근거                                                             |
+| --------------------- | --------------------- | ------------------------------------------ | ---------------------------------------------------------------- |
+| `react-hook-form`     | 7.84.0                | 온보딩 폼 상태·제출 (M2 유일한 폼)         | fe-architecture 스킬이 이미 표준 스택으로 확정. peer `react ^19` |
+| `zod`                 | 4.4.3                 | 이름·전화번호 검증 스키마                  | "검증은 스키마 하나가 소유한다" 원칙. JSX `required` 금지        |
+| `@hookform/resolvers` | 5.7.1                 | `zodResolver` 어댑터                       | peer `zod: ^3.25.0 \|\| ^4.0.0` — **zod 4 호환 조합 확인 완료**  |
+| `sonner`              | 2.0.7                 | mutation 실패 토스트 (D-21 인프라 최초 도입) | peer가 `react`/`react-dom`뿐 — 추가 전이 의존성 유입 없음        |
+
+- 이유: 온보딩(AUTH-03)이 이 프로젝트 최초의 실제 폼이고, 검증 실패 문구를 필드에 붙이려면 rhf의 `setError`가 필요하다. zod는 4.x가 현행 메이저이고 resolvers 5.x가 `^3.25.0 || ^4.0.0`을 peer로 선언해 조합이 성립한다(zod 3으로 내리면 최신 API를 포기하게 된다). 4건 모두 성숙·고다운로드·공식 리포지토리 보유이고 `postinstall` 스크립트가 없다(`pnpm.onlyBuiltDependencies`가 `esbuild`·`@tailwindcss/oxide`로 제한돼 있어 네이티브 빌드 스크립트도 실행되지 않는다).
+- 기각 대안: 폼 라이브러리 없이 `useState`+수기 검증(검증 로직이 JSX에 흩어져 스킬 규약 위반), zod 3 고정(resolvers 5가 zod 4를 지원하므로 굳이 내릴 이유 없음), Formik(유지보수 정체·리렌더 비용).
+
+## D-079. 토스트는 shadcn `sonner` 블록이 아니라 `pnpm add sonner` + 자작 `common/Toaster`로 도입한다
+
+- 2026-08 / D-21(토스트 인프라 도입)의 구현 방식 확정. shadcn 레지스트리의 `sonner` **블록을 쓰지 않고** npm 패키지 `sonner`만 설치한 뒤 `src/components/common/Toaster.tsx`를 직접 만든다.
+- 이유: `sonner` 블록은 `next-themes`를 의존성으로 끌고 들어오고 `useTheme()`로 테마를 읽는 create-app 전용 코드를 포함한다. 이 앱은 다크 모드 토글이 없고(토큰만 유지) 테마 라이브러리를 도입할 계획도 없어, 블록을 쓰면 쓰지 않는 전이 의존성 하나가 번들과 lockfile에 남는다. 토스트 규약(위치 `top-center`, `richColors` 금지, 기본 아이콘 비움, 문구는 중앙 에러 메시지 맵 경유)을 우리 쪽 래퍼가 소유하는 편이 규약 강제에도 유리하다.
+- 기각 대안: `shadcn add sonner`(불필요한 `next-themes` 유입), 토스트 없이 인라인 에러만(mutation 실패는 화면 전환과 겹쳐 인라인 표시 자리가 없다 — 규약이 이미 "변경 실패는 toast"로 확정).
+
+## D-080. `radix-nova` 프리셋에 `form` 블록이 없다 — 폼 스택을 `field` 기반으로 정정한다
+
+- 2026-08 / `pnpm exec shadcn view form` 결과 `radix-nova` 프리셋에 `form` 블록이 존재하지 않음을 실측 확인(2026-08-06). fe-architecture 스킬의 "react-hook-form + zod + shadcn `Form`(`FormField`/`FormMessage`)" 문구를 **`field` 블록(`Field`/`FieldLabel`/`FieldError`) 기반**으로 정정한다. `react-hook-form` + `zod` + `@hookform/resolvers` 조합과 "검증은 zod 스키마 하나가 소유한다"는 규약은 그대로 유지한다.
+- 이유: 없는 블록을 전제로 한 규약을 남겨두면 구현 시점에 매번 재발견하게 된다. `field`는 `label`·`separator`를 registryDependency로 갖는 정식 블록이고 라벨·설명·에러 슬롯을 모두 제공해 `Form`의 역할을 대체할 수 있다. rhf의 `handleSubmit`이 Promise를 반환하므로 `onSubmit={(e) => void form.handleSubmit(fn)(e)}` 형태로 감싸야 ESLint `no-misused-promises`(error)에 걸리지 않는다는 점도 함께 규약에 적는다.
+- 기각 대안: 다른 shadcn 스타일 프리셋으로 전환해 `form`을 얻기(기존 생성물 전체가 스타일 불일치), `Form` 컴포넌트를 손으로 이식(생성물 규약 밖의 유지보수 부담).
+
+## D-081. `@types/kakao-js-sdk`를 설치하지 않고 레포 내 최소 ambient 선언을 쓴다
+
+- 2026-08 / 카카오 JS SDK 타입은 DefinitelyTyped 패키지(`@types/kakao-js-sdk`) 대신 `src/types/kakao.d.ts`에 **실제 사용하는 3개 멤버만**(`init`, `isInitialized`, `Auth.authorize`) 선언한다. `window.Kakao`는 `optional`로 둔다.
+- 이유: `@types/kakao-js-sdk@1.39.5`는 SDK **v1.39** API 기준이라 v2에서 제거된 `Auth.login(success/fail)`·`createLoginButton`·`getAccessToken`과 오타 필드(`prompts`, v2는 `prompt`)까지 타입으로 열어준다. 우리는 v2.8.1을 쓰므로 타입이 통과한 호출이 런타임에서 `is not a function`으로 죽는다. 없는 API를 타입 단계에서 막는 편이 안전하다. 이 선언은 BE 계약 타입이 아니라 **외부 전역 스크립트**의 타입이므로 "수기 API 타입 작성 금지"(CLAUDE.md 규칙 2) 위반이 아니다 — 계약 타입은 여전히 `openapi-typescript` 생성물 `src/api/schema.d.ts`에서만 온다.
+- 기각 대안: `@types/kakao-js-sdk` 설치(버전 스큐로 런타임 오류 유발), `window.Kakao`를 `any`로 캐스팅(ESLint `no-explicit-any` error + 오용 방지 효과 0).
+
+## D-082. 카카오 JS SDK는 CDN 2.8.1 + SRI로 로드하고, `--kakao` 브랜드 토큰은 `/login` 버튼 1곳에만 쓴다
+
+- 2026-08 / 카카오는 JS SDK의 npm 패키지를 제공하지 않으므로 공식 CDN 스크립트(`kakao_js_sdk/2.8.1/kakao.min.js`)를 `integrity` + `crossorigin="anonymous"`와 함께 로드한다. 함께 도입하는 브랜드 색 토큰 `--kakao: #fee500` / `--kakao-foreground: #191919`는 **`/login`의 `카카오로 로그인하기` 버튼 하나에만** 사용하고 다른 어떤 요소에도 쓰지 않는다. `.dark`에서도 같은 값을 유지한다(브랜드 색은 테마에 따라 바뀌지 않는다).
+- 이유: 외부 오리진 스크립트는 `window.Kakao`로 앱과 같은 권한을 갖기 때문에 SRI 없이 로드하면 CDN 변조가 그대로 앱 권한이 된다. 카카오 공식 문서도 "버전과 integrity 값을 정확히 입력"을 요구한다. 색값은 카카오가 지정한 정확한 브랜드 값이라 oklch로 변환하지 않고 hex 그대로 둔다(변환하면 브랜드 규정 색이 아니게 된다). `#191919` on `#FEE500` 대비는 14.9:1로 본문 기준 4.5:1을 통과한다. 사용처를 1곳으로 묶는 이유는 노랑을 다른 곳에 흘리면 "액센트 남용"으로 위계가 무너지기 때문이다.
+- 기각 대안: `kauth.kakao.com/oauth/authorize`를 직접 조립(authorize의 `client_id`가 REST API 키인데 FE에는 JS 키만 있고, 카카오톡 앱 간편로그인을 잃는다 — D-01이 SDK로 확정), SRI 없이 CDN 로드(공급망 변조 무방비), 카카오 심볼 로고 에셋 추가(lucide에 없고 임의 SVG·이모지는 금지 — 텍스트 라벨만 쓴다. 카카오 심사에서 로고가 요구되면 그때 예외를 기록하고 추가한다).
+
+## D-083. [FE 요청 — BE 미확정] 카카오 프로필(닉네임·사진)을 회원 프로필 응답에 추가
+
+- 2026-08 / FE 요청사항 (M2 수동 검증 중 사용자 요청 발생, 2026-08-06). `/me` 내 정보 화면에 카카오 닉네임·프로필 사진을 표시하고 싶다. 필요한 BE 변경: ① 카카오 로그인 시 `kakao_account.profile`에서 닉네임·프로필 이미지 URL 수집·저장, ② `MyProfileResponse`에 `kakaoNickname`·`kakaoProfileImageUrl` 필드 추가(각각 nullable — 동의 거부 가능), ③ 카카오 개발자 콘솔 동의항목에 `profile_nickname`·`profile_image` 추가. **[FE 요청, 2026-08-06 — BE 검토·확정 대기]**
+- 이유: 현재 `MyProfileResponse`는 실명·전화번호·상태만 담고 있어 FE가 표시할 수단이 없다(FE는 계약에 없는 API를 구현하지 않는다는 원칙). 계약 반영 후 FE는 `pnpm api:types` 재생성만으로 후속 페이즈에서 표시할 수 있다.
+- 참고: 체육관 운영 기준 신원은 온보딩 실명·전화번호가 정본이고 카카오 프로필은 표시용 보조 정보다. 동의항목 추가는 기존 회원의 재동의 흐름을 유발할 수 있으므로 BE에서 시점을 판단한다.
