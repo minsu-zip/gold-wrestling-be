@@ -18,6 +18,8 @@ tags:
   description: 회원 본인 이용권·이력 조회
 - name: member
   description: 회원 본인 정보
+- name: member-schedule
+  description: 회원 본인 주간 시간표 조회
 paths:
   /api/members/me/onboarding:
     post:
@@ -333,6 +335,26 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/MyProfileResponse"
+  /api/members/me/schedule:
+    get:
+      tags:
+      - member-schedule
+      summary: "본인 주간 시간표 조회 (weekStart 생략 시 이번 주, 다음 주까지 조회 가능·예약은 불가)"
+      operationId: getWeeklySchedule
+      parameters:
+      - name: weekStart
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WeeklyScheduleResponse"
   /api/members/me/passes:
     get:
       tags:
@@ -892,6 +914,102 @@ components:
           format: date-time
         timeZone:
           type: string
+    DayScheduleResponse:
+      type: object
+      description: 하루치 시간표
+      properties:
+        date:
+          type: string
+          format: date
+          description: 날짜
+        dayOfWeek:
+          type: string
+          description: 요일
+          enum:
+          - MONDAY
+          - TUESDAY
+          - WEDNESDAY
+          - THURSDAY
+          - FRIDAY
+          - SATURDAY
+          - SUNDAY
+        cells:
+          type: array
+          description: "그 날의 셀 목록 — 시작 시각 오름차순, 같은 시각이면 EVENING→SESSION→LESSON 순"
+          items:
+            $ref: "#/components/schemas/ScheduleCellResponse"
+    ScheduleCellResponse:
+      type: object
+      description: 시간표 셀(요일×타임) — 예약 인원 숫자만 내려주고 예약자 명단은 포함하지 않는다(D-096)
+      properties:
+        classScheduleId:
+          type: integer
+          format: int64
+          description: 정기 시간표(ClassSchedule) ID
+        classSessionId:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: 날짜별 수업(ClassSession) ID — 아직 실체화되지 않았으면 null(D-094)
+        classType:
+          type: string
+          description: 수업 종류
+          enum:
+          - EVENING
+          - SESSION
+          - LESSON
+        startTime:
+          type: string
+          description: 시작 시각
+        endTime:
+          type: string
+          description: 종료 시각
+        capacity:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: 정원 — 저녁반(EVENING)은 null
+        reservedCount:
+          type: integer
+          format: int32
+          description: 현재 예약 인원
+        reservable:
+          type: boolean
+          description: 예약 대상 수업 종류인지 — 저녁반은 항상 false(D-093)
+        suspended:
+          type: boolean
+          description: 휴강 여부
+        bookable:
+          type: boolean
+          description: 지금 예약 가능한지 — FE는 이 필드 하나로 예약 버튼 활성화를 결정한다
+        myReservationId:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: "본인이 이 셀을 예약했다면 그 예약 ID, 아니면 null"
+    WeeklyScheduleResponse:
+      type: object
+      description: 주간 시간표 응답
+      properties:
+        weekStart:
+          type: string
+          format: date
+          description: 조회한 주의 월요일
+        weekEnd:
+          type: string
+          format: date
+          description: 조회한 주의 일요일
+        bookableWeek:
+          type: boolean
+          description: 예약 가능한 주(이번 주)인지 — 다음 주 조회면 false
+        days:
+          type: array
+          description: "요일별 시간표(월~일, 7개)"
+          items:
+            $ref: "#/components/schemas/DayScheduleResponse"
     PageResponsePassTransactionResponse:
       type: object
       description: 페이지네이션 응답
