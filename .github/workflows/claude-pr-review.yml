@@ -38,7 +38,13 @@ jobs:
         with:
           fetch-depth: 0 # base 브랜치와의 diff 계산에 전체 이력 필요
 
-      - uses: anthropics/claude-code-action@v1
+      # 액션 실행 전 시각을 기록해 둔다 — 아래 검증 스텝이 "이번 실행이 남긴 코멘트"만 세기 위해서.
+      # 이전 실행이 남긴 오래된 코멘트를 세면 조용한 실패를 그대로 통과시킨다.
+      - id: mark
+        run: echo "since=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - id: claude
+        uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           use_sticky_comment: true # 요약은 코멘트 하나를 갱신 (푸시마다 새 코멘트 금지)
@@ -89,6 +95,50 @@ jobs:
               PR이 크면 diff를 전부 정독하지 말고 우선순위 기준 1~4(규칙·스택·보안·스키마)
               위주로 샘플링하되, 그 사실을 요약 코멘트에 밝힌다.
           claude_args: |
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*),Bash(grep:*),Bash(rg:*),Bash(cat:*),Bash(ls:*),Bash(find:*),Bash(wc:*),Bash(sed:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*)"
             --max-turns 60
             --model claude-sonnet-5
+
+      # 리뷰봇이 코멘트를 남기지 않고 종료하면 CI를 실패시킨다.
+      #
+      # 왜 필요한가: 액션은 모델이 아무 코멘트도 남기지 않아도 is_error=false로 끝나기 때문에,
+      # "리뷰함"과 "조용히 포기함"이 CI 화면에서 똑같이 초록불로 보인다. 실제로 PR #8에서 같은
+      # 커밋을 두 번 돌렸을 때 1차는 6턴 만에 코멘트 0건으로 끝났고 CI는 성공이었다.
+      # 프롬프트의 "코멘트 없이 종료 금지" 문장은 확률을 낮출 뿐 보장이 아니므로,
+      # 결과물(코멘트)의 존재를 워크플로우가 직접 확인한다.
+      #
+      # 재발 시 조치: `gh run rerun <id>` 로 다시 돌리면 대개 정상 리뷰가 게시된다.
+      #
+      # 단, 봇이 아예 실행되지 않은 경우(아래 CONCLUSION 빈 값)는 실패로 치지 않는다 —
+      # claude-code-action은 워크플로우 파일이 기본 브랜치(main) 버전과 한 글자라도 다르면
+      # "Skipping action due to workflow validation"으로 스킵하고 exit 0으로 끝난다.
+      # 이 파일 자체를 고치는 PR은 정의상 항상 그 상태이므로, 구분하지 않으면 워크플로우
+      # 수정 PR이 영원히 빨간불이 된다(닭과 달걀). 스킵된 경우는 warning만 남긴다.
+      - name: 리뷰 코멘트 게시 여부 검증
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          SINCE: ${{ steps.mark.outputs.since }}
+          # 액션이 실제로 돌면 conclusion 출력을 남기고, 스킵되면 아무 출력도 남기지 않는다.
+          CONCLUSION: ${{ steps.claude.outputs.conclusion }}
+        run: |
+          if [ -z "$CONCLUSION" ]; then
+            echo "::warning::리뷰봇이 실행되지 않았습니다 — 워크플로우 파일이 기본 브랜치(main)와 달라 스킵됐습니다. 이 변경이 main에 머지된 뒤부터 리뷰·게이트가 작동합니다."
+            exit 0
+          fi
+          # --paginate는 페이지마다 한 줄씩 뱉으므로 awk로 합산한다.
+          # updated_at 기준인 이유: use_sticky_comment가 켜져 있어 기존 코멘트를 갱신하는 경우도
+          # "이번 실행이 리뷰를 남겼다"로 인정해야 한다.
+          count_since() {
+            gh api "repos/${GITHUB_REPOSITORY}/$1/${PR_NUMBER}/comments" --paginate \
+              --jq "[.[] | select(.user.login == \"claude[bot]\") | select(.updated_at > \"${SINCE}\")] | length" \
+              | awk '{ sum += $1 } END { print sum + 0 }'
+          }
+          SUMMARY=$(count_since issues)
+          INLINE=$(count_since pulls)
+          echo "이번 실행이 남긴 코멘트 — 요약 ${SUMMARY}건 / 인라인 ${INLINE}건"
+          if [ "$((SUMMARY + INLINE))" -eq 0 ]; then
+            echo "::error::리뷰봇이 코멘트를 남기지 않고 종료했습니다. 'gh run rerun ${GITHUB_RUN_ID}'로 재실행하세요."
+            exit 1
+          fi
