@@ -24,6 +24,7 @@ import com.goldwrestling.schedule.ClassSessionStatus
 import com.goldwrestling.schedule.ClassType
 import com.goldwrestling.support.MutableTestClock
 import com.goldwrestling.support.TestClockConfiguration
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -39,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.OffsetDateTime
@@ -88,6 +90,18 @@ class MemberReservationControllerTest {
 
     private var fixtureCounter = 60000L
 
+    /**
+     * `MutableTestClock`은 싱글턴 빈이라 이전 테스트가 밀어 둔 시각이 이어진다
+     * (`AdminPassControllerTest`·`MemberScheduleControllerTest`와 동일 관례). 매 테스트 시작 시
+     * 실제 현재 시각으로 되돌려야 [tokenAtThisWeekMonday]가 계산하는 "이번 주"가 실제 이번 주와
+     * 일치하고, 토큰의 `issuedAt`/`expiresAt`도 `JwtDecoder`가 검증하는 실제 시스템 시각과 어긋나지
+     * 않는다.
+     */
+    @BeforeEach
+    fun resetClock() {
+        (clock as MutableTestClock).setTo(Instant.now())
+    }
+
     // ---------- 성공 ----------
 
     @Test
@@ -112,8 +126,12 @@ class MemberReservationControllerTest {
 
     // ---------- 형식 검증 ----------
 
+    // classScheduleId는 Kotlin non-null 생성자 파라미터라, JSON에 키 자체가 없으면 Jackson
+    // 역직렬화가 @Valid 검증이 실행되기도 전에 실패한다 — 그래서 여기서 나오는 코드는
+    // VALIDATION_FAILED가 아니라 MALFORMED_REQUEST다(`AdminPassControllerTest`의 `note` 케이스와
+    // 동일한 관례).
     @Test
-    fun `classScheduleId 누락이면 400과 VALIDATION_FAILED를 반환한다`() {
+    fun `classScheduleId 누락이면 400과 MALFORMED_REQUEST를 반환한다`() {
         val member = persistMember(MemberStatus.ACTIVE)
         val (token, monday) = tokenAtThisWeekMonday(member)
         val classDate = monday.plusDays(DayOfWeek.TUESDAY.value - 1L)
@@ -125,7 +143,7 @@ class MemberReservationControllerTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""{"classDate":"$classDate"}"""),
             ).andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+            .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"))
     }
 
     // ---------- 409 5종 ----------
