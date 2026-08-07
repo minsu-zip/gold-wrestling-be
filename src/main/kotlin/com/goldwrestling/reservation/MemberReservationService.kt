@@ -3,6 +3,7 @@ package com.goldwrestling.reservation
 import com.goldwrestling.member.Member
 import com.goldwrestling.member.MemberNotFoundException
 import com.goldwrestling.member.MemberRepository
+import com.goldwrestling.member.dto.PageResponse
 import com.goldwrestling.notification.NotificationService
 import com.goldwrestling.pass.InsufficientPassCountException
 import com.goldwrestling.pass.PassNotFoundException
@@ -12,6 +13,7 @@ import com.goldwrestling.pass.PassTransaction
 import com.goldwrestling.pass.PassTransactionRepository
 import com.goldwrestling.pass.TransactionReason
 import com.goldwrestling.reservation.dto.ChangeReservationRequest
+import com.goldwrestling.reservation.dto.MyReservationSearchCondition
 import com.goldwrestling.reservation.dto.ReservationResponse
 import com.goldwrestling.reservation.dto.ReserveRequest
 import com.goldwrestling.schedule.ClassSchedule
@@ -21,6 +23,9 @@ import com.goldwrestling.schedule.ClassSessionRepository
 import com.goldwrestling.schedule.ClassSessionService
 import com.goldwrestling.schedule.ReservationWindow
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
+import org.springframework.data.jpa.domain.Specification
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -184,6 +189,36 @@ class MemberReservationService(
         notificationService.createReservationChanged(newReservation, byAdmin = false)
 
         return ReservationResponse.from(newReservation, newReservation.classSession.endTime)
+    }
+
+    /**
+     * 본인 예약 목록을 조회한다(RESV-05, D-090). **활성 예약만 반환하고 취소된 예약은 제외한다**
+     * — [ReservationSpecifications.ownedByMember]·[ReservationSpecifications.hasStatus]`(ACTIVE)`
+     * 조합으로만 구성한다. `ownedByMember`가 non-null 필수 조건이라 이 조합에서 본인 스코프를
+     * 빼먹을 수 없다(T-04-46).
+     *
+     * 정렬은 `classDate` 오름차순, 같은 날이면 `startTime` 오름차순 — 회원이 달력을 보는 순서와
+     * 같다.
+     */
+    fun findMyReservations(
+        memberId: Long,
+        condition: MyReservationSearchCondition,
+    ): PageResponse<ReservationResponse> {
+        val specification =
+            Specification.allOf<Reservation>(
+                listOf(
+                    ReservationSpecifications.ownedByMember(memberId),
+                    ReservationSpecifications.hasStatus(ReservationStatus.ACTIVE),
+                ),
+            )
+        val pageable =
+            PageRequest.of(
+                condition.page,
+                condition.size,
+                Sort.by(Sort.Direction.ASC, "classDate", "startTime"),
+            )
+        val page = reservationRepository.findAll(specification, pageable)
+        return PageResponse.from(page) { ReservationResponse.from(it, it.classSession.endTime) }
     }
 
     /**

@@ -345,15 +345,16 @@ class MemberReservationControllerTest {
     @Test
     fun `타인 예약 id로 취소·변경을 시도하면 404와 RESERVATION_NOT_FOUND를 반환한다`() {
         val owner = persistMember(MemberStatus.ACTIVE)
-        val (ownerToken, monday) = tokenAtThisWeekMonday(owner)
+        val stranger = persistMember(MemberStatus.ACTIVE)
+        // 두 토큰 모두 클록 이동 전에 발급한다 — moveClockToThisWeekMonday KDoc 참조.
+        val ownerToken = tokenFor(owner)
+        val strangerToken = tokenFor(stranger)
+        val monday = moveClockToThisWeekMonday()
         persistPass(owner, PassType.SESSION_PASS, "3.0")
         val schedule = findSchedule(DayOfWeek.TUESDAY, ClassType.SESSION, LocalTime.of(11, 0))
         val newSchedule = findSchedule(DayOfWeek.TUESDAY, ClassType.SESSION, LocalTime.of(13, 0))
         val classDate = monday.plusDays(DayOfWeek.TUESDAY.value - 1L)
         val reservationId = createReservation(ownerToken, schedule.id!!, classDate)
-
-        val stranger = persistMember(MemberStatus.ACTIVE)
-        val (strangerToken, _) = tokenAtThisWeekMonday(stranger)
 
         mockMvc
             .perform(
@@ -375,15 +376,16 @@ class MemberReservationControllerTest {
     @Test
     fun `같은 세션에 두 회원이 예약해도 본인 목록에는 본인 예약만 보인다`() {
         val memberA = persistMember(MemberStatus.ACTIVE)
-        val (tokenA, monday) = tokenAtThisWeekMonday(memberA)
+        val memberB = persistMember(MemberStatus.ACTIVE)
+        // 두 토큰 모두 클록 이동 전에 발급한다 — moveClockToThisWeekMonday KDoc 참조.
+        val tokenA = tokenFor(memberA)
+        val tokenB = tokenFor(memberB)
+        val monday = moveClockToThisWeekMonday()
         persistPass(memberA, PassType.SESSION_PASS, "3.0")
+        persistPass(memberB, PassType.SESSION_PASS, "3.0")
         val schedule = findSchedule(DayOfWeek.TUESDAY, ClassType.SESSION, LocalTime.of(11, 0))
         val classDate = monday.plusDays(DayOfWeek.TUESDAY.value - 1L)
         val reservationIdA = createReservation(tokenA, schedule.id!!, classDate)
-
-        val memberB = persistMember(MemberStatus.ACTIVE)
-        val (tokenB, _) = tokenAtThisWeekMonday(memberB)
-        persistPass(memberB, PassType.SESSION_PASS, "3.0")
         createReservation(tokenB, schedule.id!!, classDate)
 
         val body =
@@ -394,7 +396,12 @@ class MemberReservationControllerTest {
                 .andReturn()
                 .response.contentAsString
 
-        val idsA = objectMapper.readTree(body).get("content").toList().map { it.get("id").asLong() }
+        val idsA =
+            objectMapper
+                .readTree(body)
+                .get("content")
+                .toList()
+                .map { it.get("id").asLong() }
         assertThat(idsA).containsExactly(reservationIdA)
     }
 
@@ -515,12 +522,26 @@ class MemberReservationControllerTest {
      * 어떤 타임(가장 이른 월요일 EVENING 19:00)도 아직 시작 전이라, 이번 주 전체가 예약 가능하다.
      */
     private fun tokenAtThisWeekMonday(member: Member): Pair<String, LocalDate> {
-        val token = tokenService.issueTokenPair(PrincipalType.MEMBER, member.id!!).accessToken
+        val token = tokenFor(member)
+        val monday = moveClockToThisWeekMonday()
+        return token to monday
+    }
+
+    /**
+     * 클록을 옮기지 않고 토큰만 발급한다 — 한 테스트에 회원이 둘 이상 필요하면(IDOR 검증 등)
+     * **두 토큰 모두 클록 이동 전에** 이 함수로 먼저 발급해야 한다. 클록이 이미 이번 주 월요일로
+     * 옮겨진 뒤에 발급하면 `issuedAt`이 비즈니스 시계(수십 년 뒤/과거의 합성 날짜) 기준이 되어
+     * `JwtDecoder`의 실제 시스템 시각 검증에서 곧바로 401(만료/미래 토큰)이 난다.
+     */
+    private fun tokenFor(member: Member): String = tokenService.issueTokenPair(PrincipalType.MEMBER, member.id!!).accessToken
+
+    /** 비즈니스 시계를 "이번 주 월요일 08:00 KST"로 옮긴다. [tokenAtThisWeekMonday] KDoc 참조. */
+    private fun moveClockToThisWeekMonday(): LocalDate {
         val monday = WeekRange.of(LocalDate.now(clock)).monday
         (clock as MutableTestClock).setTo(
             ZonedDateTime.of(monday, LocalTime.of(8, 0), ZoneId.of(SEOUL_ZONE_ID)).toInstant(),
         )
-        return token to monday
+        return monday
     }
 
     private fun persistMember(status: MemberStatus): Member {
