@@ -1,5 +1,6 @@
 package com.goldwrestling.member
 
+import com.goldwrestling.common.LikePatternEscaper
 import org.springframework.data.jpa.domain.Specification
 
 /**
@@ -10,9 +11,6 @@ import org.springframework.data.jpa.domain.Specification
  * verify-boot4-api 절차로 spring-data-jpa 4.1.0 소스를 확인했다)로 합친다.
  */
 object MemberSpecifications {
-    /** LIKE 패턴에서 이스케이프 문자로 쓸 문자. `%`·`_`·이 문자 자체를 이스케이프하는 데 쓴다. */
-    private const val LIKE_ESCAPE_CHAR = '\\'
-
     /**
      * 이름·전화번호 부분 일치 검색(D-035 "검색어 하나로 이름·전화번호 부분 일치").
      *
@@ -36,7 +34,7 @@ object MemberSpecifications {
     fun keywordContains(keyword: String?): Specification<Member>? {
         if (keyword.isNullOrBlank()) return null
         val trimmed = keyword.trim()
-        val escapedNameKeyword = escapeLikeWildcards(trimmed).lowercase()
+        val escapedNameKeyword = LikePatternEscaper.escapeWildcards(trimmed).lowercase()
         val normalizedPhone = PhoneNumberNormalizer.normalize(trimmed)
 
         return Specification { root, _, criteriaBuilder ->
@@ -44,16 +42,16 @@ object MemberSpecifications {
                 criteriaBuilder.like(
                     criteriaBuilder.lower(root.get("name")),
                     "%$escapedNameKeyword%",
-                    LIKE_ESCAPE_CHAR,
+                    LikePatternEscaper.ESCAPE_CHAR,
                 )
             val predicates = mutableListOf(namePredicate)
             if (normalizedPhone.isNotEmpty()) {
-                val escapedPhoneKeyword = escapeLikeWildcards(normalizedPhone)
+                val escapedPhoneKeyword = LikePatternEscaper.escapeWildcards(normalizedPhone)
                 predicates.add(
                     criteriaBuilder.like(
                         root.get("phoneNumber"),
                         "%$escapedPhoneKeyword%",
-                        LIKE_ESCAPE_CHAR,
+                        LikePatternEscaper.ESCAPE_CHAR,
                     ),
                 )
             }
@@ -101,11 +99,4 @@ object MemberSpecifications {
             if (flag) completed else criteriaBuilder.not(completed)
         }
     }
-
-    /** `%`·`_`·이스케이프 문자 자체를 [LIKE_ESCAPE_CHAR]로 이스케이프해 LIKE 와일드카드로 해석되지 않게 한다. */
-    private fun escapeLikeWildcards(value: String): String =
-        value
-            .replace("$LIKE_ESCAPE_CHAR", "$LIKE_ESCAPE_CHAR$LIKE_ESCAPE_CHAR")
-            .replace("%", "$LIKE_ESCAPE_CHAR%")
-            .replace("_", "${LIKE_ESCAPE_CHAR}_")
 }

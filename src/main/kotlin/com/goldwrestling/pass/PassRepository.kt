@@ -112,4 +112,32 @@ interface PassRepository :
         @Param("expectedStartDate") expectedStartDate: LocalDate,
         @Param("expectedEndDate") expectedEndDate: LocalDate,
     ): Int
+
+    /**
+     * 예약 차감 대상 이용권 후보를 만료 임박순으로 조회한다(D-091 — 만료 임박순·합산 금지).
+     *
+     * **이 쿼리의 `classDate`는 예약일이 아니라 수업 날짜다.** 만료 직전에 다음 달 수업을 전부
+     * 예약해 유효기간을 사실상 연장하는 우회를 막기 위해서다 — 잘못 넘기면 유효기간 우회가 열린다.
+     *
+     * - `status = ACTIVE` — 등록 취소된 이용권은 후보에서 제외한다(D-089/D-091)
+     * - `endDate >= classDate` — [Pass.isExpired]가 쓰는 것과 **같은 비교축**(D-066 종료일 포함
+     *   판정)이다. 다른 비교식(`>`)을 쓰면 종료일 당일 수업이 경계에서 어긋난다
+     * - `remainingCount >= requiredAmount` — **단일 이용권 기준**이다. 여러 장의 잔여를 SQL이
+     *   합산해 비교하지 않는다 — 이것이 "0.5회 두 장으로 1회 예약 불가"(RESV-03)의 실현부다
+     * - `order by endDate asc, id asc` — 만료 임박순, 동률이면 `id`로 결정적 순서를 보장한다.
+     *   `ReservationPassPolicy.selectCandidate`가 이 정렬을 신뢰하고 `first()`만 취한다 — 서비스가
+     *   다시 정렬하지 않는다
+     */
+    @Query(
+        "select p from Pass p where p.member.id = :memberId and p.type = :type " +
+            "and p.status = com.goldwrestling.pass.PassStatus.ACTIVE " +
+            "and p.endDate >= :classDate and p.remainingCount >= :requiredAmount " +
+            "order by p.endDate asc, p.id asc",
+    )
+    fun findDeductionCandidates(
+        @Param("memberId") memberId: Long,
+        @Param("type") type: PassType,
+        @Param("classDate") classDate: LocalDate,
+        @Param("requiredAmount") requiredAmount: BigDecimal,
+    ): List<Pass>
 }

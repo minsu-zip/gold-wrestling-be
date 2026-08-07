@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-05-PLAN.md
-last_updated: "2026-08-07T09:30:00.000Z"
-last_activity: 2026-08-07 -- Phase 04 wave 5 (04-05) 완료, 청크 A 마감
+stopped_at: Completed 04-10-PLAN.md
+last_updated: "2026-08-07T15:55:03.322Z"
+last_activity: 2026-08-07
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 44
-  completed_plans: 34
-  percent: 77
+  completed_plans: 39
+  percent: 50
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 04 (schedule-reservation) — EXECUTING
-Plan: 5 of 15 (wave 1~5 = 청크 A 완료)
-Status: 청크 A(feature/phase-04a-schedule) PR 대기 — 다음은 wave 6 (04-06, 청크 B 시작)
-Last activity: 2026-08-07 -- Phase 04 wave 5 (04-05) 완료, 청크 A 마감
+Plan: 3 of 15
+Status: Ready to execute
+Last activity: 2026-08-07
 
-Progress: [████████░░] 77%
+Progress: [█████████░] 89%
 
 ## Performance Metrics
 
@@ -61,6 +61,11 @@ Progress: [████████░░] 77%
 | Phase 04 P02 | 30min | 3 tasks | 5 files |
 | Phase 04 P03 | ~20min | 3 tasks | 18 files |
 | Phase 04 P04 | 15min | 2 tasks | 4 files |
+| Phase 04 P06 | ~20min | 2 tasks | 4 files |
+| Phase 04 P07 | 25min | 2 tasks | 7 files |
+| Phase 04 P09 | ~15min | 2 tasks | 4 files |
+| Phase 04 P08 | 20min | 2 tasks | 3 files |
+| Phase 04 P10 | 60min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -87,6 +92,15 @@ Recent decisions affecting current work:
 - [Phase 04-03]: PassTransaction.member 추가 시 기본값을 주지 않고 모든 호출부(AdminPassService 3곳 + 테스트 1곳)에 member=null을 명시 — PLAN.md가 4곳을 모두 AdminPassService로 가정했으나 실제로는 테스트 파일 1곳 포함
 - [Phase 04-04]: WeekRange는 값 객체라 data class로 정의 — 엔티티 data class 금지 규약(conventions §3)은 JPA 엔티티 전용, WeekRange는 테스트 equals 비교가 필요해 예외
 - [Phase 04-04]: 조회범위(14일)는 WeekRange를 재사용하지 않고 ReservationWindow.ViewableRange로 분리 — glossary가 WeekRange를 7일 범위로 명시했기 때문
+- [Phase 04-06]: ReservationPassPolicy를 reservation 패키지에 배치해 schedule이 pass를 참조하지 않도록 의존 방향을 reservation→schedule·reservation→pass 두 갈래로 유지(D-091)
+- [Phase 04-06]: 리포지토리 @Query 메서드의 RED는 어서션 실패 대신 시그니처만 선언해 Spring Data 파생 쿼리 파싱 실패(PropertyReferenceException)로 컨텍스트 기동이 실패하는 것으로 확보 — 이 저장소 최초 사례
+- [Phase 04-07]: MemberReservationServiceTest는 클래스 레벨 @Transactional을 배제 - reserve() 실패 시 실제 롤백된 DB 상태를 검증하려면 각 호출이 독립 트랜잭션이어야 한다 — 테스트가 @Transactional이면 참여 트랜잭션의 rollback-only 마킹이 테스트 종료 시점까지 실제 반영되지 않아 검증이 불가능하다
+- [Phase 04-07]: 취소·변경 알림 문구는 PLAN.md가 예시로 지정한 예약/휴강 알림 톤을 따라 직접 작성 — 문구 자체는 도메인 규칙이 아니라 표시 문자열이라 Rule 4 대상이 아니다
+- [Phase 04-09]: assertCancelableByMember는 당일·과거를 !classDate.isAfter(today) 한 조건으로 함께 거부한다 — 지난 수업을 당일보다 강하게 막는다는 취지를 유지하면서 판정 로직을 단일 부등식으로 단순화
+- [Phase 04-08]: 409 코드 5종 구성에 CLASS_SESSION_CANCELED(휴강)를 추가 — behavior 목록(4종)만으로는 acceptance_criteria가 요구한 5종을 채울 수 없어 컨트롤러 action 섹션이 이미 언급한 다섯 번째 코드를 테스트에 반영
+- [Phase 04-08]: classScheduleId 누락 시 기대 코드를 VALIDATION_FAILED→MALFORMED_REQUEST로 정정 — Kotlin non-null 생성자 파라미터라 Jackson 역직렬화가 @Valid보다 먼저 실패(AdminPassControllerTest 선례와 동일)
+- [Phase 04-10]: 취소·변경 응답 재조회는 항상 findByIdAndMemberId — bare findById(Reservation)를 회원 경로 어디에서도 쓰지 않아 IDOR 방어가 조회 시그니처 수준에서 끝까지 일관된다
+- [Phase 04-10]: LikePatternEscaper를 common으로 승격 — MemberSpecifications의 private LIKE 이스케이프 로직을 ReservationSpecifications.memberKeywordContains가 재구현 없이 재사용(PageResponse KDoc이 예고한 승격 트리거 충족)
 
 ### Pending Todos
 
@@ -112,6 +126,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-07T07:38:02.626Z
-Stopped at: Completed 04-03-PLAN.md
+Last session: 2026-08-07T15:55:03.315Z
+Stopped at: Completed 04-10-PLAN.md
 Resume file: None

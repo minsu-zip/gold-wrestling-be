@@ -45,9 +45,9 @@
 - [ ] **SCHED-03**: 관리자가 주간 스케줄 보드 데이터를 조회할 수 있다 — 요일×타임 그리드: 수업 종류, 예약 n/정원, 1:1 여부, 셀별 예약자 명단
 - [x] **RESV-01**: 회원이 예약제 수업(SESSION)을 예약하면 `SESSION_PASS`에서 즉시 1회 차감된다 (`RESERVE`)
 - [x] **RESV-02**: 회원이 1:1 레슨(LESSON)을 예약하면 `LESSON_PASS`에서 즉시 1회 차감된다 — 타임당 1명
-- [ ] **RESV-03**: 잔여 횟수가 차감량보다 적으면 예약이 거부된다 (잔여 0.5회로 1회 예약 불가)
+- [x] **RESV-03**: 잔여 횟수가 차감량보다 적으면 예약이 거부된다 (잔여 0.5회로 1회 예약 불가)
 - [x] **RESV-04**: 회원이 예약을 취소(즉시 복구 `CANCEL_REFUND`)·변경(취소+재예약)할 수 있다 — 당일에는 둘 다 불가
-- [ ] **RESV-05**: 회원이 본인 예약 목록을 조회할 수 있다
+- [x] **RESV-05**: 회원이 본인 예약 목록을 조회할 수 있다
 - [x] **RESV-06**: 정원 마지막 자리·1:1 슬롯 동시 예약에서 초과 예약 0건 — DB 제약 + 조건부 갱신/락(D-021), 동시성 테스트 포함
 - [ ] **RESV-07**: 관리자가 모든 회원의 예약을 조회할 수 있다
 - [ ] **RESV-08**: 관리자가 예약을 대리 취소/변경할 수 있다 — 당일 포함 제약 없음, 취소 시 차감 복구 여부 선택(기본 복구)
@@ -129,9 +129,9 @@
 | SCHED-03 | Phase 4 | Pending |
 | RESV-01 | Phase 4 | Complete |
 | RESV-02 | Phase 4 | Complete |
-| RESV-03 | Phase 4 | Pending |
+| RESV-03 | Phase 4 | Complete |
 | RESV-04 | Phase 4 | Complete |
-| RESV-05 | Phase 4 | Pending |
+| RESV-05 | Phase 4 | Complete |
 | RESV-06 | Phase 4 | Complete |
 | RESV-07 | Phase 4 | Pending |
 | RESV-08 | Phase 4 | Pending |
