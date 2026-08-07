@@ -78,6 +78,7 @@ class AdminPassService(
                     reason = TransactionReason.INITIAL_GRANT,
                     note = null,
                     admin = admin,
+                    member = null,
                     occurredAt = now,
                 ),
             )
@@ -133,6 +134,7 @@ class AdminPassService(
                 reason = TransactionReason.ADMIN_ADJUST,
                 note = request.note.trim(),
                 admin = admin,
+                member = null,
                 occurredAt = now,
             ),
         )
@@ -274,6 +276,7 @@ class AdminPassService(
                     reason = TransactionReason.REGISTRATION_CANCELED,
                     note = reason,
                     admin = admin,
+                    member = null,
                     occurredAt = now,
                 ),
             )
