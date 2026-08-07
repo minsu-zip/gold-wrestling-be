@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-08-07T07:14:49.626Z"
+last_updated: "2026-08-07T07:41:05.690Z"
 last_activity: 2026-08-07
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 44
-  completed_plans: 32
+  completed_plans: 33
   percent: 50
 ---
 
@@ -30,7 +30,7 @@ Plan: 2 of 15
 Status: Ready to execute
 Last activity: 2026-08-07
 
-Progress: [███████░░░] 73%
+Progress: [████████░░] 75%
 
 ## Performance Metrics
 
@@ -60,6 +60,7 @@ Progress: [███████░░░] 73%
 | Phase 04 P01 | 25min | 2 tasks | 9 files |
 | Phase 04 P02 | 30min | 3 tasks | 5 files |
 | Phase 04 P03 | ~20min | 3 tasks | 18 files |
+| Phase 04 P04 | 15min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -84,6 +85,8 @@ Recent decisions affecting current work:
 - [Phase 04-02]: V8로 pass_transaction에 member_id를 추가하고 ck_pass_transaction_subject로 admin/member 중 정확히 하나만 주체가 되도록 강제 — 회원 셀프 예약/취소 이력 기록 경로 확보(D-030 이행)
 - [Phase 04-03]: ClassSession.status/reservedCount는 기본값 없는 생성자 필수 파라미터로 선언 — 판정 전용(D-072) grep 검사를 확실히 통과시키고 Pass.kt 관례와 일관성 유지
 - [Phase 04-03]: PassTransaction.member 추가 시 기본값을 주지 않고 모든 호출부(AdminPassService 3곳 + 테스트 1곳)에 member=null을 명시 — PLAN.md가 4곳을 모두 AdminPassService로 가정했으나 실제로는 테스트 파일 1곳 포함
+- [Phase 04-04]: WeekRange는 값 객체라 data class로 정의 — 엔티티 data class 금지 규약(conventions §3)은 JPA 엔티티 전용, WeekRange는 테스트 equals 비교가 필요해 예외
+- [Phase 04-04]: 조회범위(14일)는 WeekRange를 재사용하지 않고 ReservationWindow.ViewableRange로 분리 — glossary가 WeekRange를 7일 범위로 명시했기 때문
 
 ### Pending Todos
 
@@ -109,6 +112,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-07T07:14:49.620Z
+Last session: 2026-08-07T07:38:02.626Z
 Stopped at: Completed 04-03-PLAN.md
 Resume file: None
