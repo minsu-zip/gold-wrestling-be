@@ -78,14 +78,12 @@ class ScheduleService(
                     .associate { it.classSession.id to it.id }
             }
 
+        val gridDays = ScheduleGridSkeleton.build(weekRange, schedules, sessionsByKey)
         val days =
-            weekRange.dates().map { date ->
+            gridDays.map { gridDay ->
                 val cellsForDay =
-                    schedules
-                        .filter { it.dayOfWeek == date.dayOfWeek }
-                        .sortedWith(compareBy({ it.startTime }, { it.classType.ordinal }))
-                        .map { schedule -> toCell(schedule, date, sessionsByKey, myReservationIdBySessionId, now) }
-                DayScheduleResponse(date = date, dayOfWeek = date.dayOfWeek, cells = cellsForDay)
+                    gridDay.cells.map { cell -> toCell(cell.schedule, gridDay.date, cell.session, myReservationIdBySessionId, now) }
+                DayScheduleResponse(date = gridDay.date, dayOfWeek = gridDay.date.dayOfWeek, cells = cellsForDay)
             }
 
         return WeeklyScheduleResponse(
@@ -99,11 +97,10 @@ class ScheduleService(
     private fun toCell(
         schedule: ClassSchedule,
         date: LocalDate,
-        sessionsByKey: Map<Pair<Long?, LocalDate>, ClassSession>,
+        session: ClassSession?,
         myReservationIdBySessionId: Map<Long?, Long?>,
         now: LocalDateTime,
     ): ScheduleCellResponse {
-        val session = sessionsByKey[schedule.id to date]
         val suspended = session != null && session.status == ClassSessionStatus.CANCELED
         val capacity = session?.capacity ?: schedule.capacity
         val reservedCount = session?.reservedCount ?: 0

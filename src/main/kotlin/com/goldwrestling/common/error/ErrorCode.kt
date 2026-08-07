@@ -127,4 +127,7 @@ enum class ErrorCode(
 
     /** 활성 예약이 있어 등록 취소 거부 (D-089) */
     PASS_HAS_ACTIVE_RESERVATION(HttpStatus.CONFLICT),
+
+    /** 요청한 branchId에 관리자가 소속되지 않음 (T-04-53, 관리자 스케줄 보드 최초 도입) */
+    ADMIN_BRANCH_NOT_ASSIGNED(HttpStatus.FORBIDDEN),
 }

@@ -59,6 +59,7 @@
 | `RESERVATION_TYPE_MISMATCH` | 400 | 변경 시 수업 종류가 다름 (`SESSION`↔`LESSON` 교차, D-090) | `MemberReservationService` |
 | `RESERVATION_STATE_CONFLICT` | 409 | 조건부 갱신 경쟁 패배 등 위 코드로 나뉘지 않는 예약 상태 충돌 | `AdminReservationService` |
 | `PASS_HAS_ACTIVE_RESERVATION` | 409 | 대상 이용권으로 잡힌 활성 예약이 있어 등록 취소 거부 (D-089) | `AdminPassService` |
+| `ADMIN_BRANCH_NOT_ASSIGNED` | 403 | 요청한 `branchId`에 관리자가 소속되지 않음 (T-04-53) | `AdminScheduleService` |
 
 > **연결 상태 (Phase 4 진행 중에만 유효한 안내 — phase 완료 시 이 문단을 삭제한다)**
 > 위 표의 "발생 지점"은 **그 코드를 던지도록 계획된 위치**이며, 전부가 이미 연결된 것은 아니다.

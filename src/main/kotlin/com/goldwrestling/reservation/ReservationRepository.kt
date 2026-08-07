@@ -56,6 +56,22 @@ interface ReservationRepository :
     ): List<Reservation>
 
     /**
+     * 관리자 주간 보드의 셀별 예약자 명단(D-096)이 `member.name`을 N+1 없이 가져오는 경로
+     * (T-04-54, 관리자 스케줄 보드 최초 도입) — [findAllByClassSessionIdInAndStatus]와 조건은
+     * 같지만 `join fetch`로 `member`를 함께 로딩한다. 이 저장소에서 `join fetch`를 쓰는 첫
+     * 사례다 — 명단에 `memberName`을 담는 순간 `member`(LAZY) 프록시를 건드리게 되므로, 미리
+     * 가져오지 않으면 명단 크기만큼(셀당 최대 정원 수) 추가 쿼리가 나간다.
+     */
+    @Query(
+        "select r from Reservation r join fetch r.member " +
+            "where r.classSession.id in :classSessionIds and r.status = :status",
+    )
+    fun findAllByClassSessionIdInAndStatusWithMember(
+        @Param("classSessionIds") classSessionIds: Collection<Long>,
+        @Param("status") status: ReservationStatus,
+    ): List<Reservation>
+
+    /**
      * 회원 시간표 조회 전용 — 세션 목록 안에서 **[memberId] 본인의 예약만** 가져온다.
      *
      * 회원 조건을 애플리케이션 `filter`가 아니라 쿼리에 두는 이유: 정원이 찬 수업이 여러 개 열린
