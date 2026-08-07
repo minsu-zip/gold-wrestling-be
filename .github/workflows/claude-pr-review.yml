@@ -43,7 +43,8 @@ jobs:
       - id: mark
         run: echo "since=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
-      - uses: anthropics/claude-code-action@v1
+      - id: claude
+        uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           use_sticky_comment: true # 요약은 코멘트 하나를 갱신 (푸시마다 새 코멘트 금지)
@@ -107,13 +108,25 @@ jobs:
       # 결과물(코멘트)의 존재를 워크플로우가 직접 확인한다.
       #
       # 재발 시 조치: `gh run rerun <id>` 로 다시 돌리면 대개 정상 리뷰가 게시된다.
+      #
+      # 단, 봇이 아예 실행되지 않은 경우(아래 CONCLUSION 빈 값)는 실패로 치지 않는다 —
+      # claude-code-action은 워크플로우 파일이 기본 브랜치(main) 버전과 한 글자라도 다르면
+      # "Skipping action due to workflow validation"으로 스킵하고 exit 0으로 끝난다.
+      # 이 파일 자체를 고치는 PR은 정의상 항상 그 상태이므로, 구분하지 않으면 워크플로우
+      # 수정 PR이 영원히 빨간불이 된다(닭과 달걀). 스킵된 경우는 warning만 남긴다.
       - name: 리뷰 코멘트 게시 여부 검증
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           SINCE: ${{ steps.mark.outputs.since }}
+          # 액션이 실제로 돌면 conclusion 출력을 남기고, 스킵되면 아무 출력도 남기지 않는다.
+          CONCLUSION: ${{ steps.claude.outputs.conclusion }}
         run: |
+          if [ -z "$CONCLUSION" ]; then
+            echo "::warning::리뷰봇이 실행되지 않았습니다 — 워크플로우 파일이 기본 브랜치(main)와 달라 스킵됐습니다. 이 변경이 main에 머지된 뒤부터 리뷰·게이트가 작동합니다."
+            exit 0
+          fi
           # --paginate는 페이지마다 한 줄씩 뱉으므로 awk로 합산한다.
           # updated_at 기준인 이유: use_sticky_comment가 켜져 있어 기존 코멘트를 갱신하는 경우도
           # "이번 실행이 리뷰를 남겼다"로 인정해야 한다.
