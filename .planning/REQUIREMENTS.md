@@ -49,7 +49,7 @@
 - [x] **RESV-04**: 회원이 예약을 취소(즉시 복구 `CANCEL_REFUND`)·변경(취소+재예약)할 수 있다 — 당일에는 둘 다 불가
 - [x] **RESV-05**: 회원이 본인 예약 목록을 조회할 수 있다
 - [x] **RESV-06**: 정원 마지막 자리·1:1 슬롯 동시 예약에서 초과 예약 0건 — DB 제약 + 조건부 갱신/락(D-021), 동시성 테스트 포함
-- [ ] **RESV-07**: 관리자가 모든 회원의 예약을 조회할 수 있다
+- [x] **RESV-07**: 관리자가 모든 회원의 예약을 조회할 수 있다
 - [ ] **RESV-08**: 관리자가 예약을 대리 취소/변경할 수 있다 — 당일 포함 제약 없음, 취소 시 차감 복구 여부 선택(기본 복구)
 - [ ] **RESV-09**: 관리자가 특정 날짜의 수업을 휴강 처리하면 예약 전부 자동 취소 + 차감 복구(`CLASS_CANCELED_REFUND`) + 알림 생성, 해당 타임은 예약 불가로 표시된다
 
@@ -133,7 +133,7 @@
 | RESV-04 | Phase 4 | Complete |
 | RESV-05 | Phase 4 | Complete |
 | RESV-06 | Phase 4 | Complete |
-| RESV-07 | Phase 4 | Pending |
+| RESV-07 | Phase 4 | Complete |
 | RESV-08 | Phase 4 | Pending |
 | RESV-09 | Phase 4 | Pending |
 | NOTIF-01 | Phase 4 | Complete |

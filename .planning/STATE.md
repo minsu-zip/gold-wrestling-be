@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-11-PLAN.md
-last_updated: "2026-08-07T16:37:55.843Z"
+stopped_at: Completed 04-12-PLAN.md
+last_updated: "2026-08-07T16:56:09.999Z"
 last_activity: 2026-08-07
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 44
-  completed_plans: 40
+  completed_plans: 41
   percent: 50
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 04 (schedule-reservation) — EXECUTING
-Plan: 2 of 15
+Plan: 3 of 15
 Status: Ready to execute
 Last activity: 2026-08-07
 
-Progress: [█████████░] 91%
+Progress: [█████████░] 93%
 
 ## Performance Metrics
 
@@ -67,6 +67,7 @@ Progress: [█████████░] 91%
 | Phase 04 P08 | 20min | 2 tasks | 3 files |
 | Phase 04 P10 | 60min | 3 tasks | 10 files |
 | Phase 04 P11 | 35min | 2 tasks | 16 files |
+| Phase 04 P12 | 40min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -104,6 +105,8 @@ Recent decisions affecting current work:
 - [Phase 04-10]: LikePatternEscaper를 common으로 승격 — MemberSpecifications의 private LIKE 이스케이프 로직을 ReservationSpecifications.memberKeywordContains가 재구현 없이 재사용(PageResponse KDoc이 예고한 승격 트리거 충족)
 - [Phase 04-11]: branchId 해석은 admin_branch 매핑 우선, 없으면(v1 미도입) 단일 지점으로 대체(D-101)
 - [Phase 04-11]: ScheduleService.getWeeklySchedule을 순수 리팩터링해 ScheduleGridSkeleton(관리자용과 공유하는 그리드 조립 헬퍼)을 도입, 기존 테스트로 행위 불변 확인
+- [Phase 04-12]: 관리자 예약 조회는 branchId 스코프를 받지 않는다 — RESV-07 결정과 AdminMemberController 원본 인터페이스를 따름(AdminBranch 매핑은 v1 미도입, D-101)
+- [Phase 04-12]: ReservationRepository.findAll(Specification, Pageable)을 @EntityGraph로 재선언 — Specification 페이지 조회에서 ManyToOne LAZY 연관을 count 쿼리에 영향 없이 N+1 없이 로딩하는 이 저장소 최초 패턴
 
 ### Pending Todos
 
@@ -129,6 +132,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-07T16:37:55.837Z
-Stopped at: Completed 04-11-PLAN.md
+Last session: 2026-08-07T16:56:09.992Z
+Stopped at: Completed 04-12-PLAN.md
 Resume file: None
