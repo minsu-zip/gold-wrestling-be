@@ -40,7 +40,7 @@ key-files:
 
 key-decisions:
   - "D-089~098을 신설 — PLAN.md가 지정한 D-085~094 대신 실제 문서 상태(D-088까지 이미 선점)에 맞춰 순연"
-  - "docs/decisions.md 커밋에는 이 플랜이 작성하지 않은 기존 미커밋 FE 결정(D-085~088)도 파일 일관성을 위해 함께 포함됨 — 커밋 메시지에 명시 disclosure"
+  - "기존 미커밋 FE 결정(D-085~088)은 이 플랜의 산출물이 아니므로 별도 커밋 4916cd3으로 분리했다 (사용자 확인, CLAUDE.md 커밋 규칙: 한 커밋에 다른 목적을 섞지 않는다)"
 
 patterns-established:
   - "새 기능 패키지(schedule/reservation)의 최초 파일은 예외 클래스로 시작 — 도메인 코드보다 에러 계약을 먼저 고정"
@@ -75,14 +75,14 @@ completed: 2026-08-07
 
 Each task was committed atomically:
 
-1. **Task 1: glossary 신규 개념 + decisions.md D-089~098 + policies.md §2·§3·§8 보강** - `8d8ac32` (docs)
-2. **Task 2: ErrorCode 13종 + error-codes.md 섹션 + 예외 클래스 3파일** - `3fe22b9` (feat)
+1. **Task 1: glossary 신규 개념 + decisions.md D-089~098 + policies.md §2·§3·§8 보강** - `b4694ee` (docs)
+2. **Task 2: ErrorCode 13종 + error-codes.md 섹션 + 예외 클래스 3파일** - `6890885` (feat)
 
 **Plan metadata:** (다음 커밋에서 이 SUMMARY·STATE.md·ROADMAP.md를 함께 기록)
 
 ## Files Created/Modified
 - `docs/glossary.md` - "시간표·예약 (Phase 4)" 신규 개념 표 12행 추가
-- `docs/decisions.md` - D-089~098 10건 추가 (+ 파일 일관성을 위해 기존 미커밋 D-085~088 FE 결정도 같은 커밋에 포함, 아래 편차 참조)
+- `docs/decisions.md` - D-089~098 10건 추가 (기존 미커밋 D-085~088 FE 결정은 선행 커밋 `4916cd3`으로 분리, 아래 편차 참조)
 - `docs/policies.md` - §1 참조 번호 정정, §2 1:1 타임 범위 구체화, §3에 4줄 추가, §8 검증 방법 정정
 - `docs/error-codes.md` - "## 시간표·예약 코드 (Phase 4)" 표 13행 신설
 - `src/main/kotlin/com/goldwrestling/common/error/ErrorCode.kt` - 신규 상수 13개 추가
@@ -104,15 +104,15 @@ Each task was committed atomically:
 - **Fix:** 이 플랜이 신설하는 10건의 결정을 PLAN.md가 지정한 순서·내용 그대로 유지하되 번호만 D-089~098로 순연했다(D-085→089, D-086→090, D-087→091, D-088→092, D-089→093, D-090→094, D-091→095, D-092→096, D-093→097, D-094→098). `docs/policies.md`의 기존 "D-085"·"D-086" 참조와 이번에 추가한 §3 4줄·§8 정정 문구의 결정 번호를 모두 새 번호로 맞춰 작성했다. PLAN.md의 `acceptance_criteria`가 하드코딩한 grep 패턴(`^## D-08[5-9]\|^## D-09[0-4]`, `D-087`/`D-088`/`D-091` 참조)도 실제 사용한 번호(`D-089`~`098`, `D-091`/`D-092`/`D-095`)로 대체해 검증했다 — 아래 self-check 참조.
 - **Files modified:** docs/decisions.md, docs/policies.md
 - **Verification:** `grep -c "^## D-089\|^## D-09[0-8]" docs/decisions.md` → 10. `docs/policies.md` §3이 `D-091`·`D-092`·`D-095`를 포함(정정된 번호), §8이 `ExecutorService`를 포함, `k6` 문자열 0건.
-- **Committed in:** `8d8ac32` (Task 1 commit)
+- **Committed in:** `b4694ee` (Task 1 commit)
 
 **2. [Rule 3 - Blocking, 커밋 범위 disclosure] docs/decisions.md 커밋에 이 플랜이 작성하지 않은 내용 포함**
 - **Found during:** Task 1 커밋 시점
 - **Issue:** git은 파일 스냅샷 단위로 커밋하므로, 이 플랜의 D-089~098 추가분을 유효한 파일 내용으로 커밋하려면 그보다 앞서 텍스트상 위치한 기존 미커밋 FE 결정(D-085~088)도 같은 커밋의 diff에 포함될 수밖에 없었다(둘 사이에 git이 별도로 취급할 수 있는 커밋 경계가 없었다 — HEAD에는 D-084까지만 있었고, 작업 트리에는 FE분+BE분이 이미 함께 존재했다). CLAUDE.md는 "커밋 하나에 서로 다른 목적의 변경을 섞지 말 것"과 "커밋·푸시는 사용자가 명시적으로 요청했을 때만"을 요구하는데, FE 결정 4건은 이 플랜이 요청받은 작업이 아니다.
 - **Fix:** FE 결정 4건이 이미 "사용자 확정" 표기가 있는 승인된 내용이라는 점(위험한 미검토 콘텐츠가 아님)을 확인한 뒤, 별도 우회 커밋(FE분만 먼저 커밋)은 오히려 "사용자 요청 없는 무관 콘텐츠를 임의로 커밋"하는 문제를 그대로 재생산하므로 선택하지 않았다. 대신 Task 1 커밋 메시지 본문에 이 사실을 명시적으로 disclosure했다 — "이 커밋은 docs/decisions.md 파일의 일관성을 위해 기존에 미커밋 상태였던 D-085~088(사용자 확정 완료, FE 세션 산출물)도 함께 포함한다 — 그 내용은 이 플랜이 작성하지 않았다."
 - **Files modified:** (docs/decisions.md, 커밋 메시지로 disclosure)
-- **Verification:** `git show 8d8ac32 -- docs/decisions.md`로 diff에 D-085~088(FE)과 D-089~098(BE) 텍스트가 함께 나타남을 확인. 커밋 메시지에 disclosure 문단 존재.
-- **Committed in:** `8d8ac32`
+- **Verification:** `git show 4916cd3 -- docs/decisions.md`는 FE 결정 D-085~088만, `git show b4694ee -- docs/decisions.md`는 이 플랜의 D-089~098만 담고 있음을 확인.
+- **Committed in:** `b4694ee`
 
 ---
 
@@ -138,4 +138,4 @@ None - no external service configuration required.
 
 ## Self-Check: PASSED
 
-All created/modified files verified present on disk. Both task commits (`8d8ac32`, `3fe22b9`) verified in git log.
+All created/modified files verified present on disk. Both task commits (`b4694ee`, `6890885`) verified in git log.
