@@ -41,6 +41,26 @@
 | 예약제 수업      | `SESSION` |
 | 1:1 레슨         | `LESSON`  |
 
+## 시간표·예약 (Phase 4)
+
+| 한국어                     | 코드 네이밍                                | 설명                                                                                              |
+| -------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 정기 시간표                | `ClassSchedule`                             | 요일+시각+수업종류+정원으로 정의되는 주간 반복 시간표. Flyway 시드로 고정                          |
+| 날짜별 수업                | `ClassSession`                              | `ClassSchedule`이 특정 날짜에 실체화된 것                                                          |
+| 날짜별 수업 상태           | `ClassSessionStatus`                        | `SCHEDULED` / `CANCELED`(휴강)                                                                     |
+| 예약                       | `Reservation`                               | 회원 ↔ `ClassSession`                                                                              |
+| 예약 상태                  | `ReservationStatus`                         | `ACTIVE` / `CANCELED`                                                                              |
+| 복구 여부                  | `refunded`                                  | DB `reservation.refunded` — 관리자 대리 취소의 "복구 안 함" 선택 결과                              |
+| 취소 주체(회원)            | `canceledByMember`                          | 예약을 취소한 회원 (`canceledByAdmin`과 둘 중 정확히 하나만 채워진다)                              |
+| 취소 주체(관리자)          | `canceledByAdmin`                           | 예약을 대리 취소한 관리자 (`canceledByMember`와 둘 중 정확히 하나만 채워진다)                      |
+| 예약 인원                  | `reservedCount`                             | `ClassSession`의 현재 활성 예약 수                                                                 |
+| 정원                       | `capacity`                                  | `ClassSchedule`/`ClassSession`의 최대 예약 가능 인원 (`EVENING`은 null)                            |
+| 관리자 알림                | `Notification`                              | 관리자 인앱 알림 레코드 (append-only)                                                              |
+| 알림 종류                  | `NotificationType`                          | `RESERVATION_CREATED` / `RESERVATION_CANCELED_BY_MEMBER` / `RESERVATION_CHANGED_BY_MEMBER` / `RESERVATION_CANCELED_BY_ADMIN` / `RESERVATION_CHANGED_BY_ADMIN` / `CLASS_SESSION_SUSPENDED` |
+| 주 범위                    | `WeekRange`                                 | 월요일 시작, 월~일 7일 범위 계산 유틸 (`common/time`)                                              |
+| 휴강 처리                  | `suspend`                                   | 특정 날짜의 수업을 휴강 상태로 전환하는 동작                                                       |
+| 휴강 해제                  | `resume`                                    | 휴강된 수업을 다시 예약 가능 상태로 되돌리는 동작 (취소된 예약은 자동 복원하지 않는다)               |
+
 ## 회원 상태 (MemberStatus)
 
 `PENDING`(승인대기) / `ACTIVE`(활성) / `ON_LEAVE`(휴회) / `INACTIVE`(비활성)
