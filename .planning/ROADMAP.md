@@ -119,7 +119,7 @@ Phase 4, `INACTIVITY`는 Phase 5, `EVENING_HALF`는 Phase 6이 쓴다. `PassTran
 (같은 Flyway 버전 충돌 방지). 각 청크의 마지막 플랜에서 `openapi.yaml`을 재생성하고 dev PR을 낸다.
 
 **청크 A — 시간표·스키마 (wave 1~5)**
-- [ ] 04-01-PLAN.md — 용어·에러코드·설계 결정 문서 정합(D-085~D-094) + 도메인 예외 12종 (SCHED-02, RESV-03/04/06/09)
+- [x] 04-01-PLAN.md — 용어·에러코드·설계 결정 문서 정합(D-085~D-094) + 도메인 예외 12종 (SCHED-02, RESV-03/04/06/09)
 - [ ] 04-02-PLAN.md — V6 스키마(4테이블·부분 유니크 인덱스 3종) + V7 시간표 시드 52행 + V8 PassTransaction 주체 확장 (SCHED-01/02, RESV-06, NOTIF-01)
 - [ ] 04-03-PLAN.md — enum·엔티티·리포지토리(get-or-create·정원 조건부 UPDATE·취소 CAS) (SCHED-01/02, RESV-01/02/06, NOTIF-01)
 - [ ] 04-04-PLAN.md — [TDD] WeekRange + 예약 창 판정(오픈·마감·조회범위) (SCHED-02, RESV-04)
@@ -176,7 +176,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. 기반 | 3/3 | Complete   | 2026-07-30 |
 | 2. 인증·회원 | 15/15 | Complete   | 2026-08-03 |
 | 3. 이용권 | 11/11 | Complete    | 2026-08-04 |
-| 4. 시간표·예약 | 0/15 | Planned | - |
+| 4. 시간표·예약 | 1/15 | In Progress|  |
 | 5. 배치 | 0/TBD | Not started | - |
 | 6. 운영 | 0/TBD | Not started | - |
 </content>
