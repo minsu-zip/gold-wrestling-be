@@ -113,7 +113,31 @@ Phase 4, `INACTIVITY`는 Phase 5, `EVENING_HALF`는 Phase 6이 쓴다. `PassTran
   3. 회원은 당일이 아닌 예약을 취소(즉시 복구)하거나 변경(취소+재예약)할 수 있고, 당일에는 취소·변경 모두 거부된다. 본인 예약 목록을 조회할 수 있다
   4. 정원 마지막 자리·1:1 슬롯에 여러 명이 동시에 예약을 요청하면, 정확히 정원 수만큼만 성공하고 나머지는 정원 초과 에러를 받는다(초과 예약 0건) — 성공 건수·DB 예약 행 수·`PassTransaction` 이력 건수가 서로 일치한다
   5. 관리자는 주간 스케줄 보드(요일×타임 그리드: 수업 종류·예약 n/정원·1:1 여부·셀별 예약자 명단)와 모든 회원의 예약을 조회하고, 당일 포함 제약 없이 예약을 대리 취소(복구 여부 선택, 기본 복구)·변경할 수 있으며, 특정 날짜 수업을 휴강 처리하면 해당 예약이 전부 자동 취소+차감 복구(`CLASS_CANCELED_REFUND`)+알림 생성되고 그 타임은 예약 불가로 표시된다
-**Plans**: TBD — 규모가 커서 여러 플랜으로 분할 필요 (예: 시간표/세션 실체화 → 예약 생성/취소/변경+차감·복구 → 동시성 보장+동시성 테스트 → 관리자 스케줄 보드·대리 취소/변경·휴강)
+**Plans**: 15 plans / 14 waves — **3개 청크로 납품한다 (D-084)**.
+청크 A `feature/phase-04a-schedule`(wave 1~5) · 청크 B `feature/phase-04b-reservation`(wave 6~10) ·
+청크 C `feature/phase-04c-admin-ops`(wave 11~14). 청크 경계 = wave 경계이며 순차 진행한다
+(같은 Flyway 버전 충돌 방지). 각 청크의 마지막 플랜에서 `openapi.yaml`을 재생성하고 dev PR을 낸다.
+
+**청크 A — 시간표·스키마 (wave 1~5)**
+- [ ] 04-01-PLAN.md — 용어·에러코드·설계 결정 문서 정합(D-085~D-094) + 도메인 예외 12종 (SCHED-02, RESV-03/04/06/09)
+- [ ] 04-02-PLAN.md — V6 스키마(4테이블·부분 유니크 인덱스 3종) + V7 시간표 시드 52행 + V8 PassTransaction 주체 확장 (SCHED-01/02, RESV-06, NOTIF-01)
+- [ ] 04-03-PLAN.md — enum·엔티티·리포지토리(get-or-create·정원 조건부 UPDATE·취소 CAS) (SCHED-01/02, RESV-01/02/06, NOTIF-01)
+- [ ] 04-04-PLAN.md — [TDD] WeekRange + 예약 창 판정(오픈·마감·조회범위) (SCHED-02, RESV-04)
+- [ ] 04-05-PLAN.md — 세션 get-or-create 서비스·동시성 테스트 + 회원 주간 시간표 조회 API (SCHED-01/02)
+
+**청크 B — 회원 예약 (wave 6~10)**
+- [ ] 04-06-PLAN.md — [TDD] 차감 대상 이용권 선택(만료 임박순·합산 금지·수업날 기준) (RESV-01/02/03)
+- [ ] 04-07-PLAN.md — NotificationService + 예약 생성 트랜잭션(정원·차감·이력·알림) (RESV-01/02, NOTIF-01)
+- [ ] 04-08-PLAN.md — 예약 생성 API + 동시성 테스트 3종(정원·1:1·중복) — 초과 예약 0건 실증 (RESV-01/02/06)
+- [ ] 04-09-PLAN.md — [TDD] 취소·변경 판정 + 복구 수행 여부 판정 (RESV-04)
+- [ ] 04-10-PLAN.md — 회원 취소·변경 API + 본인 예약 목록(IDOR 방어) (RESV-04/05, NOTIF-01)
+
+**청크 C — 관리자 운영 (wave 11~14)**
+- [ ] 04-11-PLAN.md — 관리자 주간 스케줄 보드(셀별 예약자 명단) (SCHED-03)
+- [ ] 04-12-PLAN.md — 관리자 전체 예약 조회(기간·종류·검색어·페이지네이션) (RESV-07)
+- [ ] 04-13-PLAN.md — 관리자 대리 취소·변경 + 이용권 등록 취소 선행 검사(D-085) (RESV-08, NOTIF-01)
+- [ ] 04-14-PLAN.md — 휴강 처리·해제 캐스케이드 + 세션당 1건 요약 알림 (RESV-09, NOTIF-01)
+- [ ] 04-15-PLAN.md — phase 마감: 전체 검증·문서 정합·openapi 재생성 + 수동 확인 (전 요구사항)
 
 **Note (Phase 6와의 경계)**: Notification은 이 phase에서 **스키마 마이그레이션과 알림 레코드 생성(NOTIF-01)까지만** 구현한다 — 예약 생성/변경/취소·휴강 이벤트가 모두 이 phase에서 발생하기 때문. 알림 조회·확인 처리·폴링 API·활동 피드(NOTIF-02, NOTIF-03)는 Phase 6에서 구현한다.
 
@@ -152,7 +176,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. 기반 | 3/3 | Complete   | 2026-07-30 |
 | 2. 인증·회원 | 15/15 | Complete   | 2026-08-03 |
 | 3. 이용권 | 11/11 | Complete    | 2026-08-04 |
-| 4. 시간표·예약 | 0/TBD | Not started | - |
+| 4. 시간표·예약 | 0/15 | Planned | - |
 | 5. 배치 | 0/TBD | Not started | - |
 | 6. 운영 | 0/TBD | Not started | - |
 </content>
