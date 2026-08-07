@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-08-07T06:05:56.603Z"
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-08-07T06:51:29.456Z"
 last_activity: 2026-08-07
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 44
-  completed_plans: 30
+  completed_plans: 31
   percent: 50
 ---
 
@@ -30,7 +30,7 @@ Plan: 2 of 15
 Status: Ready to execute
 Last activity: 2026-08-07
 
-Progress: [███████░░░] 68%
+Progress: [███████░░░] 70%
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ Progress: [███████░░░] 68%
 | Phase 01-foundation P02 | 15min | 2 tasks | 6 files |
 | Phase 01-foundation P03 | 25min | 3 tasks | 5 files |
 | Phase 04 P01 | 25min | 2 tasks | 9 files |
+| Phase 04 P02 | 30min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -78,6 +79,8 @@ Recent decisions affecting current work:
 - [Phase 01]: created_at은 Phase 1 엔티티에 매핑하지 않음 — 첫 INSERT 경로가 없어 Clock 빈 기반 감사 시각 전략은 Phase 2에서 결정
 - [Phase 01-foundation]: D-029: springdoc gradle 플러그인 대신 커스텀 Exec 태스크 체인(generateApiDocs)으로 openapi.yaml 재생성 — 플러그인이 Boot 4 Gradle 플러그인과 캐스트 충돌/configuration cache 비호환 이슈 미해결 — 성공 경로 3.9초·실패 경로 62초(DB 다운, 좀비 프로세스 0건)를 로컬에서 실제로 검증
 - [Phase 04]: docs/decisions.md 번호를 D-085~094 대신 D-089~098로 순연(FE M3 결정이 D-085~088을 이미 선점) — PLAN.md가 가정한 '마지막 결정 D-084'가 실행 시점에는 이미 D-088까지 진행돼 있었다. 내용·순서는 그대로 유지하고 번호만 순연했다.
+- [Phase 04-02]: V6 4테이블(class_schedule/class_session/reservation/notification)을 한 마이그레이션에 담고, 부분 유니크 인덱스 3종·CHECK 5종으로 초과 예약 0건을 DB 수준에서 강제(D-021 확장)
+- [Phase 04-02]: V8로 pass_transaction에 member_id를 추가하고 ck_pass_transaction_subject로 admin/member 중 정확히 하나만 주체가 되도록 강제 — 회원 셀프 예약/취소 이력 기록 경로 확보(D-030 이행)
 
 ### Pending Todos
 
@@ -103,6 +106,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-07T06:05:56.596Z
-Stopped at: Completed 04-01-PLAN.md
+Last session: 2026-08-07T06:51:29.450Z
+Stopped at: Completed 04-02-PLAN.md
 Resume file: None
