@@ -35,7 +35,8 @@ class ClassSessionService(
         schedule: ClassSchedule,
         classDate: LocalDate,
     ): ClassSession {
-        val scheduleId = schedule.id!!
+        val scheduleId =
+            requireNotNull(schedule.id) { "저장되지 않은 ClassSchedule로는 세션을 생성할 수 없습니다." }
         classSessionRepository.insertIfAbsent(
             scheduleId,
             classDate,
