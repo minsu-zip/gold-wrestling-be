@@ -112,4 +112,14 @@ interface PassRepository :
         @Param("expectedStartDate") expectedStartDate: LocalDate,
         @Param("expectedEndDate") expectedEndDate: LocalDate,
     ): Int
+
+    // TODO(04-06 RED): 시그니처만 먼저 선언해 컴파일을 통과시킨다. @Query가 아직 없어 Spring Data가
+    // 메서드 이름을 파생 쿼리로 해석하려다 실패하고, 그 결과 PassDeductionCandidateTest가 컨텍스트
+    // 기동 단계에서 실패한다 — 이것이 이 사이클의 RED다. GREEN 커밋에서 @Query로 교체한다(D-091).
+    fun findDeductionCandidates(
+        @Param("memberId") memberId: Long,
+        @Param("type") type: PassType,
+        @Param("classDate") classDate: LocalDate,
+        @Param("requiredAmount") requiredAmount: BigDecimal,
+    ): List<Pass>
 }
