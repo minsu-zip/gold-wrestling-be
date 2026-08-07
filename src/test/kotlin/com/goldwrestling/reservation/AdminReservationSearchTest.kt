@@ -26,12 +26,17 @@ import com.goldwrestling.support.TestClockConfiguration
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
+import org.springframework.http.HttpHeaders
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import java.time.Clock
@@ -248,6 +253,93 @@ class AdminReservationSearchTest {
         assertThatThrownBy {
             adminReservationService.search(ReservationSearchCondition(from = today, to = today.minusDays(1)))
         }.isInstanceOf(InvalidReservationSearchRangeException::class.java)
+    }
+
+    // ---------- Task 2: GET /api/admin/reservations HTTP 계약 ----------
+
+    @Nested
+    inner class HttpContract {
+        @Test
+        fun `관리자 토큰으로 조회하면 200과 PageResponse가 온다`() {
+            val token = adminAccessToken()
+
+            mockMvc
+                .perform(get("/api/admin/reservations").header(HttpHeaders.AUTHORIZATION, "Bearer $token"))
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.content").isArray)
+                .andExpect(jsonPath("$.page").value(0))
+        }
+
+        @Test
+        fun `필터 쿼리 파라미터를 함께 주면 200이고 필터가 적용된다`() {
+            val admin = persistAdmin()
+            val schedule = findSchedule(DayOfWeek.TUESDAY, ClassType.LESSON, LocalTime.of(11, 0))
+            val classDate = nextClassDate(DayOfWeek.TUESDAY)
+            val member = persistMember("HTTP검증회원")
+            persistReservation(member, admin, schedule, classDate, PassType.LESSON_PASS)
+            val token = adminAccessToken()
+
+            mockMvc
+                .perform(
+                    get("/api/admin/reservations")
+                        .param("from", classDate.toString())
+                        .param("to", classDate.toString())
+                        .param("classType", "LESSON")
+                        .param("keyword", "HTTP검증")
+                        .param("page", "0")
+                        .param("size", "10")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer $token"),
+                ).andExpect(status().isOk)
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].classType").value("LESSON"))
+        }
+
+        @Test
+        fun `size=500이면 400과 VALIDATION_FAILED를 반환한다`() {
+            val token = adminAccessToken()
+
+            mockMvc
+                .perform(
+                    get("/api/admin/reservations")
+                        .param("size", "500")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer $token"),
+                ).andExpect(status().isBadRequest)
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+        }
+
+        @Test
+        fun `from이 to보다 뒤이면 400과 INVALID_RESERVATION_SEARCH_RANGE를 반환한다`() {
+            val token = adminAccessToken()
+            val today = LocalDate.now(clock)
+
+            mockMvc
+                .perform(
+                    get("/api/admin/reservations")
+                        .param("from", today.toString())
+                        .param("to", today.minusDays(1).toString())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer $token"),
+                ).andExpect(status().isBadRequest)
+                .andExpect(jsonPath("$.code").value("INVALID_RESERVATION_SEARCH_RANGE"))
+        }
+
+        @Test
+        fun `회원 토큰으로 조회하면 403과 ACCESS_DENIED를 반환한다`() {
+            val member = persistMember("HTTP회원토큰")
+            val token = tokenService.issueTokenPair(PrincipalType.MEMBER, member.id!!).accessToken
+
+            mockMvc
+                .perform(get("/api/admin/reservations").header(HttpHeaders.AUTHORIZATION, "Bearer $token"))
+                .andExpect(status().isForbidden)
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"))
+        }
+
+        @Test
+        fun `토큰 없이 조회하면 401과 UNAUTHENTICATED를 반환한다`() {
+            mockMvc
+                .perform(get("/api/admin/reservations"))
+                .andExpect(status().isUnauthorized)
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"))
+        }
     }
 
     // ---------- 픽스처 ----------
