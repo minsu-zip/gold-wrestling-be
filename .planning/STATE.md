@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 04-07-PLAN.md
-last_updated: "2026-08-07T11:40:24.193Z"
+last_updated: "2026-08-07T11:48:05.546Z"
 last_activity: 2026-08-07
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 44
-  completed_plans: 36
+  completed_plans: 37
   percent: 50
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 04 (schedule-reservation) — EXECUTING
-Plan: 2 of 15
+Plan: 3 of 15
 Status: Ready to execute
 Last activity: 2026-08-07
 
-Progress: [████████░░] 82%
+Progress: [████████░░] 84%
 
 ## Performance Metrics
 
@@ -63,6 +63,7 @@ Progress: [████████░░] 82%
 | Phase 04 P04 | 15min | 2 tasks | 4 files |
 | Phase 04 P06 | ~20min | 2 tasks | 4 files |
 | Phase 04 P07 | 25min | 2 tasks | 7 files |
+| Phase 04 P09 | ~15min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -93,6 +94,7 @@ Recent decisions affecting current work:
 - [Phase 04-06]: 리포지토리 @Query 메서드의 RED는 어서션 실패 대신 시그니처만 선언해 Spring Data 파생 쿼리 파싱 실패(PropertyReferenceException)로 컨텍스트 기동이 실패하는 것으로 확보 — 이 저장소 최초 사례
 - [Phase 04-07]: MemberReservationServiceTest는 클래스 레벨 @Transactional을 배제 - reserve() 실패 시 실제 롤백된 DB 상태를 검증하려면 각 호출이 독립 트랜잭션이어야 한다 — 테스트가 @Transactional이면 참여 트랜잭션의 rollback-only 마킹이 테스트 종료 시점까지 실제 반영되지 않아 검증이 불가능하다
 - [Phase 04-07]: 취소·변경 알림 문구는 PLAN.md가 예시로 지정한 예약/휴강 알림 톤을 따라 직접 작성 — 문구 자체는 도메인 규칙이 아니라 표시 문자열이라 Rule 4 대상이 아니다
+- [Phase 04-09]: assertCancelableByMember는 당일·과거를 !classDate.isAfter(today) 한 조건으로 함께 거부한다 — 지난 수업을 당일보다 강하게 막는다는 취지를 유지하면서 판정 로직을 단일 부등식으로 단순화
 
 ### Pending Todos
 
@@ -118,6 +120,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-07T11:40:24.186Z
+Last session: 2026-08-07T11:47:57.862Z
 Stopped at: Completed 04-07-PLAN.md
 Resume file: None
