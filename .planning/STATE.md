@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-08-PLAN.md
-last_updated: "2026-08-07T15:18:29.664Z"
+stopped_at: Completed 04-10-PLAN.md
+last_updated: "2026-08-07T15:55:03.322Z"
 last_activity: 2026-08-07
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 44
-  completed_plans: 38
+  completed_plans: 39
   percent: 50
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 04 (schedule-reservation) — EXECUTING
-Plan: 2 of 15
+Plan: 3 of 15
 Status: Ready to execute
 Last activity: 2026-08-07
 
-Progress: [█████████░] 86%
+Progress: [█████████░] 89%
 
 ## Performance Metrics
 
@@ -65,6 +65,7 @@ Progress: [█████████░] 86%
 | Phase 04 P07 | 25min | 2 tasks | 7 files |
 | Phase 04 P09 | ~15min | 2 tasks | 4 files |
 | Phase 04 P08 | 20min | 2 tasks | 3 files |
+| Phase 04 P10 | 60min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -98,6 +99,8 @@ Recent decisions affecting current work:
 - [Phase 04-09]: assertCancelableByMember는 당일·과거를 !classDate.isAfter(today) 한 조건으로 함께 거부한다 — 지난 수업을 당일보다 강하게 막는다는 취지를 유지하면서 판정 로직을 단일 부등식으로 단순화
 - [Phase 04-08]: 409 코드 5종 구성에 CLASS_SESSION_CANCELED(휴강)를 추가 — behavior 목록(4종)만으로는 acceptance_criteria가 요구한 5종을 채울 수 없어 컨트롤러 action 섹션이 이미 언급한 다섯 번째 코드를 테스트에 반영
 - [Phase 04-08]: classScheduleId 누락 시 기대 코드를 VALIDATION_FAILED→MALFORMED_REQUEST로 정정 — Kotlin non-null 생성자 파라미터라 Jackson 역직렬화가 @Valid보다 먼저 실패(AdminPassControllerTest 선례와 동일)
+- [Phase 04-10]: 취소·변경 응답 재조회는 항상 findByIdAndMemberId — bare findById(Reservation)를 회원 경로 어디에서도 쓰지 않아 IDOR 방어가 조회 시그니처 수준에서 끝까지 일관된다
+- [Phase 04-10]: LikePatternEscaper를 common으로 승격 — MemberSpecifications의 private LIKE 이스케이프 로직을 ReservationSpecifications.memberKeywordContains가 재구현 없이 재사용(PageResponse KDoc이 예고한 승격 트리거 충족)
 
 ### Pending Todos
 
@@ -123,6 +126,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-07T15:18:29.657Z
-Stopped at: Completed 04-08-PLAN.md
+Last session: 2026-08-07T15:55:03.315Z
+Stopped at: Completed 04-10-PLAN.md
 Resume file: None

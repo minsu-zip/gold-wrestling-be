@@ -130,7 +130,7 @@ Phase 4, `INACTIVITY`는 Phase 5, `EVENING_HALF`는 Phase 6이 쓴다. `PassTran
 - [x] 04-07-PLAN.md — NotificationService + 예약 생성 트랜잭션(정원·차감·이력·알림) (RESV-01/02, NOTIF-01)
 - [x] 04-08-PLAN.md — 예약 생성 API + 동시성 테스트 3종(정원·1:1·중복) — 초과 예약 0건 실증 (RESV-01/02/06)
 - [x] 04-09-PLAN.md — [TDD] 취소·변경 판정 + 복구 수행 여부 판정 (RESV-04)
-- [ ] 04-10-PLAN.md — 회원 취소·변경 API + 본인 예약 목록(IDOR 방어) (RESV-04/05, NOTIF-01)
+- [x] 04-10-PLAN.md — 회원 취소·변경 API + 본인 예약 목록(IDOR 방어) (RESV-04/05, NOTIF-01)
 
 **청크 C — 관리자 운영 (wave 11~14)**
 - [ ] 04-11-PLAN.md — 관리자 주간 스케줄 보드(셀별 예약자 명단) (SCHED-03)
@@ -176,7 +176,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. 기반 | 3/3 | Complete   | 2026-07-30 |
 | 2. 인증·회원 | 15/15 | Complete   | 2026-08-03 |
 | 3. 이용권 | 11/11 | Complete    | 2026-08-04 |
-| 4. 시간표·예약 | 9/15 | In Progress|  |
+| 4. 시간표·예약 | 10/15 | In Progress|  |
 | 5. 배치 | 0/TBD | Not started | - |
 | 6. 운영 | 0/TBD | Not started | - |
 </content>
