@@ -147,6 +147,69 @@ class PassRepositoryTest {
         }.isInstanceOf(DataIntegrityViolationException::class.java)
     }
 
+    @Test
+    fun `PassTransaction을 회원 주체로 저장할 수 있다`() {
+        val pass = persistPass(remaining = BigDecimal("1.0"))
+        val member = persistMember()
+
+        val saved =
+            passTransactionRepository.saveAndFlush(
+                PassTransaction(
+                    pass = pass,
+                    amount = BigDecimal("-1.0"),
+                    reason = TransactionReason.RESERVE,
+                    note = null,
+                    admin = null,
+                    member = member,
+                    occurredAt = OffsetDateTime.now(clock),
+                ),
+            )
+
+        assertThat(saved.id).isNotNull()
+        assertThat(saved.member?.id).isEqualTo(member.id)
+        assertThat(saved.admin).isNull()
+    }
+
+    @Test
+    fun `PassTransaction 주체가 관리자-회원 둘 다 채워지면 ck_pass_transaction_subject 위반으로 저장이 실패한다`() {
+        val pass = persistPass(remaining = BigDecimal("1.0"))
+        val member = persistMember()
+        val admin = persistAdmin()
+
+        assertThatThrownBy {
+            passTransactionRepository.saveAndFlush(
+                PassTransaction(
+                    pass = pass,
+                    amount = BigDecimal("-1.0"),
+                    reason = TransactionReason.RESERVE,
+                    note = null,
+                    admin = admin,
+                    member = member,
+                    occurredAt = OffsetDateTime.now(clock),
+                ),
+            )
+        }.isInstanceOf(DataIntegrityViolationException::class.java)
+    }
+
+    @Test
+    fun `PassTransaction 주체가 둘 다 비어 있으면 ck_pass_transaction_subject 위반으로 저장이 실패한다`() {
+        val pass = persistPass(remaining = BigDecimal("1.0"))
+
+        assertThatThrownBy {
+            passTransactionRepository.saveAndFlush(
+                PassTransaction(
+                    pass = pass,
+                    amount = BigDecimal("-1.0"),
+                    reason = TransactionReason.RESERVE,
+                    note = null,
+                    admin = null,
+                    member = null,
+                    occurredAt = OffsetDateTime.now(clock),
+                ),
+            )
+        }.isInstanceOf(DataIntegrityViolationException::class.java)
+    }
+
     private fun songpaBranch(): Branch = branchRepository.findByName("송파점")!!
 
     private fun persistMember(): Member {

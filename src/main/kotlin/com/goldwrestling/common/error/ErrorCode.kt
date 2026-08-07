@@ -88,4 +88,43 @@ enum class ErrorCode(
 
     /** 조건부 갱신 경쟁 패배 등 위 코드로 나뉘지 않는 이용권 상태 충돌 */
     PASS_STATE_CONFLICT(HttpStatus.CONFLICT),
+
+    /** 요청한 정기 시간표 행이 없음 */
+    CLASS_SCHEDULE_NOT_FOUND(HttpStatus.NOT_FOUND),
+
+    /** 휴강된 수업에 예약·변경 시도 (policies §7) */
+    CLASS_SESSION_CANCELED(HttpStatus.CONFLICT),
+
+    /** 휴강 상태가 아닌 수업에 휴강 해제 시도 */
+    CLASS_SESSION_NOT_CANCELED(HttpStatus.CONFLICT),
+
+    /** 예약 대상이 아닌 수업 종류(`EVENING`) 예약 시도 (D-093) */
+    CLASS_SESSION_NOT_RESERVABLE(HttpStatus.CONFLICT),
+
+    /** 대상 예약 없음(타인 예약 조회 포함 — 존재 여부를 흘리지 않는다) */
+    RESERVATION_NOT_FOUND(HttpStatus.NOT_FOUND),
+
+    /** 정원 초과 (RESV-06) */
+    RESERVATION_CAPACITY_EXCEEDED(HttpStatus.CONFLICT),
+
+    /** 예약 창 밖(다음 주 예약, 시작 시각 경과) (D-095) */
+    RESERVATION_WINDOW_CLOSED(HttpStatus.CONFLICT),
+
+    /** 같은 회원·같은 날짜·시각 중복 예약 (D-092) */
+    DUPLICATE_RESERVATION(HttpStatus.CONFLICT),
+
+    /** 당일 취소·변경 시도 (policies §3). 취소와 변경이 동일 규칙이라 코드를 하나로 둔다 — FE 분기가 나뉘지 않는다 */
+    SAME_DAY_MODIFICATION_NOT_ALLOWED(HttpStatus.CONFLICT),
+
+    /** 이미 취소된 예약에 재취소·변경 시도 */
+    RESERVATION_ALREADY_CANCELED(HttpStatus.CONFLICT),
+
+    /** 변경 시 수업 종류가 다름 (`SESSION`↔`LESSON` 교차, D-090) */
+    RESERVATION_TYPE_MISMATCH(HttpStatus.BAD_REQUEST),
+
+    /** 조건부 갱신 경쟁 패배 등 위 코드로 나뉘지 않는 예약 상태 충돌 */
+    RESERVATION_STATE_CONFLICT(HttpStatus.CONFLICT),
+
+    /** 활성 예약이 있어 등록 취소 거부 (D-089) */
+    PASS_HAS_ACTIVE_RESERVATION(HttpStatus.CONFLICT),
 }

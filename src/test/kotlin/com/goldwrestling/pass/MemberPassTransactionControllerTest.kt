@@ -416,6 +416,7 @@ class MemberPassTransactionControllerTest {
                 reason = reason,
                 note = note,
                 admin = admin,
+                member = null,
                 occurredAt = OffsetDateTime.now(clock),
             ),
         )

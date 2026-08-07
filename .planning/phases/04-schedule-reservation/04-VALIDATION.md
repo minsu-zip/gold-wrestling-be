@@ -39,7 +39,7 @@ updated: 2026-08-07
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 04-01-T1 | 04-01 | 1 | SCHED-02, RESV-03, RESV-04, RESV-09 | T-04-03 | 설계 결정(D-085~D-094) 미기록으로 인한 임의 재해석 차단 | static (grep) | `grep -v '^#' docs/decisions.md \| grep -c "D-09"` | ✅ 기존(docs/decisions.md) | ⬜ pending |
+| 04-01-T1 | 04-01 | 1 | SCHED-02, RESV-03, RESV-04, RESV-09 | T-04-03 | 설계 결정(D-089~D-098) 미기록으로 인한 임의 재해석 차단 | static (grep) | `grep -v '^#' docs/decisions.md \| grep -c "D-09"` | ✅ 기존(docs/decisions.md) | ⬜ pending |
 | 04-01-T2 | 04-01 | 1 | RESV-01~RESV-09 공통 | T-04-01, T-04-02, T-04-04 | 예외 메시지에 식별자 미노출 · 타인 예약은 404 · error-codes.md ↔ ErrorCode 양방향 일치 | unit | `./gradlew test --tests "com.goldwrestling.common.error.ErrorCodeRegistryTest"` | ✅ 기존(확장) | ⬜ pending |
 | 04-02-T1 | 04-02 | 2 | SCHED-01, SCHED-02, RESV-06 | T-04-05, T-04-06, T-04-07 | 정원 CHECK · 1:1/중복 예약 부분 유니크 인덱스 · 취소 메타 완전성 | integration (Testcontainers) | `./gradlew test --tests "*FlywayMigrationIntegrationTest*"` | ✅ 기존(확장) | ⬜ pending |
 | 04-02-T2 | 04-02 | 2 | SCHED-01 | — | 송파점 시간표 52행 시드 정합 | integration (Testcontainers) | `./gradlew test --tests "com.goldwrestling.schedule.ClassScheduleSeedIntegrationTest"` | ⬜ 신규 | ⬜ pending |
@@ -49,7 +49,7 @@ updated: 2026-08-07
 | 04-03-T3 | 04-03 | 3 | NOTIF-01, RESV-06 | T-04-13 | `Notification` 이력 불변(표시·연결 필드 `val`) | integration (Testcontainers) | `./gradlew test --tests "com.goldwrestling.pass.*"` | ✅ 기존(확장) | ⬜ pending |
 | 04-04-F1 | 04-04 | 4 | SCHED-02, RESV-04 | T-04-14, T-04-15, T-04-16, T-04-17 | 예약 오픈/마감 창 · 시작 정각 거부 · 조회 주 범위 제한 · 예외 메시지 무반사 | unit (TDD) | `./gradlew test --tests "com.goldwrestling.common.time.WeekRangeTest" --tests "com.goldwrestling.schedule.ReservationWindowTest"` | ⬜ 신규 | ⬜ pending |
 | 04-05-T1 | 04-05 | 5 | SCHED-01 | T-04-22 | 동시 세션 생성 시 `uq_class_session` + `ON CONFLICT DO NOTHING`으로 행 1개 | concurrency (Testcontainers) | `./gradlew test --tests "com.goldwrestling.schedule.ClassSessionConcurrencyTest"` | ⬜ 신규 | ⬜ pending |
-| 04-05-T2 | 04-05 | 5 | SCHED-01, SCHED-02 | T-04-18, T-04-19, T-04-20, T-04-21 | 회원 응답에 예약자 명단 없음(D-092) · 주 범위 제한 · 비활성 회원 403 · 배치 조회 | integration (MockMvc + Testcontainers) | `./gradlew test --tests "com.goldwrestling.schedule.MemberScheduleControllerTest"` | ⬜ 신규 | ⬜ pending |
+| 04-05-T2 | 04-05 | 5 | SCHED-01, SCHED-02 | T-04-18, T-04-19, T-04-20, T-04-21 | 회원 응답에 예약자 명단 없음(D-096) · 주 범위 제한 · 비활성 회원 403 · 배치 조회 | integration (MockMvc + Testcontainers) | `./gradlew test --tests "com.goldwrestling.schedule.MemberScheduleControllerTest"` | ⬜ 신규 | ⬜ pending |
 | 04-05-T3 | 04-05 | 5 | SCHED-01, SCHED-02 | — | 청크 A 마감 — openapi.yaml 재생성 후 전체 그린 | build (full suite) | `./gradlew build` | ✅ 기존 | ⬜ pending |
 | 04-06-F1 | 04-06 | 6 | RESV-01, RESV-02, RESV-03 | T-04-23, T-04-24, T-04-25, T-04-26 | 유효기간은 수업 날짜 기준 · 단일 이용권 잔여 기준 · 타 회원/취소 이용권 제외 | unit (TDD) | `./gradlew test --tests "com.goldwrestling.reservation.ReservationPassPolicyTest" --tests "com.goldwrestling.pass.PassDeductionCandidateTest"` | ⬜ 신규 | ⬜ pending |
 | 04-07-T1 | 04-07 | 7 | NOTIF-01 | — | 관리자 알림 생성 경로 단일화 | integration (Testcontainers) | `./gradlew test --tests "com.goldwrestling.notification.NotificationServiceTest"` | ⬜ 신규 | ⬜ pending |

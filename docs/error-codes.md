@@ -42,6 +42,33 @@
 | `INVALID_PASS_PERIOD` | 400 | 종료일이 시작일보다 앞서거나, 횟수권 시작일 수정 시도 (D-062) | `AdminPassService` |
 | `PASS_STATE_CONFLICT` | 409 | 조건부 갱신 경쟁 패배 등 위 코드로 나뉘지 않는 이용권 상태 충돌 | `AdminPassService` |
 
+## 시간표·예약 코드 (Phase 4)
+
+| 코드 | HTTP 상태 | 의미 | 발생 지점 |
+|---|---|---|---|
+| `CLASS_SCHEDULE_NOT_FOUND` | 404 | 요청한 정기 시간표 행이 없음 | `AdminScheduleService` |
+| `CLASS_SESSION_CANCELED` | 409 | 휴강된 수업에 예약·변경 시도 (policies §7) | `ClassSession` |
+| `CLASS_SESSION_NOT_CANCELED` | 409 | 휴강 상태가 아닌 수업에 휴강 해제 시도 | `ClassSession` |
+| `CLASS_SESSION_NOT_RESERVABLE` | 409 | 예약 대상이 아닌 수업 종류(`EVENING`) 예약 시도 (D-093) | `MemberReservationService` |
+| `RESERVATION_NOT_FOUND` | 404 | 대상 예약 없음. 소유자가 아닌 예약 접근도 403이 아니라 이 코드(404)로 응답한다 — "그 id의 예약이 존재한다"는 사실 자체를 노출하지 않기 위해서다 | `MemberReservationService`, `AdminReservationService` |
+| `RESERVATION_CAPACITY_EXCEEDED` | 409 | 정원 초과 (RESV-06) | `Reservation` |
+| `RESERVATION_WINDOW_CLOSED` | 409 | 예약 창 밖(다음 주 예약, 시작 시각 경과) (D-095) | `MemberReservationService` |
+| `DUPLICATE_RESERVATION` | 409 | 같은 회원·같은 날짜·시각 중복 예약 (D-092) | `MemberReservationService` |
+| `SAME_DAY_MODIFICATION_NOT_ALLOWED` | 409 | 당일 취소·변경 시도 (policies §3) | `Reservation` |
+| `RESERVATION_ALREADY_CANCELED` | 409 | 이미 취소된 예약에 재취소·변경 시도 | `Reservation` |
+| `RESERVATION_TYPE_MISMATCH` | 400 | 변경 시 수업 종류가 다름 (`SESSION`↔`LESSON` 교차, D-090) | `MemberReservationService` |
+| `RESERVATION_STATE_CONFLICT` | 409 | 조건부 갱신 경쟁 패배 등 위 코드로 나뉘지 않는 예약 상태 충돌 | `AdminReservationService` |
+| `PASS_HAS_ACTIVE_RESERVATION` | 409 | 대상 이용권으로 잡힌 활성 예약이 있어 등록 취소 거부 (D-089) | `AdminPassService` |
+
+> **연결 상태 (Phase 4 진행 중에만 유효한 안내 — phase 완료 시 이 문단을 삭제한다)**
+> 위 표의 "발생 지점"은 **그 코드를 던지도록 계획된 위치**이며, 전부가 이미 연결된 것은 아니다.
+> 청크 A(04-01~04-05) 시점에 실제로 던져지는 코드는 `CLASS_SESSION_CANCELED`·`CLASS_SESSION_NOT_CANCELED`·
+> `CLASS_SESSION_NOT_RESERVABLE`·`RESERVATION_WINDOW_CLOSED` 4개뿐이고, 나머지 9개는 예외 클래스만 선언된
+> 상태다. 예약 API(04-07·04-08·04-10)와 관리자 운영(04-11~04-14)에서 연결된다.
+> 특히 `PASS_HAS_ACTIVE_RESERVATION`(D-089)은 **04-13**이 `AdminPassService.cancel`에
+> `ReservationRepository.existsByPassIdAndStatus` 선행 검사를 붙일 때 연결된다 — 지금 이 문서만 보고
+> "D-089는 이미 구현됐다"고 판단하면 안 된다.
+
 **폴백 규칙** — 위 표에 매핑되지 않은 예외는 상태값으로 코드를 추측하지 않고 다음으로 고정된다:
 4xx → `MALFORMED_REQUEST`, 그 외 → `INTERNAL_ERROR`. (이때 HTTP 상태는 예외가 정한 값이 그대로 나가므로,
 FE가 특정 코드로 구분해야 하는 에러가 생기면 이 표와 핸들러에 명시 매핑을 추가한다.)
