@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-07-PLAN.md
-last_updated: "2026-08-07T11:48:05.546Z"
+stopped_at: Completed 04-08-PLAN.md
+last_updated: "2026-08-07T15:18:29.664Z"
 last_activity: 2026-08-07
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 44
-  completed_plans: 37
+  completed_plans: 38
   percent: 50
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 04 (schedule-reservation) — EXECUTING
-Plan: 3 of 15
+Plan: 2 of 15
 Status: Ready to execute
 Last activity: 2026-08-07
 
-Progress: [████████░░] 84%
+Progress: [█████████░] 86%
 
 ## Performance Metrics
 
@@ -64,6 +64,7 @@ Progress: [████████░░] 84%
 | Phase 04 P06 | ~20min | 2 tasks | 4 files |
 | Phase 04 P07 | 25min | 2 tasks | 7 files |
 | Phase 04 P09 | ~15min | 2 tasks | 4 files |
+| Phase 04 P08 | 20min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -95,6 +96,8 @@ Recent decisions affecting current work:
 - [Phase 04-07]: MemberReservationServiceTest는 클래스 레벨 @Transactional을 배제 - reserve() 실패 시 실제 롤백된 DB 상태를 검증하려면 각 호출이 독립 트랜잭션이어야 한다 — 테스트가 @Transactional이면 참여 트랜잭션의 rollback-only 마킹이 테스트 종료 시점까지 실제 반영되지 않아 검증이 불가능하다
 - [Phase 04-07]: 취소·변경 알림 문구는 PLAN.md가 예시로 지정한 예약/휴강 알림 톤을 따라 직접 작성 — 문구 자체는 도메인 규칙이 아니라 표시 문자열이라 Rule 4 대상이 아니다
 - [Phase 04-09]: assertCancelableByMember는 당일·과거를 !classDate.isAfter(today) 한 조건으로 함께 거부한다 — 지난 수업을 당일보다 강하게 막는다는 취지를 유지하면서 판정 로직을 단일 부등식으로 단순화
+- [Phase 04-08]: 409 코드 5종 구성에 CLASS_SESSION_CANCELED(휴강)를 추가 — behavior 목록(4종)만으로는 acceptance_criteria가 요구한 5종을 채울 수 없어 컨트롤러 action 섹션이 이미 언급한 다섯 번째 코드를 테스트에 반영
+- [Phase 04-08]: classScheduleId 누락 시 기대 코드를 VALIDATION_FAILED→MALFORMED_REQUEST로 정정 — Kotlin non-null 생성자 파라미터라 Jackson 역직렬화가 @Valid보다 먼저 실패(AdminPassControllerTest 선례와 동일)
 
 ### Pending Todos
 
@@ -120,6 +123,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-07T11:47:57.862Z
-Stopped at: Completed 04-07-PLAN.md
+Last session: 2026-08-07T15:18:29.657Z
+Stopped at: Completed 04-08-PLAN.md
 Resume file: None
