@@ -60,6 +60,15 @@
 | `RESERVATION_STATE_CONFLICT` | 409 | 조건부 갱신 경쟁 패배 등 위 코드로 나뉘지 않는 예약 상태 충돌 | `AdminReservationService` |
 | `PASS_HAS_ACTIVE_RESERVATION` | 409 | 대상 이용권으로 잡힌 활성 예약이 있어 등록 취소 거부 (D-089) | `AdminPassService` |
 
+> **연결 상태 (Phase 4 진행 중에만 유효한 안내 — phase 완료 시 이 문단을 삭제한다)**
+> 위 표의 "발생 지점"은 **그 코드를 던지도록 계획된 위치**이며, 전부가 이미 연결된 것은 아니다.
+> 청크 A(04-01~04-05) 시점에 실제로 던져지는 코드는 `CLASS_SESSION_CANCELED`·`CLASS_SESSION_NOT_CANCELED`·
+> `CLASS_SESSION_NOT_RESERVABLE`·`RESERVATION_WINDOW_CLOSED` 4개뿐이고, 나머지 9개는 예외 클래스만 선언된
+> 상태다. 예약 API(04-07·04-08·04-10)와 관리자 운영(04-11~04-14)에서 연결된다.
+> 특히 `PASS_HAS_ACTIVE_RESERVATION`(D-089)은 **04-13**이 `AdminPassService.cancel`에
+> `ReservationRepository.existsByPassIdAndStatus` 선행 검사를 붙일 때 연결된다 — 지금 이 문서만 보고
+> "D-089는 이미 구현됐다"고 판단하면 안 된다.
+
 **폴백 규칙** — 위 표에 매핑되지 않은 예외는 상태값으로 코드를 추측하지 않고 다음으로 고정된다:
 4xx → `MALFORMED_REQUEST`, 그 외 → `INTERNAL_ERROR`. (이때 HTTP 상태는 예외가 정한 값이 그대로 나가므로,
 FE가 특정 코드로 구분해야 하는 에러가 생기면 이 표와 핸들러에 명시 매핑을 추가한다.)
