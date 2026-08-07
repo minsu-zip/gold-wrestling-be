@@ -130,4 +130,7 @@ enum class ErrorCode(
 
     /** 요청한 branchId에 관리자가 소속되지 않음 (T-04-53, 관리자 스케줄 보드 최초 도입) */
     ADMIN_BRANCH_NOT_ASSIGNED(HttpStatus.FORBIDDEN),
+
+    /** 관리자 예약 검색 조건의 from이 to보다 뒤임 (RESV-07) */
+    INVALID_RESERVATION_SEARCH_RANGE(HttpStatus.BAD_REQUEST),
 }

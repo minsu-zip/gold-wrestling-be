@@ -322,23 +322,28 @@ class AdminReservationSearchTest {
             ),
         )
 
+    /**
+     * 같은 (schedule, classDate) 조합으로 여러 예약을 만드는 테스트가 많아 `uq_class_session`
+     * 유니크 제약(class_schedule_id, class_date)에 걸리지 않도록 이미 있으면 재사용한다.
+     */
     private fun persistSession(
         schedule: ClassSchedule,
         classDate: LocalDate,
     ): ClassSession =
-        classSessionRepository.saveAndFlush(
-            ClassSession(
-                classSchedule = schedule,
-                classDate = classDate,
-                classType = schedule.classType,
-                startTime = schedule.startTime,
-                endTime = schedule.endTime,
-                capacity = schedule.capacity,
-                reservedCount = 0,
-                status = ClassSessionStatus.SCHEDULED,
-                createdAt = OffsetDateTime.now(clock),
-            ),
-        )
+        classSessionRepository.findByClassScheduleIdAndClassDate(requireNotNull(schedule.id), classDate)
+            ?: classSessionRepository.saveAndFlush(
+                ClassSession(
+                    classSchedule = schedule,
+                    classDate = classDate,
+                    classType = schedule.classType,
+                    startTime = schedule.startTime,
+                    endTime = schedule.endTime,
+                    capacity = schedule.capacity,
+                    reservedCount = 0,
+                    status = ClassSessionStatus.SCHEDULED,
+                    createdAt = OffsetDateTime.now(clock),
+                ),
+            )
 
     private fun persistReservation(
         member: Member,

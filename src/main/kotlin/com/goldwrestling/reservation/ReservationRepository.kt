@@ -2,6 +2,10 @@ package com.goldwrestling.reservation
 
 import com.goldwrestling.admin.Admin
 import com.goldwrestling.member.Member
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
+import org.springframework.data.jpa.domain.Specification
+import org.springframework.data.jpa.repository.EntityGraph
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor
 import org.springframework.data.jpa.repository.Modifying
@@ -18,6 +22,22 @@ import java.time.OffsetDateTime
 interface ReservationRepository :
     JpaRepository<Reservation, Long>,
     JpaSpecificationExecutor<Reservation> {
+    /**
+     * 관리자 예약 검색(RESV-07, `AdminReservationService.search`)이 쓰는 페이지 조회를 재선언해
+     * `@EntityGraph`를 붙인다(T-04-58) — `AdminReservationResponse.from`이 `member`·`classSession`·
+     * `canceledByMember`·`canceledByAdmin`(전부 `ManyToOne`, 단일 연관) `LAZY` 필드를 읽으므로,
+     * 미리 로딩해 두지 않으면 페이지 크기만큼 N+1이 난다. `Specification`에 `root.fetch(...)`를
+     * 넣는 대신 이 방식을 쓰는 이유: fetch join은 페이지네이션의 count 쿼리에도 함께 적용되면
+     * JPA 스펙 위반이 되지만, `@EntityGraph` 힌트는 count 쿼리에는 적용되지 않고 본문 조회에만
+     * 적용된다(verify-boot4-api 절차로 spring-data-jpa 4.1.0 테스트 코드
+     * `RepositoryMethodsWithEntityGraphConfigRepository`에서 이 재선언 패턴을 확인).
+     */
+    @EntityGraph(attributePaths = ["member", "classSession", "canceledByMember", "canceledByAdmin"])
+    override fun findAll(
+        spec: Specification<Reservation>,
+        pageable: Pageable,
+    ): Page<Reservation>
+
     /** 등록 취소 선행 검사(D-089, `AdminPassService.cancel`이 호출) — 활성 예약 유무만 확인한다. */
     fun existsByPassIdAndStatus(
         passId: Long,
