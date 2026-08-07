@@ -183,6 +183,43 @@ class ReservationRepositoryTest {
         assertThat(reservationRepository.existsByPassIdAndStatus(pass.id!!, ReservationStatus.ACTIVE)).isTrue()
     }
 
+    @Test
+    fun `findAllByClassSessionIdInAndStatusAndMemberId는 같은 세션의 타인 예약을 제외한다`() {
+        val me = persistMember()
+        val other = persistMember()
+        val session = persistClassSession()
+        val myReservation = persistReservation(me, session, persistPass(me, PassType.SESSION_PASS))
+        persistReservation(other, session, persistPass(other, PassType.SESSION_PASS))
+
+        val found =
+            reservationRepository.findAllByClassSessionIdInAndStatusAndMemberId(
+                listOf(session.id!!),
+                ReservationStatus.ACTIVE,
+                me.id!!,
+            )
+
+        assertThat(found).extracting<Long> { it.id }.containsExactly(myReservation.id)
+    }
+
+    @Test
+    fun `findAllByClassSessionIdInAndStatusAndMemberId는 본인의 취소된 예약을 제외한다`() {
+        val me = persistMember()
+        val session = persistClassSession()
+        // 취소는 실제 취소 경로로 만든다 — CANCELED 행에 취소 메타데이터가 없으면
+        // `ck_reservation_cancellation`(V6)이 INSERT 자체를 거부한다.
+        val reservation = persistReservation(me, session, persistPass(me, PassType.SESSION_PASS))
+        reservationRepository.cancelByMemberIfActive(reservation.id!!, me, OffsetDateTime.now(clock))
+
+        val found =
+            reservationRepository.findAllByClassSessionIdInAndStatusAndMemberId(
+                listOf(session.id!!),
+                ReservationStatus.ACTIVE,
+                me.id!!,
+            )
+
+        assertThat(found).isEmpty()
+    }
+
     private fun songpaBranch(): Branch = branchRepository.findByName("송파점")!!
 
     /** [index]번째(오름차순 id)로 서로 다른 시간표를 골라 세션 간 `class_schedule_id`가 겹치지 않게 한다. */

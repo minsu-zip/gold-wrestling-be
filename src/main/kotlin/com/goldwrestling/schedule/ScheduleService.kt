@@ -23,8 +23,10 @@ import java.time.LocalDateTime
  * 생성"이 요구하는 조회 방향).
  *
  * **조회 쿼리는 N+1을 만들지 않는다(T-04-21)** — [ClassSessionRepository.findAllByClassDateBetween]과
- * [ReservationRepository.findAllByClassSessionIdInAndStatus]를 각각 정확히 1회만 호출해 맵으로 만들고,
- * 셀 루프 안에서는 그 맵만 조회한다.
+ * [ReservationRepository.findAllByClassSessionIdInAndStatusAndMemberId]를 각각 정확히 1회만 호출해
+ * 맵으로 만들고, 셀 루프 안에서는 그 맵만 조회한다. 예약 조회는 **회원 조건까지 쿼리에 넣는다** —
+ * 전체 명단을 가져와 애플리케이션에서 본인 것만 거르면, 정원이 찬 주에 타인 예약 수백 건이
+ * 불필요하게 메모리로 올라온다.
  */
 @Service
 @Transactional(readOnly = true)
@@ -58,7 +60,9 @@ class ScheduleService(
         ReservationWindow.assertViewable(resolvedWeekStart, today)
 
         val weekRange = WeekRange.of(resolvedWeekStart)
-        val bookableWeek = resolvedWeekStart == thisWeekStart
+        // 지역 변수명이 ReservationWindow.bookableWeek(함수, WeekRange 반환)와 겹치지 않게 한다 —
+        // 이쪽은 "조회한 주가 예약 가능한 주인가"라는 Boolean이다.
+        val isBookableWeek = resolvedWeekStart == thisWeekStart
 
         val schedules = classScheduleRepository.findAllByBranchId(branchId)
         val sessions = classSessionRepository.findAllByClassDateBetween(weekRange.monday, weekRange.sunday)
@@ -70,8 +74,7 @@ class ScheduleService(
                 emptyMap()
             } else {
                 reservationRepository
-                    .findAllByClassSessionIdInAndStatus(sessionIds, ReservationStatus.ACTIVE)
-                    .filter { it.member.id == memberId }
+                    .findAllByClassSessionIdInAndStatusAndMemberId(sessionIds, ReservationStatus.ACTIVE, memberId)
                     .associate { it.classSession.id to it.id }
             }
 
@@ -88,7 +91,7 @@ class ScheduleService(
         return WeeklyScheduleResponse(
             weekStart = weekRange.monday,
             weekEnd = weekRange.sunday,
-            bookableWeek = bookableWeek,
+            bookableWeek = isBookableWeek,
             days = days,
         )
     }

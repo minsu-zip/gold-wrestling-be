@@ -28,10 +28,29 @@ interface ReservationRepository :
         status: ReservationStatus,
     ): List<Reservation>
 
-    /** 주간 보드가 셀별 명단을 N+1 없이 한 번에 가져오는 경로. */
+    /**
+     * 관리자 주간 보드가 셀별 **전체 명단**을 N+1 없이 한 번에 가져오는 경로.
+     *
+     * 회원 시간표 조회는 이 메서드를 쓰지 않는다 — 본인 예약 표시에만 쓰면서 그 주 모든 회원의
+     * 예약 행을 메모리에 올리게 되기 때문이다. 회원 경로는
+     * [findAllByClassSessionIdInAndStatusAndMemberId]를 쓴다.
+     */
     fun findAllByClassSessionIdInAndStatus(
         classSessionIds: Collection<Long>,
         status: ReservationStatus,
+    ): List<Reservation>
+
+    /**
+     * 회원 시간표 조회 전용 — 세션 목록 안에서 **[memberId] 본인의 예약만** 가져온다.
+     *
+     * 회원 조건을 애플리케이션 `filter`가 아니라 쿼리에 두는 이유: 정원이 찬 수업이 여러 개 열린
+     * 주에는 셀당 수십 건씩, 한 주 전체로는 수백 건의 타인 예약 행이 로드된다. 응답에 노출되지는
+     * 않으므로(D-096) 정보 유출은 아니지만, 회원 한 명의 시간표 조회가 지불할 이유가 없는 비용이다.
+     */
+    fun findAllByClassSessionIdInAndStatusAndMemberId(
+        classSessionIds: Collection<Long>,
+        status: ReservationStatus,
+        memberId: Long,
     ): List<Reservation>
 
     /**
