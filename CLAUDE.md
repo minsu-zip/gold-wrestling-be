@@ -75,7 +75,11 @@
   테스트는 필요하면(if applicable) 추가"로 되어 있지만, 이 프로젝트에서는 **규칙 10과
   conventions.md §10.0 표가 기준**이다. 잔여 횟수·예약에 영향을 주는 코드는 CRUD로 보이더라도 테스트를 쓴다
 - 이용권 차감·예약 검증처럼 입력→출력이 명확한 도메인 로직 phase는 **TDD 플랜으로 요청**한다
-  (`/gsd-plan-phase` 시 TDD 여부를 명시). 배선·설정 phase는 표준 플랜 + 사후 테스트로 충분하다
+  (`/gsd-plan-phase --tdd`). 배선·설정 phase는 표준 플랜 + 사후 테스트로 충분하다
+- **phase 하나를 PR 하나로 내지 않는다 (D-084).** 플랜 여러 개를 리뷰 가능한 크기의 **청크**로 묶어
+  청크마다 `feature/phase-{N}{a|b|c}-{slug}` 브랜치를 dev에서 따고, 끝나면 PR을 내 dev에 머지한 뒤
+  다음 청크를 시작한다. 절차·청크 경계 판단 기준은 `.claude/skills/deliver-phase-chunk/SKILL.md`에 있다.
+  (근거: Phase 2가 +17,857줄 / Phase 3이 +11,682줄 단일 PR이었고 실질 리뷰가 불가능했다)
 
 ## 학습 모드 (중요)
 
@@ -121,7 +125,20 @@
   적절한 단위로 커밋을 지시한다. "작업이 끝났으니 커밋한다"는 판단을 AI가 스스로 내리지 말 것.
   이 규칙은 GSD 등 자동 커밋을 전제로 하는 워크플로우에도 우선 적용된다 —
   해당 워크플로우가 커밋을 요구하면 커밋 없이 멈추고 사용자에게 알린다.
+- **[예외] phase 실행 중 청크 경계에서는 커밋·푸시·PR 생성을 자동으로 한다 (D-084).**
+  `/gsd-execute-phase`로 phase를 실행할 때는 위 규칙 대신 `.claude/skills/deliver-phase-chunk`
+  절차를 따른다 — 청크 하나가 끝나면 승인을 기다리지 않고 브랜치 커밋 → 푸시 → `create-pr` 스킬로
+  PR 생성까지 하고 **결과를 보고한다.** 이 예외의 경계는 아래와 같고, 벗어나면 예외가 아니다:
+  - 대상 브랜치는 **`feature/phase-*` 뿐이다.** dev·main에 직접 커밋·푸시하지 않는다
+  - **PR 머지는 절대 자동으로 하지 않는다** — 머지 버튼은 항상 사용자가 누른다
+  - 배포는 dev → main PR 시점에만 일어나므로, 이 예외가 배포를 유발하지 않는다
+  - phase 실행 밖(quick task·단발 수정·문서 작업)에서는 원래 규칙대로 사용자 지시를 기다린다
 - 브랜치: dev에서 작업하고 dev → main PR 머지 시 배포. main 직접 커밋 금지
+- **phase 작업 브랜치는 반드시 `origin/dev`에서 분기한다.** GSD `execute-phase`는 브랜치를
+  `origin/HEAD`에서 따는데, 이 레포의 GitHub 기본 브랜치는 `main`이고 main은 dev보다 한참 뒤처져 있다
+  (2026-08-07 기준 235커밋). 로컬에서 `git remote set-head origin dev`로 교정해 두었으나
+  `git remote set-head origin --auto`를 돌리면 되돌아간다 — 새 phase 시작 전에
+  `git symbolic-ref --short refs/remotes/origin/HEAD`가 `origin/dev`인지 확인한다
 - 커밋은 작업 단위로 잘게, Conventional Commits 형식 사용 (feat:, fix:, refactor:, docs:, test:, chore:)
 - 커밋 메시지 본문은 한국어 가능, 제목은 형식 준수
 - 하나의 커밋에 서로 다른 목적의 변경을 섞지 말 것
