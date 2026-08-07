@@ -94,7 +94,10 @@ class ReservationWindowTest {
 
         val week = ReservationWindow.bookableWeek(today)
 
-        assertThat(week).isEqualTo(com.goldwrestling.common.time.WeekRange.of(today))
+        assertThat(week).isEqualTo(
+            com.goldwrestling.common.time.WeekRange
+                .of(today),
+        )
     }
 
     @Test
