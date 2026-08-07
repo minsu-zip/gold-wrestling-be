@@ -145,7 +145,11 @@ class ReservationCapacityConcurrencyTest {
         val classDate = SCENARIO_A_DATE
         val threadCount = 20
 
-        data class Attempt(val memberId: Long, val passId: Long, val error: Throwable?)
+        data class Attempt(
+            val memberId: Long,
+            val passId: Long,
+            val error: Throwable?,
+        )
 
         val members = (1..threadCount).map { persistMember() }
         val passes = members.associate { it.id!! to persistPass(it, PassType.SESSION_PASS, "1.0") }
@@ -185,7 +189,10 @@ class ReservationCapacityConcurrencyTest {
         val session = classSessionRepository.findByClassScheduleIdAndClassDate(schedule.id!!, classDate)!!
         val activeReservations = reservationRepository.findAllByClassSessionIdAndStatus(session.id!!, ReservationStatus.ACTIVE)
         val reserveTransactions =
-            passTransactionRepository.findAll().filter { it.pass.id in passes.values.mapNotNull { p -> p.id } && it.reason == TransactionReason.RESERVE }
+            passTransactionRepository.findAll().filter {
+                it.pass.id in passes.values.mapNotNull { p -> p.id } &&
+                    it.reason == TransactionReason.RESERVE
+            }
 
         // 4자 일치 — 성공 건수 = 활성 예약 행 수 = RESERVE 이력 건수 = 세션 reservedCount.
         assertThat(successes).hasSize(10)
@@ -251,7 +258,10 @@ class ReservationCapacityConcurrencyTest {
         val session = classSessionRepository.findByClassScheduleIdAndClassDate(schedule.id!!, classDate)!!
         val activeReservations = reservationRepository.findAllByClassSessionIdAndStatus(session.id!!, ReservationStatus.ACTIVE)
         val reserveTransactions =
-            passTransactionRepository.findAll().filter { it.pass.id in passes.values.mapNotNull { p -> p.id } && it.reason == TransactionReason.RESERVE }
+            passTransactionRepository.findAll().filter {
+                it.pass.id in passes.values.mapNotNull { p -> p.id } &&
+                    it.reason == TransactionReason.RESERVE
+            }
 
         assertThat(activeReservations).hasSize(1)
         assertThat(reserveTransactions).hasSize(1)
@@ -304,7 +314,11 @@ class ReservationCapacityConcurrencyTest {
 
         val session = classSessionRepository.findByClassScheduleIdAndClassDate(schedule.id!!, classDate)!!
         val activeReservations = reservationRepository.findAllByClassSessionIdAndStatus(session.id!!, ReservationStatus.ACTIVE)
-        val reserveTransactions = passTransactionRepository.findAll().filter { it.pass.id == pass.id && it.reason == TransactionReason.RESERVE }
+        val reserveTransactions =
+            passTransactionRepository.findAll().filter {
+                it.pass.id == pass.id &&
+                    it.reason == TransactionReason.RESERVE
+            }
 
         assertThat(activeReservations).hasSize(1)
         assertThat(reserveTransactions).hasSize(1)
