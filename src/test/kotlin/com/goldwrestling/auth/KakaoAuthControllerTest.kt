@@ -271,6 +271,9 @@ class KakaoAuthControllerTest {
 
     @Test
     fun `기본 지점이 DB에 없으면 로그인이 500과 INTERNAL_ERROR로 실패하고 회원이 생성되지 않는다`() {
+        // V7 시드가 class_schedule에 branch_id FK로 52행을 남겨 두므로, branch를 지우려면
+        // 먼저 그 참조를 없애야 한다(04-02) — 이 테스트의 관심사는 "기본 지점 없음"이지 시간표가 아니다.
+        jdbcClient.sql("DELETE FROM class_schedule").update()
         branchRepository.deleteAll()
         stubKakaoLogin(kakaoId = 3999L)
         val before = memberRepository.count()
