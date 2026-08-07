@@ -80,3 +80,14 @@ class InvalidPassPeriodException(
 class PassStateConflictException(
     message: String,
 ) : DomainException(ErrorCode.PASS_STATE_CONFLICT, message)
+
+/**
+ * 대상 이용권으로 잡힌 활성 예약이 있어 등록 취소를 거부할 때(D-089).
+ * `pass` 패키지가 `reservation` 패키지를 참조하게 되는 유일한 지점 — 의존 방향은
+ * `AdminPassService`의 `reservationRepository.existsBy...` 최소 결합으로만 유지한다.
+ */
+class PassHasActiveReservationException :
+    DomainException(
+        ErrorCode.PASS_HAS_ACTIVE_RESERVATION,
+        "활성 예약이 있어 등록을 취소할 수 없습니다.",
+    )
