@@ -228,9 +228,14 @@ class MemberReservationCancellationTest {
 
         // D-089 정상 운영에서는 활성 예약이 있으면 등록 취소가 거부되지만, 이 테스트는 그 방어가
         // 뚫렸을 때(예: 휴강 등 다른 경로)를 대비한 방어 분기(D-091 "그래도 방어적으로 처리한다")를
-        // 검증하기 위해 DB 상태를 직접 등록 취소로 만든다.
+        // 검증하기 위해 DB 상태를 직접 등록 취소로 만든다. ck_pass_cancellation(V4)이 CANCELED와
+        // 취소 메타데이터 3종의 동시 존재를 강제하므로 셋 다 채운다.
+        val admin = persistAdmin()
         val canceledPass = passRepository.findById(pass.id!!).get()
         canceledPass.status = PassStatus.CANCELED
+        canceledPass.canceledAt = OffsetDateTime.now(clock)
+        canceledPass.cancelReason = "테스트 등록 취소"
+        canceledPass.canceledBy = admin
         passRepository.saveAndFlush(canceledPass)
 
         memberReservationService.cancel(member.id!!, reservation.id)
