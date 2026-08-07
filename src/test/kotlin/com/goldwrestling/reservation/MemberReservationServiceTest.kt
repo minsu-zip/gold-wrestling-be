@@ -103,20 +103,37 @@ class MemberReservationServiceTest {
 
     @AfterEach
     fun cleanUp() {
-        jdbcClient.sql("delete from notification where class_date between :from and :to")
-            .param("from", RANGE_FROM).param("to", RANGE_TO).update()
-        jdbcClient.sql("delete from reservation where class_date between :from and :to")
-            .param("from", RANGE_FROM).param("to", RANGE_TO).update()
-        jdbcClient.sql("delete from pass_transaction where member_id in (select id from member where kakao_id >= :base)")
-            .param("base", KAKAO_ID_BASE).update()
-        jdbcClient.sql("delete from pass where member_id in (select id from member where kakao_id >= :base)")
-            .param("base", KAKAO_ID_BASE).update()
-        jdbcClient.sql("delete from class_session where class_date between :from and :to")
-            .param("from", RANGE_FROM).param("to", RANGE_TO).update()
-        jdbcClient.sql("delete from member where kakao_id >= :base")
-            .param("base", KAKAO_ID_BASE).update()
-        jdbcClient.sql("delete from admin where login_id like :prefix")
-            .param("prefix", "$ADMIN_LOGIN_PREFIX%").update()
+        jdbcClient
+            .sql("delete from notification where class_date between :from and :to")
+            .param("from", RANGE_FROM)
+            .param("to", RANGE_TO)
+            .update()
+        jdbcClient
+            .sql("delete from reservation where class_date between :from and :to")
+            .param("from", RANGE_FROM)
+            .param("to", RANGE_TO)
+            .update()
+        jdbcClient
+            .sql("delete from pass_transaction where member_id in (select id from member where kakao_id >= :base)")
+            .param("base", KAKAO_ID_BASE)
+            .update()
+        jdbcClient
+            .sql("delete from pass where member_id in (select id from member where kakao_id >= :base)")
+            .param("base", KAKAO_ID_BASE)
+            .update()
+        jdbcClient
+            .sql("delete from class_session where class_date between :from and :to")
+            .param("from", RANGE_FROM)
+            .param("to", RANGE_TO)
+            .update()
+        jdbcClient
+            .sql("delete from member where kakao_id >= :base")
+            .param("base", KAKAO_ID_BASE)
+            .update()
+        jdbcClient
+            .sql("delete from admin where login_id like :prefix")
+            .param("prefix", "$ADMIN_LOGIN_PREFIX%")
+            .update()
     }
 
     @Test
