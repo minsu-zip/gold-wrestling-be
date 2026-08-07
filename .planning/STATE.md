@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-10-PLAN.md
-last_updated: "2026-08-07T15:55:03.322Z"
+stopped_at: Completed 04-11-PLAN.md
+last_updated: "2026-08-07T16:37:55.843Z"
 last_activity: 2026-08-07
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 44
-  completed_plans: 39
+  completed_plans: 40
   percent: 50
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 04 (schedule-reservation) — EXECUTING
-Plan: 3 of 15
+Plan: 2 of 15
 Status: Ready to execute
 Last activity: 2026-08-07
 
-Progress: [█████████░] 89%
+Progress: [█████████░] 91%
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Progress: [█████████░] 89%
 | Phase 04 P09 | ~15min | 2 tasks | 4 files |
 | Phase 04 P08 | 20min | 2 tasks | 3 files |
 | Phase 04 P10 | 60min | 3 tasks | 10 files |
+| Phase 04 P11 | 35min | 2 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -101,6 +102,8 @@ Recent decisions affecting current work:
 - [Phase 04-08]: classScheduleId 누락 시 기대 코드를 VALIDATION_FAILED→MALFORMED_REQUEST로 정정 — Kotlin non-null 생성자 파라미터라 Jackson 역직렬화가 @Valid보다 먼저 실패(AdminPassControllerTest 선례와 동일)
 - [Phase 04-10]: 취소·변경 응답 재조회는 항상 findByIdAndMemberId — bare findById(Reservation)를 회원 경로 어디에서도 쓰지 않아 IDOR 방어가 조회 시그니처 수준에서 끝까지 일관된다
 - [Phase 04-10]: LikePatternEscaper를 common으로 승격 — MemberSpecifications의 private LIKE 이스케이프 로직을 ReservationSpecifications.memberKeywordContains가 재구현 없이 재사용(PageResponse KDoc이 예고한 승격 트리거 충족)
+- [Phase 04-11]: branchId 해석은 admin_branch 매핑 우선, 없으면(v1 미도입) 단일 지점으로 대체(D-101)
+- [Phase 04-11]: ScheduleService.getWeeklySchedule을 순수 리팩터링해 ScheduleGridSkeleton(관리자용과 공유하는 그리드 조립 헬퍼)을 도입, 기존 테스트로 행위 불변 확인
 
 ### Pending Todos
 
@@ -126,6 +129,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-07T15:55:03.315Z
-Stopped at: Completed 04-10-PLAN.md
+Last session: 2026-08-07T16:37:55.837Z
+Stopped at: Completed 04-11-PLAN.md
 Resume file: None

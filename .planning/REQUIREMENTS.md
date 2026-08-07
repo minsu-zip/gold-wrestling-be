@@ -42,7 +42,7 @@
 
 - [x] **SCHED-01**: 주간 반복 시간표(`ClassSchedule`)가 정의되고 조회된다 — 송파점 시간표 (policies §2, 90분 타임)
 - [x] **SCHED-02**: 특정 날짜의 수업(`ClassSession`)이 실체화되고, 해당 주 월요일에 그 주(월~일) 예약이 열린다 — 다음 주 예약 불가
-- [ ] **SCHED-03**: 관리자가 주간 스케줄 보드 데이터를 조회할 수 있다 — 요일×타임 그리드: 수업 종류, 예약 n/정원, 1:1 여부, 셀별 예약자 명단
+- [x] **SCHED-03**: 관리자가 주간 스케줄 보드 데이터를 조회할 수 있다 — 요일×타임 그리드: 수업 종류, 예약 n/정원, 1:1 여부, 셀별 예약자 명단
 - [x] **RESV-01**: 회원이 예약제 수업(SESSION)을 예약하면 `SESSION_PASS`에서 즉시 1회 차감된다 (`RESERVE`)
 - [x] **RESV-02**: 회원이 1:1 레슨(LESSON)을 예약하면 `LESSON_PASS`에서 즉시 1회 차감된다 — 타임당 1명
 - [x] **RESV-03**: 잔여 횟수가 차감량보다 적으면 예약이 거부된다 (잔여 0.5회로 1회 예약 불가)
@@ -126,7 +126,7 @@
 | PASS-08 | Phase 3 | Complete |
 | SCHED-01 | Phase 4 | Complete |
 | SCHED-02 | Phase 4 | Complete |
-| SCHED-03 | Phase 4 | Pending |
+| SCHED-03 | Phase 4 | Complete |
 | RESV-01 | Phase 4 | Complete |
 | RESV-02 | Phase 4 | Complete |
 | RESV-03 | Phase 4 | Complete |
