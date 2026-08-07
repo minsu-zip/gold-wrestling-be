@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
+import java.time.LocalDate
+import java.time.LocalTime
 import java.time.OffsetDateTime
 
 /**
@@ -19,6 +21,19 @@ interface ReservationRepository :
     /** 등록 취소 선행 검사(D-089, `AdminPassService.cancel`이 호출) — 활성 예약 유무만 확인한다. */
     fun existsByPassIdAndStatus(
         passId: Long,
+        status: ReservationStatus,
+    ): Boolean
+
+    /**
+     * 중복 예약 사전 검사(D-092, `MemberReservationService.reserve` ⑥단계) — 같은 회원이 같은
+     * 날짜·시각에 이미 활성 예약을 갖고 있는지 확인한다. **이 검사는 사용자에게 정확한 에러를
+     * 주기 위한 것일 뿐, 실제 방어는 부분 유니크 인덱스(`ux_reservation_member_timeslot_active`,
+     * V6, D-021)다** — 사전 검사와 커밋 사이에 다른 트랜잭션이 끼어들 수 있기 때문이다.
+     */
+    fun existsByMemberIdAndClassDateAndStartTimeAndStatus(
+        memberId: Long,
+        classDate: LocalDate,
+        startTime: LocalTime,
         status: ReservationStatus,
     ): Boolean
 
