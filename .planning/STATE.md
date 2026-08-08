@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-12-PLAN.md
-last_updated: "2026-08-07T16:56:09.999Z"
-last_activity: 2026-08-07
+stopped_at: Completed 04-13-PLAN.md
+last_updated: "2026-08-08T02:07:23.503Z"
+last_activity: 2026-08-08
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 44
-  completed_plans: 41
+  completed_plans: 42
   percent: 50
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 04 (schedule-reservation) — EXECUTING
-Plan: 3 of 15
+Plan: 2 of 15
 Status: Ready to execute
-Last activity: 2026-08-07
+Last activity: 2026-08-08
 
-Progress: [█████████░] 93%
+Progress: [██████████] 95%
 
 ## Performance Metrics
 
@@ -68,6 +68,7 @@ Progress: [█████████░] 93%
 | Phase 04 P10 | 60min | 3 tasks | 10 files |
 | Phase 04 P11 | 35min | 2 tasks | 16 files |
 | Phase 04 P12 | 40min | 2 tasks | 9 files |
+| Phase 04 P13 | 65min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -107,6 +108,8 @@ Recent decisions affecting current work:
 - [Phase 04-11]: ScheduleService.getWeeklySchedule을 순수 리팩터링해 ScheduleGridSkeleton(관리자용과 공유하는 그리드 조립 헬퍼)을 도입, 기존 테스트로 행위 불변 확인
 - [Phase 04-12]: 관리자 예약 조회는 branchId 스코프를 받지 않는다 — RESV-07 결정과 AdminMemberController 원본 인터페이스를 따름(AdminBranch 매핑은 v1 미도입, D-101)
 - [Phase 04-12]: ReservationRepository.findAll(Specification, Pageable)을 @EntityGraph로 재선언 — Specification 페이지 조회에서 ManyToOne LAZY 연관을 count 쿼리에 영향 없이 N+1 없이 로딩하는 이 저장소 최초 패턴
+- [Phase 04-13]: 예약 생성/취소 복구 실행부를 회원·관리자 경로가 공유하도록 ReservationLedgerSupport 컴포넌트로 추출 — 차감/복구 경로가 두 서비스에 각자 복제되면 D-021(모든 잔여 변경이 이력을 남긴다) 보장이 흩어진다
+- [Phase 04-13]: AdminPassService.cancel의 활성 예약 선행 검사는 이용권 조회 직후, 다른 판정보다 먼저 수행 — 조건부 UPDATE 이후에 두면 거부 사유가 경쟁 패배·잔여 충돌 등 다른 실패와 뒤섞인다(D-089)
 
 ### Pending Todos
 
@@ -132,6 +135,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-07T16:56:09.992Z
-Stopped at: Completed 04-12-PLAN.md
+Last session: 2026-08-08T02:07:23.497Z
+Stopped at: Completed 04-13-PLAN.md
 Resume file: None
