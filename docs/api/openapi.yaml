@@ -10,6 +10,10 @@ tags:
   description: 관리자 회원 관리
 - name: system
   description: 서버 상태·환경 확인
+- name: admin-reservation
+  description: 관리자 예약 조회·대리 취소·변경
+- name: admin-schedule
+  description: 관리자 주간 스케줄 보드 + 휴강 처리·해제
 - name: auth
   description: 인증·토큰
 - name: admin-pass
@@ -222,12 +226,68 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/AdminLoginResponse"
+  /api/admin/reservations/{reservationId}/change:
+    post:
+      tags:
+      - admin-reservation
+      summary: "예약 대리 변경 (당일·예약 창 제약 없음, 취소 + 재예약을 하나의 트랜잭션으로 처리)"
+      description: 새 타임 예약이 실패하면(정원 초과·수업 종류 불일치 등) 기존 예약이 그대로 유지된다. 관리자 경로도 정원 조건부
+        UPDATE를 그대로 거친다 — 오버부킹 백도어가 없다.
+      operationId: change_1
+      parameters:
+      - name: reservationId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminChangeReservationRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AdminReservationResponse"
+  /api/admin/reservations/{reservationId}/cancellation:
+    post:
+      tags:
+      - admin-reservation
+      summary: "예약 대리 취소 (당일·과거 포함 제약 없음, 복구 여부 선택 — 기본 복구)"
+      description: "회원 경로와 달리 당일·과거 예약도 취소할 수 있다. refund=false면 잔여를 복구하지 않고 예약만 취소\
+        한다(당일 불참 연락, D-089 등록 취소 선행 조건 2단계 절차). 이미 취소된 예약이면 409로 응답한다."
+      operationId: cancel_1
+      parameters:
+      - name: reservationId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminCancelReservationRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AdminReservationResponse"
   /api/admin/passes/{passId}/cancellation:
     post:
       tags:
       - admin-pass
       summary: 이용권 등록 취소 (물리 삭제 없이 취소 상태 전환 + 상쇄 이력)
-      operationId: cancel_1
+      operationId: cancel_2
       parameters:
       - name: passId
         in: path
@@ -367,6 +427,49 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/MemberDetailResponse"
+  /api/admin/class-sessions/{classSessionId}/resumption:
+    post:
+      tags:
+      - admin-schedule
+      summary: 휴강 해제 (그 타임이 다시 예약 가능해진다 — 취소됐던 예약은 복원하지 않는다)
+      description: "휴강으로 자동 취소됐던 예약은 이 API로 복원되지 않는다 — 회원이 직접 다시 예약한다 (잔여 음수 방지, CONTEXT.md\
+        \ 락인). 휴강 상태가 아닌 세션이면 409 CLASS_SESSION_NOT_CANCELED로 응답한다."
+      operationId: resume
+      parameters:
+      - name: classSessionId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ClassSessionResponse"
+  /api/admin/class-sessions/suspension:
+    post:
+      tags:
+      - admin-schedule
+      summary: "휴강 처리 (활성 예약 일괄 취소 + 차감 복구 + 세션당 1건 요약 알림, RESV-09, policies §7)"
+      description: 세션 id가 아니라 시간표 id + 날짜로 받는다(D-094) — 아직 예약이 없어 세션 행이 없는 타임도 휴강할
+        수 있다. 이미 휴강된 수업이면 409 CLASS_SESSION_CANCELED로 응답한다.
+      operationId: suspend
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SuspendClassSessionRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ClassSessionResponse"
   /api/admin/passes/{passId}/period:
     patch:
       tags:
@@ -523,13 +626,118 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/PageResponsePassTransactionResponse"
+  /api/admin/schedule/board:
+    get:
+      tags:
+      - admin-schedule
+      summary: "관리자 주간 스케줄 보드 조회 (요일×타임 그리드 + 셀별 예약자 명단, 조회 주 범위 제한 없음)"
+      operationId: getWeeklyBoard
+      parameters:
+      - name: weekStart
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: branchId
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AdminWeeklyBoardResponse"
+  /api/admin/reservations:
+    get:
+      tags:
+      - admin-reservation
+      summary: "예약 목록 조회 (기간·수업 종류·회원 검색어 필터 + 페이지네이션, 취소 예약 포함)"
+      operationId: search
+      parameters:
+      - name: from
+        in: query
+        description: 수업 날짜 범위 시작(포함)
+        required: false
+        schema:
+          type: string
+          format: date
+          description: 수업 날짜 범위 시작(포함)
+      - name: to
+        in: query
+        description: 수업 날짜 범위 끝(포함)
+        required: false
+        schema:
+          type: string
+          format: date
+          description: 수업 날짜 범위 끝(포함)
+      - name: classType
+        in: query
+        description: 수업 종류 필터
+        required: false
+        schema:
+          type: string
+          description: 수업 종류 필터
+          enum:
+          - EVENING
+          - SESSION
+          - LESSON
+      - name: keyword
+        in: query
+        description: 회원 이름·전화번호 부분 일치 검색어
+        required: false
+        schema:
+          type: string
+          description: 회원 이름·전화번호 부분 일치 검색어
+      - name: status
+        in: query
+        description: 예약 상태 필터 — 생략하면 취소 포함 전체
+        required: false
+        schema:
+          type: string
+          description: 예약 상태 필터 — 생략하면 취소 포함 전체
+          enum:
+          - ACTIVE
+          - CANCELED
+      - name: page
+        in: query
+        description: 페이지 번호(0부터 시작)
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          description: 페이지 번호(0부터 시작)
+          minimum: 0
+      - name: size
+        in: query
+        description: 페이지 크기(1~100)
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          description: 페이지 크기(1~100)
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageResponseAdminReservationResponse"
   /api/admin/members:
     get:
       tags:
       - admin-member
       summary: 회원 목록 조회 (검색·상태 필터·페이지네이션. status=PENDING+onboardingCompleted=true
         가 승인 대기 목록)
-      operationId: search
+      operationId: search_1
       parameters:
       - name: keyword
         in: query
@@ -869,6 +1077,108 @@ components:
         name:
           type: string
           description: 관리자 이름
+    AdminChangeReservationRequest:
+      type: object
+      description: 관리자 대리 변경 요청 — 새 타임(시간표 id + 날짜)만 받는다. 기존 예약은 경로 변수(reservationId)로
+        지정한다
+      properties:
+        classScheduleId:
+          type: integer
+          format: int64
+          description: 변경할 정기 시간표(ClassSchedule) ID
+          example: 12
+        classDate:
+          type: string
+          format: date
+          description: 변경할 날짜 — 시간표의 요일과 일치해야 한다. 당일·과거 날짜도 허용된다(관리자 경로)
+          example: 2026-08-11
+      required:
+      - classDate
+      - classScheduleId
+    AdminReservationResponse:
+      type: object
+      description: 관리자 예약 응답 — 취소 메타데이터 포함
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 예약 ID
+        memberId:
+          type: integer
+          format: int64
+          description: 회원 ID
+        memberName:
+          type: string
+          description: 회원 이름
+        classSessionId:
+          type: integer
+          format: int64
+          description: 날짜별 수업(ClassSession) ID
+        classType:
+          type: string
+          description: 수업 종류
+          enum:
+          - EVENING
+          - SESSION
+          - LESSON
+        classDate:
+          type: string
+          format: date
+          description: 수업 날짜
+        startTime:
+          type: string
+          description: 시작 시각
+        endTime:
+          type: string
+          description: 종료 시각
+        status:
+          type: string
+          description: 예약 상태
+          enum:
+          - ACTIVE
+          - CANCELED
+        reservedAt:
+          type: string
+          format: date-time
+          description: 예약(생성) 시각
+        canceledAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+          description: 취소 시각 — 취소되지 않았으면 null
+        refunded:
+          type:
+          - boolean
+          - "null"
+          description: 복구 여부 — 취소되지 않았으면 null
+        canceledByType:
+          type:
+          - string
+          - "null"
+          description: 취소 주체 종류 — 취소되지 않았으면 null
+          enum:
+          - MEMBER
+          - ADMIN
+        canceledByName:
+          type:
+          - string
+          - "null"
+          description: 취소 주체 이름 — 취소되지 않았으면 null
+        passId:
+          type: integer
+          format: int64
+          description: 차감에 쓰인 이용권 ID
+    AdminCancelReservationRequest:
+      type: object
+      description: 관리자 대리 취소 요청 — refund 생략 시 기본값 true(복구). false는 당일 불참 연락 등 차감을
+        유지해야 하는 경우에 쓴다
+      properties:
+        refund:
+          type: boolean
+          default: true
+          description: 취소 시 이용권 잔여를 복구할지 여부. 기본값 true
+          example: true
     CancelPassRequest:
       type: object
       description: 취소 사유. 관리자 전용 정보이며 pass.cancel_reason과 상쇄 이력 note에 함께 저장된다
@@ -1052,6 +1362,92 @@ components:
           example: 10.0
       required:
       - type
+    ClassSessionResponse:
+      type: object
+      description: 날짜별 수업(ClassSession) 응답 — 휴강 처리·해제 결과
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 날짜별 수업(ClassSession) ID
+        classScheduleId:
+          type: integer
+          format: int64
+          description: 정기 시간표(ClassSchedule) ID
+        classDate:
+          type: string
+          format: date
+          description: 수업 날짜
+        classType:
+          type: string
+          description: 수업 종류
+          enum:
+          - EVENING
+          - SESSION
+          - LESSON
+        startTime:
+          type: string
+          description: 시작 시각
+        endTime:
+          type: string
+          description: 종료 시각
+        capacity:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: 정원 — EVENING은 null
+        reservedCount:
+          type: integer
+          format: int32
+          description: 현재 예약 인원
+        status:
+          type: string
+          description: 세션 상태
+          enum:
+          - SCHEDULED
+          - CANCELED
+        cancelReason:
+          type:
+          - string
+          - "null"
+          description: 휴강 사유 — 휴강 상태가 아니면 null
+        canceledAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+          description: 휴강 처리 시각 — 휴강 상태가 아니면 null
+        canceledReservationCount:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: 휴강 처리로 자동 취소된 예약 건수 — 휴강 해제 응답에서는 null
+    SuspendClassSessionRequest:
+      type: object
+      description: 휴강 처리 요청 — 세션 id가 아니라 시간표 id + 날짜로 받는다(D-094)
+      properties:
+        classScheduleId:
+          type: integer
+          format: int64
+          description: 휴강할 정기 시간표(ClassSchedule) ID
+          example: 12
+        classDate:
+          type: string
+          format: date
+          description: 휴강할 날짜 — 시간표의 요일과 일치해야 한다
+          example: 2026-08-15
+        reason:
+          type: string
+          description: 휴강 사유(500자 이내)
+          example: 공휴일 휴관
+          maxLength: 500
+          minLength: 0
+      required:
+      - classDate
+      - classScheduleId
+      - reason
     ChangePassPeriodRequest:
       type: object
       description: "기간·유효기간 수정 요청 — 저녁반은 시작·종료 모두, 횟수권은 종료일만 반영된다(D-062)"
@@ -1286,6 +1682,140 @@ components:
           type: string
           format: date-time
           description: 발생 시각
+    AdminBoardCellResponse:
+      type: object
+      description: 관리자 스케줄 보드 셀(요일×타임) — 예약자 명단 포함(D-096)
+      properties:
+        classScheduleId:
+          type: integer
+          format: int64
+          description: 정기 시간표(ClassSchedule) ID
+        classSessionId:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: 날짜별 수업(ClassSession) ID — 아직 실체화되지 않았으면 null(D-094)
+        classType:
+          type: string
+          description: 수업 종류
+          enum:
+          - EVENING
+          - SESSION
+          - LESSON
+        startTime:
+          type: string
+          description: 시작 시각
+        endTime:
+          type: string
+          description: 종료 시각
+        capacity:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: 정원 — 저녁반(EVENING)은 null
+        reservedCount:
+          type: integer
+          format: int32
+          description: 현재 예약 인원(취소 제외)
+        reservable:
+          type: boolean
+          description: 예약 대상 수업 종류인지 — 저녁반은 항상 false(D-093)
+        suspended:
+          type: boolean
+          description: 휴강 여부
+        cancelReason:
+          type:
+          - string
+          - "null"
+          description: 휴강 사유 — 휴강이 아니면 null
+        reservations:
+          type: array
+          description: "예약자 명단(활성 예약만) — 관리자 전용(D-096, T-04-52)"
+          items:
+            $ref: "#/components/schemas/BoardReservationResponse"
+    AdminBoardDayResponse:
+      type: object
+      description: 하루치 관리자 스케줄 보드
+      properties:
+        date:
+          type: string
+          format: date
+          description: 날짜
+        dayOfWeek:
+          type: string
+          description: 요일
+          enum:
+          - MONDAY
+          - TUESDAY
+          - WEDNESDAY
+          - THURSDAY
+          - FRIDAY
+          - SATURDAY
+          - SUNDAY
+        cells:
+          type: array
+          description: "그 날의 셀 목록 — 시작 시각 오름차순, 같은 시각이면 EVENING→SESSION→LESSON 순"
+          items:
+            $ref: "#/components/schemas/AdminBoardCellResponse"
+    AdminWeeklyBoardResponse:
+      type: object
+      description: 관리자 주간 스케줄 보드 응답 — 조회 주 범위 제한이 없다(관리자 전용)
+      properties:
+        weekStart:
+          type: string
+          format: date
+          description: 조회한 주의 월요일
+        weekEnd:
+          type: string
+          format: date
+          description: 조회한 주의 일요일
+        days:
+          type: array
+          description: "요일별 보드(월~일, 7개)"
+          items:
+            $ref: "#/components/schemas/AdminBoardDayResponse"
+    BoardReservationResponse:
+      type: object
+      description: 예약자 명단 항목 — reservationId·memberId·memberName 3필드로 고정(T-04-52)
+      properties:
+        reservationId:
+          type: integer
+          format: int64
+          description: 예약 ID
+        memberId:
+          type: integer
+          format: int64
+          description: 회원 ID
+        memberName:
+          type: string
+          description: 회원 실명
+    PageResponseAdminReservationResponse:
+      type: object
+      description: 페이지네이션 응답
+      properties:
+        content:
+          type: array
+          description: 현재 페이지의 항목 목록
+          items:
+            $ref: "#/components/schemas/AdminReservationResponse"
+        page:
+          type: integer
+          format: int32
+          description: 현재 페이지 번호(0부터 시작)
+        size:
+          type: integer
+          format: int32
+          description: 페이지 크기
+        totalElements:
+          type: integer
+          format: int64
+          description: 전체 항목 수
+        totalPages:
+          type: integer
+          format: int32
+          description: 전체 페이지 수
     MemberSummaryResponse:
       type: object
       description: 관리자 회원 목록 항목
