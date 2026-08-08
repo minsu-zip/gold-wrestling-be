@@ -8,6 +8,8 @@ import com.goldwrestling.pass.dto.CancelPassRequest
 import com.goldwrestling.pass.dto.ChangePassPeriodRequest
 import com.goldwrestling.pass.dto.PassResponse
 import com.goldwrestling.pass.dto.RegisterPassRequest
+import com.goldwrestling.reservation.ReservationRepository
+import com.goldwrestling.reservation.ReservationStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
@@ -23,6 +25,12 @@ import java.time.OffsetDateTime
  * 그런 제한이 없고, D-034·D-044가 상태 전이에 관리자 재량을 남긴 선례를 따른다. 이 판단은 계획
  * 단계에서 사용자가 확정했다(2026-08-03, plan-phase AskUserQuestion — "제한 없음, 관리자 재량"
  * 선택, D-068).
+ *
+ * **[cancel]이 `reservation` 패키지를 참조한다** — 등록 취소 선행 조건(D-089)이 활성 예약 유무를
+ * 확인해야 하기 때문이다. 기능별 패키지 원칙(D-018)상 `pass`→`reservation` 참조가 역전되는
+ * **유일한 지점**이라, 결합을 [ReservationRepository.existsByPassIdAndStatus] 한 메서드만 주입해
+ * 쓰는 것으로 최소화한다 — `ReservationService`·`Reservation` 엔티티는 참조하지 않는다. 새 예외
+ * [PassHasActiveReservationException]은 `pass` 패키지에 그대로 둔다(04-01에서 이미 그렇게 뒀다).
  */
 @Service
 @Transactional(readOnly = true)
@@ -32,6 +40,7 @@ class AdminPassService(
     private val passRepository: PassRepository,
     private val passTransactionRepository: PassTransactionRepository,
     private val passPeriodChangeRepository: PassPeriodChangeRepository,
+    private val reservationRepository: ReservationRepository,
     private val clock: Clock,
 ) {
     /**
@@ -225,12 +234,21 @@ class AdminPassService(
      * 한다(D-072) — 상쇄 수량이 0인 분기(기간제·잔여 0 횟수권)도 예외 없이 이 조건부 UPDATE를
      * 거친다.
      *
-     * 처리 순서: 조회 → 사전 판정으로 상쇄 수량 산출(잔여는 아직 안 바뀜) →
-     * `cancelIfNotCanceled`로 상태·취소 메타데이터를 조건부 반영(반환 0이면 경쟁 패배 →
-     * [PassAlreadyCanceledException]) → 상쇄 수량이 0이 아니면 `zeroRemainingCount`로 잔여를
-     * 조건부로 0으로 만듦(반환 0이면 그 사이 잔여가 바뀐 것이므로 [PassStateConflictException],
+     * 처리 순서: 조회 → **활성 예약 선행 검사(D-089)** → 사전 판정으로 상쇄 수량 산출(잔여는
+     * 아직 안 바뀜) → `cancelIfNotCanceled`로 상태·취소 메타데이터를 조건부 반영(반환 0이면 경쟁
+     * 패배 → [PassAlreadyCanceledException]) → 상쇄 수량이 0이 아니면 `zeroRemainingCount`로
+     * 잔여를 조건부로 0으로 만듦(반환 0이면 그 사이 잔여가 바뀐 것이므로 [PassStateConflictException],
      * 트랜잭션 롤백으로 상태 전환도 함께 되돌아간다) → 재조회한 영속 `Pass`로
      * `REGISTRATION_CANCELED` 상쇄 이력을 저장한다(같은 트랜잭션, CLAUDE.md 규칙 6).
+     *
+     * **활성 예약 선행 검사는 이용권 조회 직후, 다른 판정보다 먼저** 수행한다(D-089) — 조건부
+     * UPDATE 이후에 두면 이미 상태 전환·잔여 상쇄가 반영된 뒤에야 예외가 나 롤백에 의존하게
+     * 되고, "왜 거부됐는지"가 경쟁 패배([PassAlreadyCanceledException])·잔여 충돌
+     * ([PassStateConflictException]) 같은 다른 실패 원인과 뒤섞인다. 이 검사가 먼저면 활성
+     * 예약이 있다는 사실 하나만으로 거부 사유가 명확하다. **자동 연쇄 취소는 만들지 않는다** —
+     * 오등록 정정은 드문 운영 행위이고, 연쇄 복구가 `REGISTRATION_CANCELED` 상쇄와 곧바로
+     * 충돌한다(D-089) — 관리자가 대리 취소(`refund=false`)로 먼저 정리하는 명시적 2단계 절차가
+     * 안전하다.
      */
     @Transactional
     fun cancel(
@@ -239,6 +257,9 @@ class AdminPassService(
         adminId: Long,
     ): PassResponse {
         val pass = passRepository.findById(passId).orElseThrow { PassNotFoundException(passId) }
+        if (reservationRepository.existsByPassIdAndStatus(passId, ReservationStatus.ACTIVE)) {
+            throw PassHasActiveReservationException()
+        }
         val admin =
             adminRepository.findById(adminId).orElseThrow {
                 IllegalStateException("이용권을 취소하려는 관리자(id=$adminId)를 찾을 수 없습니다.")
