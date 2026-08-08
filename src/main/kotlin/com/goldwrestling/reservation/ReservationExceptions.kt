@@ -71,3 +71,14 @@ class ReservationTypeMismatchException :
 class ReservationStateConflictException(
     message: String,
 ) : DomainException(ErrorCode.RESERVATION_STATE_CONFLICT, message)
+
+/**
+ * 관리자 예약 검색(RESV-07)에서 `from`이 `to`보다 뒤일 때. 형식 검증(`@Valid`)이 아니라 두 필드를
+ * 함께 봐야 판정할 수 있는 도메인 규칙이라 서비스에서 던진다(`AdminPassService.changePeriod`의
+ * 기간 역전 판정과 동일 관례).
+ */
+class InvalidReservationSearchRangeException :
+    DomainException(
+        ErrorCode.INVALID_RESERVATION_SEARCH_RANGE,
+        "조회 시작일(from)은 종료일(to)보다 늦을 수 없습니다.",
+    )

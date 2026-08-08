@@ -92,6 +92,9 @@ enum class ErrorCode(
     /** 요청한 정기 시간표 행이 없음 */
     CLASS_SCHEDULE_NOT_FOUND(HttpStatus.NOT_FOUND),
 
+    /** 요청한 날짜별 수업(ClassSession) 행이 없음 (휴강 해제 대상 조회, RESV-09) */
+    CLASS_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND),
+
     /** 휴강된 수업에 예약·변경 시도 (policies §7) */
     CLASS_SESSION_CANCELED(HttpStatus.CONFLICT),
 
@@ -127,4 +130,10 @@ enum class ErrorCode(
 
     /** 활성 예약이 있어 등록 취소 거부 (D-089) */
     PASS_HAS_ACTIVE_RESERVATION(HttpStatus.CONFLICT),
+
+    /** 요청한 branchId에 관리자가 소속되지 않음 (T-04-53, 관리자 스케줄 보드 최초 도입) */
+    ADMIN_BRANCH_NOT_ASSIGNED(HttpStatus.FORBIDDEN),
+
+    /** 관리자 예약 검색 조건의 from이 to보다 뒤임 (RESV-07) */
+    INVALID_RESERVATION_SEARCH_RANGE(HttpStatus.BAD_REQUEST),
 }

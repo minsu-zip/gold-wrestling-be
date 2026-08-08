@@ -35,7 +35,9 @@ import java.time.Clock
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
 
 /**
  * `NotificationService`의 4개 팩토리 메서드가 `<behavior>`(04-07-PLAN.md Task 1)를 지키는지
@@ -150,6 +152,8 @@ class NotificationServiceTest {
         assertThat(notification.classDate).isEqualTo(session.classDate)
         assertThat(notification.startTime).isEqualTo(session.startTime)
         assertThat(notification.message).contains("7건")
+        assertThat(notification.message)
+            .isEqualTo("${formatFor(session.classDate, session.startTime)} 예약제 수업이 휴강 처리되어 예약 7건이 자동 취소되었습니다.")
     }
 
     @Test
@@ -161,6 +165,48 @@ class NotificationServiceTest {
         assertThat(notification.message).contains("예약제 수업")
         assertThat(notification.message).contains(reservation.member.name!!)
     }
+
+    /**
+     * `SESSION`의 라벨이 이미 "예약제 수업"이라, 템플릿이 뒤에 " 수업"을 덧붙이면
+     * "예약제 수업 수업을 예약했습니다."가 된다(04-UAT 테스트 12에서 실제로 발견).
+     * `contains("예약제 수업")` 단언은 중복이 있어도 통과하므로 **전체 문구를 그대로 비교**한다.
+     */
+    @Test
+    fun `SESSION 알림 문구는 라벨 뒤에 '수업'을 덧붙이지 않는다`() {
+        val reservation = persistReservation()
+        val name = reservation.member.name
+        val at = formatFor(reservation.classDate, reservation.startTime)
+
+        assertThat(notificationService.createReservationCreated(reservation).message)
+            .isEqualTo("${name}님이 $at 예약제 수업을 예약했습니다.")
+        assertThat(notificationService.createReservationChanged(reservation, byAdmin = false).message)
+            .isEqualTo("${name}님이 $at 예약제 수업으로 예약을 변경했습니다.")
+    }
+
+    /** 4개 팩토리 전 경로(주체 회원/관리자 포함)에 "수업 수업" 중복이 없음을 한 번에 고정한다. */
+    @Test
+    fun `모든 알림 문구에 수업 중복이 없다`() {
+        val reservation = persistReservation()
+        val session = persistSession()
+
+        val messages =
+            listOf(
+                notificationService.createReservationCreated(reservation).message,
+                notificationService.createReservationCanceled(reservation, byAdmin = false).message,
+                notificationService.createReservationCanceled(reservation, byAdmin = true).message,
+                notificationService.createReservationChanged(reservation, byAdmin = false).message,
+                notificationService.createReservationChanged(reservation, byAdmin = true).message,
+                notificationService.createClassSessionSuspended(session, canceledCount = 2).message,
+            )
+
+        assertThat(messages).allSatisfy { assertThat(it).doesNotContain("수업 수업") }
+    }
+
+    /** `NotificationService`의 `formatDateTime`(M/d HH:mm)과 같은 형식 — 전체 문구 비교용. */
+    private fun formatFor(
+        date: LocalDate,
+        time: LocalTime,
+    ): String = "${date.format(DateTimeFormatter.ofPattern("M/d"))} ${time.format(DateTimeFormatter.ofPattern("HH:mm"))}"
 
     private fun songpaBranch(): Branch = branchRepository.findByName("송파점")!!
 

@@ -38,7 +38,7 @@ class NotificationService(
         val memberName = reservation.member.name
         val message =
             "${memberName}님이 ${formatDateTime(reservation.classDate, reservation.startTime)} " +
-                "${classTypeLabel(reservation.classType)} 수업을 예약했습니다."
+                "${classTypeLabel(reservation.classType)}을 예약했습니다."
         return save(
             type = NotificationType.RESERVATION_CREATED,
             reservation = reservation,
@@ -85,7 +85,7 @@ class NotificationService(
         val message =
             "${actorPrefix(byAdmin)}${memberName}님${subjectParticle(byAdmin)} " +
                 "${formatDateTime(newReservation.classDate, newReservation.startTime)} " +
-                "${classTypeLabel(newReservation.classType)} 수업으로 예약을 변경했습니다."
+                "${classTypeLabel(newReservation.classType)}으로 예약을 변경했습니다."
         return save(
             type = if (byAdmin) NotificationType.RESERVATION_CHANGED_BY_ADMIN else NotificationType.RESERVATION_CHANGED_BY_MEMBER,
             reservation = newReservation,
@@ -109,7 +109,7 @@ class NotificationService(
     ): Notification {
         val message =
             "${formatDateTime(classSession.classDate, classSession.startTime)} " +
-                "${classTypeLabel(classSession.classType)} 수업이 휴강 처리되어 예약 ${canceledCount}건이 자동 취소되었습니다."
+                "${classTypeLabel(classSession.classType)}이 휴강 처리되어 예약 ${canceledCount}건이 자동 취소되었습니다."
         return save(
             type = NotificationType.CLASS_SESSION_SUSPENDED,
             reservation = null,
@@ -160,7 +160,13 @@ class NotificationService(
         startTime: LocalTime,
     ): String = "${classDate.format(DATE_FORMATTER)} ${startTime.format(TIME_FORMATTER)}"
 
-    /** 수업 종류 한글 라벨(docs/glossary.md "수업 종류" 표 그대로). */
+    /**
+     * 수업 종류 한글 라벨(docs/glossary.md "수업 종류" 표 그대로).
+     *
+     * **라벨 뒤에 "수업"을 덧붙이지 말 것** — `SESSION`의 라벨이 이미 "예약제 수업"이라
+     * "예약제 수업 수업을 예약했습니다."처럼 중복된다(04-UAT 테스트 12에서 발견).
+     * 세 라벨 모두 받침으로 끝나므로 조사는 `을`/`으로`/`이`로 고정해도 안전하다.
+     */
     private fun classTypeLabel(classType: ClassType): String =
         when (classType) {
             ClassType.EVENING -> "저녁반"

@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-10-PLAN.md
-last_updated: "2026-08-07T15:55:03.322Z"
-last_activity: 2026-08-07
+stopped_at: Completed 04-15-PLAN.md — Phase 4(시간표·예약) 15/15 plans 완료
+last_updated: "2026-08-08T07:45:12.652Z"
+last_activity: 2026-08-08
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 44
-  completed_plans: 39
-  percent: 50
+  completed_plans: 44
+  percent: 67
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-30)
 
 **Core value:** 회원이 보는 잔여 횟수는 항상 실제 사용 가능 횟수와 일치한다 (즉시 차감/복구 + 전 이력 + 초과 예약 0건)
-**Current focus:** Phase 04 — schedule-reservation
+**Current focus:** Phase 04 — schedule-reservation (완료, 청크 C PR 대기)
 
 ## Current Position
 
-Phase: 04 (schedule-reservation) — EXECUTING
-Plan: 3 of 15
-Status: Ready to execute
-Last activity: 2026-08-07
+Phase: 04 (schedule-reservation) — COMPLETE (15/15 plans)
+Plan: 15 of 15
+Status: Phase complete — dev PR 생성 대기 (청크 C `feature/phase-04c-admin-ops`)
+Last activity: 2026-08-08 -- Phase 4 execution complete, Task 3 human-verify 16/16 PASS
 
-Progress: [█████████░] 89%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -66,6 +66,11 @@ Progress: [█████████░] 89%
 | Phase 04 P09 | ~15min | 2 tasks | 4 files |
 | Phase 04 P08 | 20min | 2 tasks | 3 files |
 | Phase 04 P10 | 60min | 3 tasks | 10 files |
+| Phase 04 P11 | 35min | 2 tasks | 16 files |
+| Phase 04 P12 | 40min | 2 tasks | 9 files |
+| Phase 04 P13 | 65min | 2 tasks | 9 files |
+| Phase 04 P14 | 55min | 2 tasks | 10 files |
+| Phase 04 P15 | ~30min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -101,6 +106,17 @@ Recent decisions affecting current work:
 - [Phase 04-08]: classScheduleId 누락 시 기대 코드를 VALIDATION_FAILED→MALFORMED_REQUEST로 정정 — Kotlin non-null 생성자 파라미터라 Jackson 역직렬화가 @Valid보다 먼저 실패(AdminPassControllerTest 선례와 동일)
 - [Phase 04-10]: 취소·변경 응답 재조회는 항상 findByIdAndMemberId — bare findById(Reservation)를 회원 경로 어디에서도 쓰지 않아 IDOR 방어가 조회 시그니처 수준에서 끝까지 일관된다
 - [Phase 04-10]: LikePatternEscaper를 common으로 승격 — MemberSpecifications의 private LIKE 이스케이프 로직을 ReservationSpecifications.memberKeywordContains가 재구현 없이 재사용(PageResponse KDoc이 예고한 승격 트리거 충족)
+- [Phase 04-11]: branchId 해석은 admin_branch 매핑 우선, 없으면(v1 미도입) 단일 지점으로 대체(D-101)
+- [Phase 04-11]: ScheduleService.getWeeklySchedule을 순수 리팩터링해 ScheduleGridSkeleton(관리자용과 공유하는 그리드 조립 헬퍼)을 도입, 기존 테스트로 행위 불변 확인
+- [Phase 04-12]: 관리자 예약 조회는 branchId 스코프를 받지 않는다 — RESV-07 결정과 AdminMemberController 원본 인터페이스를 따름(AdminBranch 매핑은 v1 미도입, D-101)
+- [Phase 04-12]: ReservationRepository.findAll(Specification, Pageable)을 @EntityGraph로 재선언 — Specification 페이지 조회에서 ManyToOne LAZY 연관을 count 쿼리에 영향 없이 N+1 없이 로딩하는 이 저장소 최초 패턴
+- [Phase 04-13]: 예약 생성/취소 복구 실행부를 회원·관리자 경로가 공유하도록 ReservationLedgerSupport 컴포넌트로 추출 — 차감/복구 경로가 두 서비스에 각자 복제되면 D-021(모든 잔여 변경이 이력을 남긴다) 보장이 흩어진다
+- [Phase 04-13]: AdminPassService.cancel의 활성 예약 선행 검사는 이용권 조회 직후, 다른 판정보다 먼저 수행 — 조건부 UPDATE 이후에 두면 거부 사유가 경쟁 패배·잔여 충돌 등 다른 실패와 뒤섞인다(D-089)
+- [Phase 04-14]: ReservationLedgerSupport.restoreAfterCancellation를 restorePassAfterCancellation(세션 정원 미반영 + reason 파라미터)로 감싸는 형태로 리팩터링 — 기존 회원/관리자 취소 호출부는 동작 불변(기본값 CANCEL_REFUND), 휴강 캐스케이드는 CLASS_CANCELED_REFUND로 호출해 원장에서 구분(T-04-67)
+- [Phase 04-14]: AdminScheduleController의 클래스 레벨 @RequestMapping을 /api/admin/schedule에서 /api/admin으로 넓히고 메서드마다 하위 경로를 붙임 — 스케줄 보드와 휴강 처리가 서로 다른 리소스 계층이라 한 컨트롤러 파일 안에서 고정 경로 두 갈래를 표현하기 위한 최소 변경
+- [Phase 04-14]: ClassSessionNotFoundException + ErrorCode.CLASS_SESSION_NOT_FOUND 신설 — 휴강 해제 대상 세션 id가 없는 경로를 plan이 명시하지 않았으나 404 처리 없이는 500이 노출되는 방어적이지 않은 API가 된다
+- [Phase 04-15]: docs/decisions.md(D-089~101)·docs/glossary.md는 이미 실제 구현과 일치해 phase 마감 시점에 추가 수정 없음 — error-codes.md 발생 지점 열만 실제 throw 지점 기준으로 정정
+- [Phase 04-15]: Task 3 회원 예약~관리자 운영 전체 흐름 검증(16항목)은 오케스트레이터가 실제 HTTP·psql로 판정하고 사용자가 승인하는 방식으로 수행 — 16/16 PASS, 로컬 검증 데이터는 사용자 지시로 보존
 
 ### Pending Todos
 
@@ -126,6 +142,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-07T15:55:03.315Z
-Stopped at: Completed 04-10-PLAN.md
+Last session: 2026-08-08T07:44:51.549Z
+Stopped at: Completed 04-15-PLAN.md — Phase 4(시간표·예약) 15/15 plans 완료, dev PR 생성 대기
 Resume file: None

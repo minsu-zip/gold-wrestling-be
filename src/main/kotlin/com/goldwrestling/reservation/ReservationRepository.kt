@@ -2,6 +2,10 @@ package com.goldwrestling.reservation
 
 import com.goldwrestling.admin.Admin
 import com.goldwrestling.member.Member
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
+import org.springframework.data.jpa.domain.Specification
+import org.springframework.data.jpa.repository.EntityGraph
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor
 import org.springframework.data.jpa.repository.Modifying
@@ -18,6 +22,31 @@ import java.time.OffsetDateTime
 interface ReservationRepository :
     JpaRepository<Reservation, Long>,
     JpaSpecificationExecutor<Reservation> {
+    /**
+     * 관리자 예약 검색(RESV-07, `AdminReservationService.search`)이 쓰는 페이지 조회를 재선언해
+     * `@EntityGraph`를 붙인다(T-04-58) — `AdminReservationResponse.from`이 `member`·`classSession`·
+     * `canceledByMember`·`canceledByAdmin`(전부 `ManyToOne`, 단일 연관) `LAZY` 필드를 읽으므로,
+     * 미리 로딩해 두지 않으면 페이지 크기만큼 N+1이 난다. `Specification`에 `root.fetch(...)`를
+     * 넣는 대신 이 방식을 쓰는 이유: fetch join은 페이지네이션의 count 쿼리에도 함께 적용되면
+     * JPA 스펙 위반이 되지만, `@EntityGraph` 힌트는 count 쿼리에는 적용되지 않고 본문 조회에만
+     * 적용된다(verify-boot4-api 절차로 spring-data-jpa 4.1.0 테스트 코드
+     * `RepositoryMethodsWithEntityGraphConfigRepository`에서 이 재선언 패턴을 확인).
+     *
+     * **이 재선언은 `MemberReservationService.search`에도 함께 적용된다** — `findAll(Specification,
+     * Pageable)`은 `JpaSpecificationExecutor`의 공용 메서드라, 여기에 힌트를 붙이면 호출부를 가리지
+     * 않고 모두 받는다(PR #11 리뷰 Info). 회원 경로에는 이득과 비용이 함께 있다:
+     * `ReservationResponse.from(it, it.classSession.endTime)`이 `classSession`(LAZY)에 접근하므로
+     * 그쪽 N+1도 덤으로 사라지지만, 회원 응답이 쓰지 않는 `canceledByMember`·`canceledByAdmin`까지
+     * 매번 조인된다. 회원 본인 목록은 페이지가 작아 실질 비용이 낮다고 보고 그대로 둔다.
+     * **한쪽 용도에 맞춰 공용 메서드를 재정의하면 다른 호출부의 실행 계획이 조용히 바뀐다**는 점을
+     * 남겨 둔다 — 회원 경로의 쿼리를 튜닝할 일이 생기면 여기부터 본다.
+     */
+    @EntityGraph(attributePaths = ["member", "classSession", "canceledByMember", "canceledByAdmin"])
+    override fun findAll(
+        spec: Specification<Reservation>,
+        pageable: Pageable,
+    ): Page<Reservation>
+
     /** 등록 취소 선행 검사(D-089, `AdminPassService.cancel`이 호출) — 활성 예약 유무만 확인한다. */
     fun existsByPassIdAndStatus(
         passId: Long,
@@ -44,6 +73,21 @@ interface ReservationRepository :
     ): List<Reservation>
 
     /**
+     * 휴강 캐스케이드(RESV-09, 04-14)가 활성 예약을 **한 번에** 조회하는 경로(건별 조회 금지 — N+1).
+     * 복구 판정(`ReservationRefundPolicy.shouldRestore`)에 `pass.status`가 필요하므로 `pass`를
+     * `join fetch`로 함께 가져온다 — [findAllByClassSessionIdInAndStatusWithMember]가 `member`를
+     * 같은 이유로 join fetch하는 것과 동일 관례다.
+     */
+    @Query(
+        "select r from Reservation r join fetch r.pass " +
+            "where r.classSession.id = :classSessionId and r.status = :status",
+    )
+    fun findAllByClassSessionIdAndStatusWithPass(
+        @Param("classSessionId") classSessionId: Long,
+        @Param("status") status: ReservationStatus,
+    ): List<Reservation>
+
+    /**
      * 관리자 주간 보드가 셀별 **전체 명단**을 N+1 없이 한 번에 가져오는 경로.
      *
      * 회원 시간표 조회는 이 메서드를 쓰지 않는다 — 본인 예약 표시에만 쓰면서 그 주 모든 회원의
@@ -53,6 +97,22 @@ interface ReservationRepository :
     fun findAllByClassSessionIdInAndStatus(
         classSessionIds: Collection<Long>,
         status: ReservationStatus,
+    ): List<Reservation>
+
+    /**
+     * 관리자 주간 보드의 셀별 예약자 명단(D-096)이 `member.name`을 N+1 없이 가져오는 경로
+     * (T-04-54, 관리자 스케줄 보드 최초 도입) — [findAllByClassSessionIdInAndStatus]와 조건은
+     * 같지만 `join fetch`로 `member`를 함께 로딩한다. 이 저장소에서 `join fetch`를 쓰는 첫
+     * 사례다 — 명단에 `memberName`을 담는 순간 `member`(LAZY) 프록시를 건드리게 되므로, 미리
+     * 가져오지 않으면 명단 크기만큼(셀당 최대 정원 수) 추가 쿼리가 나간다.
+     */
+    @Query(
+        "select r from Reservation r join fetch r.member " +
+            "where r.classSession.id in :classSessionIds and r.status = :status",
+    )
+    fun findAllByClassSessionIdInAndStatusWithMember(
+        @Param("classSessionIds") classSessionIds: Collection<Long>,
+        @Param("status") status: ReservationStatus,
     ): List<Reservation>
 
     /**
