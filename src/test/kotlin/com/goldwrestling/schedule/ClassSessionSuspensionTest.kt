@@ -3,6 +3,8 @@ package com.goldwrestling.schedule
 import com.goldwrestling.TestcontainersConfiguration
 import com.goldwrestling.admin.Admin
 import com.goldwrestling.admin.AdminRepository
+import com.goldwrestling.auth.PrincipalType
+import com.goldwrestling.auth.TokenService
 import com.goldwrestling.branch.Branch
 import com.goldwrestling.branch.BranchRepository
 import com.goldwrestling.member.Member
@@ -27,11 +29,21 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
+import org.springframework.http.HttpHeaders
+import org.springframework.http.MediaType
 import org.springframework.jdbc.core.simple.JdbcClient
+import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.DayOfWeek
@@ -41,16 +53,15 @@ import java.time.OffsetDateTime
 import java.time.temporal.TemporalAdjusters
 
 /**
- * `AdminScheduleService.suspend`(RESV-09, 04-14 Task 1)를 실제 PostgreSQL로 증명하는 통합테스트.
- * `AdminReservationCancellationTest`와 동일하게 클래스에 `@Transactional`을 붙이지 않는다 —
- * "휴강 처리가 실제로 커밋한 결과"(예약 N건 취소·이력·알림)를 봐야 하기 때문이다.
+ * `AdminScheduleService.suspend`/`resume`(RESV-09, 04-14 Task 1·2)를 실제 PostgreSQL로 증명하는
+ * 통합테스트. `AdminReservationCancellationTest`와 동일하게 클래스에 `@Transactional`을 붙이지
+ * 않는다 — "휴강 처리가 실제로 커밋한 결과"(예약 N건 취소·이력·알림)를 봐야 하기 때문이다.
  *
  * 클록은 다른 04-13/04-14 통합테스트와 동일한 고정 값(`BASE_CLOCK`, 월요일)을 쓴다 — 회원 시간표
  * 조회 검증([ReservationWindow])이 "이번 주"를 판정하는 기준이 이 클록이다.
- *
- * 휴강 해제(`resume`)·엔드포인트 2종의 테스트는 04-14 Task 2가 이 파일에 이어서 추가한다.
  */
 @SpringBootTest
+@AutoConfigureMockMvc
 @Import(TestcontainersConfiguration::class, TestClockConfiguration::class)
 class ClassSessionSuspensionTest {
     @Autowired
@@ -61,6 +72,9 @@ class ClassSessionSuspensionTest {
 
     @Autowired
     private lateinit var reservationLedgerSupport: ReservationLedgerSupport
+
+    @Autowired
+    private lateinit var mockMvc: MockMvc
 
     @Autowired
     private lateinit var branchRepository: BranchRepository
@@ -90,10 +104,16 @@ class ClassSessionSuspensionTest {
     private lateinit var notificationRepository: NotificationRepository
 
     @Autowired
+    private lateinit var tokenService: TokenService
+
+    @Autowired
     private lateinit var clock: Clock
 
     @Autowired
     private lateinit var jdbcClient: JdbcClient
+
+    @Autowired
+    private lateinit var transactionManager: PlatformTransactionManager
 
     private var fixtureCounter = 0L
 
@@ -130,6 +150,14 @@ class ClassSessionSuspensionTest {
             .sql("delete from class_session where class_date between :from and :to")
             .param("from", RANGE_FROM)
             .param("to", RANGE_TO)
+            .update()
+        jdbcClient
+            .sql("delete from refresh_token where member_id in (select id from member where kakao_id >= :base)")
+            .param("base", KAKAO_ID_BASE)
+            .update()
+        jdbcClient
+            .sql("delete from refresh_token where admin_id in (select id from admin where login_id like :prefix)")
+            .param("prefix", "$ADMIN_LOGIN_PREFIX%")
             .update()
         jdbcClient
             .sql("delete from member where kakao_id >= :base")
@@ -368,6 +396,156 @@ class ClassSessionSuspensionTest {
         }.isInstanceOf(ClassScheduleNotFoundException::class.java)
     }
 
+    // ---------- Task 2: 휴강 해제 + 엔드포인트 ----------
+
+    @Test
+    fun `휴강된 세션을 해제하면 상태가 SCHEDULED로 바뀌고 취소 메타데이터가 모두 null이 된다`() {
+        val admin = persistAdmin()
+        val schedule = findSchedule(DayOfWeek.THURSDAY, ClassType.SESSION, LocalTime.of(11, 0))
+        val classDate = nextClassDate(DayOfWeek.THURSDAY)
+        adminScheduleService.suspend(admin.id!!, SuspendClassSessionRequest(schedule.id!!, classDate, "휴강 사유"))
+        val sessionId = classSessionRepository.findByClassScheduleIdAndClassDate(schedule.id!!, classDate)!!.id!!
+
+        val response = adminScheduleService.resume(admin.id!!, sessionId)
+
+        assertThat(response.status).isEqualTo(ClassSessionStatus.SCHEDULED)
+        assertThat(response.cancelReason).isNull()
+        assertThat(response.canceledAt).isNull()
+
+        val refreshedSession = classSessionRepository.findById(sessionId).get()
+        assertThat(refreshedSession.status).isEqualTo(ClassSessionStatus.SCHEDULED)
+        assertThat(refreshedSession.cancelReason).isNull()
+        assertThat(refreshedSession.canceledAt).isNull()
+        assertThat(refreshedSession.canceledByAdmin).isNull()
+    }
+
+    @Test
+    fun `휴강 해제 후 그 타임에 새 예약이 성공한다`() {
+        val admin = persistAdmin()
+        val member = persistMember()
+        val schedule = findSchedule(DayOfWeek.FRIDAY, ClassType.SESSION, LocalTime.of(13, 0))
+        val classDate = nextClassDate(DayOfWeek.FRIDAY)
+        adminScheduleService.suspend(admin.id!!, SuspendClassSessionRequest(schedule.id!!, classDate, "휴강 사유"))
+        val sessionId = classSessionRepository.findByClassScheduleIdAndClassDate(schedule.id!!, classDate)!!.id!!
+        adminScheduleService.resume(admin.id!!, sessionId)
+        persistPass(member, admin, PassType.SESSION_PASS, "3.0", PassStatus.ACTIVE)
+
+        // ReservationLedgerSupport는 자체 트랜잭션 경계를 열지 않는 헬퍼라(호출부의 @Transactional에
+        // 편승) 서비스 계층을 거치지 않고 직접 호출하는 이 테스트에서는 TransactionTemplate으로
+        // 명시적 트랜잭션을 열어준다 — 그렇지 않으면 내부의 @Modifying 조건부 UPDATE가
+        // TransactionRequiredException으로 실패한다.
+        val newReservation =
+            TransactionTemplate(transactionManager).execute {
+                reservationLedgerSupport.createReservation(
+                    memberId = member.id!!,
+                    schedule = schedule,
+                    classDate = classDate,
+                    enforceWindow = false,
+                    admin = admin,
+                )
+            }
+
+        assertThat(newReservation!!.status).isEqualTo(ReservationStatus.ACTIVE)
+    }
+
+    @Test
+    fun `휴강 해제 후에도 휴강으로 취소됐던 예약은 CANCELED 그대로이고 reserved_count는 0이다`() {
+        val admin = persistAdmin()
+        val member = persistMember()
+        val schedule = findSchedule(DayOfWeek.SATURDAY, ClassType.SESSION, LocalTime.of(13, 0))
+        val classDate = nextClassDate(DayOfWeek.SATURDAY)
+        val session = persistSession(schedule, classDate, reservedCount = 1)
+        val pass = persistPass(member, admin, PassType.SESSION_PASS, "1.0", PassStatus.ACTIVE)
+        val reservation = persistReservation(member, session, schedule, classDate, pass)
+        adminScheduleService.suspend(admin.id!!, SuspendClassSessionRequest(schedule.id!!, classDate, "휴강 사유"))
+
+        adminScheduleService.resume(admin.id!!, session.id!!)
+
+        val refreshedReservation = reservationRepository.findById(reservation.id!!).get()
+        assertThat(refreshedReservation.status).isEqualTo(ReservationStatus.CANCELED)
+        val refreshedSession = classSessionRepository.findById(session.id!!).get()
+        assertThat(refreshedSession.reservedCount).isEqualTo(0)
+    }
+
+    @Test
+    fun `휴강 상태가 아닌 세션을 해제하려 하면 ClassSessionNotCanceledException이 발생한다`() {
+        val admin = persistAdmin()
+        val schedule = findSchedule(DayOfWeek.SUNDAY, ClassType.SESSION, LocalTime.of(9, 0))
+        val classDate = nextClassDate(DayOfWeek.SUNDAY)
+        val session = persistSession(schedule, classDate, reservedCount = 0)
+
+        assertThatThrownBy {
+            adminScheduleService.resume(admin.id!!, session.id!!)
+        }.isInstanceOf(ClassSessionNotCanceledException::class.java)
+    }
+
+    @Nested
+    inner class HttpContract {
+        @Test
+        fun `관리자 토큰으로 휴강 처리 요청하면 200과 CANCELED 상태가 온다`() {
+            val schedule = findSchedule(DayOfWeek.TUESDAY, ClassType.SESSION, LocalTime.of(11, 0))
+            val classDate = nextClassDate(DayOfWeek.TUESDAY)
+            val token = adminAccessToken()
+
+            mockMvc
+                .perform(
+                    post("/api/admin/class-sessions/suspension")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""{"classScheduleId":${schedule.id},"classDate":"$classDate","reason":"공휴일"}"""),
+                ).andExpect(status().isOk)
+                .andExpect(jsonPath("$.status").value("CANCELED"))
+        }
+
+        @Test
+        fun `관리자 토큰으로 휴강 해제 요청하면 200과 SCHEDULED 상태가 온다`() {
+            val admin = persistAdmin()
+            val schedule = findSchedule(DayOfWeek.THURSDAY, ClassType.SESSION, LocalTime.of(11, 0))
+            val classDate = nextClassDate(DayOfWeek.THURSDAY)
+            adminScheduleService.suspend(admin.id!!, SuspendClassSessionRequest(schedule.id!!, classDate, "휴강 사유"))
+            val sessionId = classSessionRepository.findByClassScheduleIdAndClassDate(schedule.id!!, classDate)!!.id!!
+            val token = adminAccessToken()
+
+            mockMvc
+                .perform(
+                    post("/api/admin/class-sessions/$sessionId/resumption")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer $token"),
+                ).andExpect(status().isOk)
+                .andExpect(jsonPath("$.status").value("SCHEDULED"))
+        }
+
+        @Test
+        fun `회원 토큰으로 휴강 처리를 시도하면 403과 ACCESS_DENIED를 반환한다`() {
+            val member = persistMember()
+            val schedule = findSchedule(DayOfWeek.FRIDAY, ClassType.SESSION, LocalTime.of(11, 0))
+            val classDate = nextClassDate(DayOfWeek.FRIDAY)
+            val token = memberAccessToken(member)
+
+            mockMvc
+                .perform(
+                    post("/api/admin/class-sessions/suspension")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""{"classScheduleId":${schedule.id},"classDate":"$classDate","reason":"공휴일"}"""),
+                ).andExpect(status().isForbidden)
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"))
+        }
+
+        @Test
+        fun `토큰 없이 휴강 처리를 시도하면 401과 UNAUTHENTICATED를 반환한다`() {
+            val schedule = findSchedule(DayOfWeek.SATURDAY, ClassType.SESSION, LocalTime.of(9, 0))
+            val classDate = nextClassDate(DayOfWeek.SATURDAY)
+
+            mockMvc
+                .perform(
+                    post("/api/admin/class-sessions/suspension")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""{"classScheduleId":${schedule.id},"classDate":"$classDate","reason":"공휴일"}"""),
+                ).andExpect(status().isUnauthorized)
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"))
+        }
+    }
+
     // ---------- 픽스처 ----------
 
     private fun songpaBranch(): Branch = branchRepository.findByName("송파점")!!
@@ -415,6 +593,13 @@ class ClassSessionSuspensionTest {
             ),
         )
     }
+
+    private fun adminAccessToken(): String {
+        val admin = persistAdmin()
+        return tokenService.issueTokenPair(PrincipalType.ADMIN, admin.id!!).accessToken
+    }
+
+    private fun memberAccessToken(member: Member): String = tokenService.issueTokenPair(PrincipalType.MEMBER, member.id!!).accessToken
 
     private fun persistPass(
         member: Member,
