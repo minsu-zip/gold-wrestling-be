@@ -30,8 +30,10 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
 import org.springframework.http.HttpHeaders
+import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.annotation.Transactional
@@ -254,6 +256,76 @@ class AdminScheduleControllerTest {
                     .param("branchId", branch.id.toString())
                     .header(HttpHeaders.AUTHORIZATION, "Bearer $token"),
             ).andExpect(status().isOk)
+    }
+
+    /**
+     * 휴강 처리·해제(POST)에도 지점 소속 검증이 걸리는지 고정한다 — 조회(GET)만 `resolveBranchId`로
+     * 검증하고 변경은 검증하지 않던 비대칭을 없앤 수정(PR #11 리뷰 Warning)의 회귀 방지다.
+     * 지점이 늘어나는 순간 `classScheduleId`만 알면 타 지점 수업을 휴강(예약 N건 자동 취소 +
+     * 차감 복구)시킬 수 있었다.
+     */
+    @Test
+    fun `타 지점에만 소속된 관리자가 휴강 처리하면 403과 ADMIN_BRANCH_NOT_ASSIGNED를 반환한다`() {
+        val admin = persistAdmin()
+        val otherBranch = branchRepository.saveAndFlush(Branch(name = "미배정지점"))
+        adminBranchRepository.saveAndFlush(AdminBranch(admin = admin, branch = otherBranch))
+        val token = tokenService.issueTokenPair(PrincipalType.ADMIN, admin.id!!).accessToken
+        val monday = WeekRange.of(LocalDate.now(clock)).monday
+        val schedule = findSchedule(DayOfWeek.WEDNESDAY, ClassType.LESSON, LocalTime.of(19, 0))
+        val classDate = monday.plusDays(DayOfWeek.WEDNESDAY.value - 1L)
+
+        mockMvc
+            .perform(
+                post("/api/admin/class-sessions/suspension")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"classScheduleId":${schedule.id},"classDate":"$classDate","reason":"타 지점 휴강 시도"}"""),
+            ).andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.code").value("ADMIN_BRANCH_NOT_ASSIGNED"))
+    }
+
+    @Test
+    fun `타 지점에만 소속된 관리자가 휴강 해제하면 403과 ADMIN_BRANCH_NOT_ASSIGNED를 반환한다`() {
+        val owner = persistAdmin()
+        val admin = persistAdmin()
+        val otherBranch = branchRepository.saveAndFlush(Branch(name = "미배정지점"))
+        adminBranchRepository.saveAndFlush(AdminBranch(admin = admin, branch = otherBranch))
+        val token = tokenService.issueTokenPair(PrincipalType.ADMIN, admin.id!!).accessToken
+        val monday = WeekRange.of(LocalDate.now(clock)).monday
+        val schedule = findSchedule(DayOfWeek.WEDNESDAY, ClassType.LESSON, LocalTime.of(19, 0))
+        val session =
+            persistSuspendedSession(schedule, monday.plusDays(DayOfWeek.WEDNESDAY.value - 1L), owner, "설비 점검")
+
+        mockMvc
+            .perform(
+                post("/api/admin/class-sessions/${session.id}/resumption")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token"),
+            ).andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.code").value("ADMIN_BRANCH_NOT_ASSIGNED"))
+    }
+
+    /**
+     * `admin_branch` 매핑이 **하나도 없는** 관리자(시드 관리자를 포함한 현재 모든 관리자,
+     * `AdminBranchRepository` KDoc)는 지점이 하나뿐인 동안 계속 휴강 처리를 할 수 있어야 한다.
+     * 위 인가 검증을 `existsByAdminIdAndBranchId` 하나로만 짜면 이 관리자들이 전부 403이 되어
+     * 휴강 기능 자체가 막힌다 — 그 회귀를 막는 테스트다.
+     */
+    @Test
+    fun `지점 매핑이 없는 관리자도 지점이 하나뿐이면 휴강 처리할 수 있다`() {
+        val admin = persistAdmin()
+        val token = tokenService.issueTokenPair(PrincipalType.ADMIN, admin.id!!).accessToken
+        val monday = WeekRange.of(LocalDate.now(clock)).monday
+        val schedule = findSchedule(DayOfWeek.WEDNESDAY, ClassType.LESSON, LocalTime.of(19, 0))
+        val classDate = monday.plusDays(DayOfWeek.WEDNESDAY.value - 1L)
+
+        mockMvc
+            .perform(
+                post("/api/admin/class-sessions/suspension")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"classScheduleId":${schedule.id},"classDate":"$classDate","reason":"매핑 없는 관리자"}"""),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.status").value("CANCELED"))
     }
 
     private fun getBoard(token: String): String =

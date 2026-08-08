@@ -134,6 +134,34 @@ class AdminScheduleService(
     }
 
     /**
+     * [adminId]가 [branchId] 지점을 **변경**할 권한이 있는지 검증한다 — 휴강 처리([suspend])·
+     * 해제([resume])가 대상 수업의 소속 지점으로 호출한다.
+     *
+     * [resolveBranchId]를 재사용하지 않는 이유: 그쪽은 "요청받은 지점을 조회용 id로 **해석**"하는
+     * 함수라 `branchId`가 null일 때의 기본값 결정까지 겸한다. 여기서는 지점이 이미 대상 수업
+     * (`ClassSchedule.branch`)으로 정해져 있어 해석할 것이 없고 **검증만** 필요하다.
+     *
+     * 그렇다고 `existsByAdminIdAndBranchId` 하나로 끝낼 수는 없다 — `admin_branch` 매핑이 비어 있는
+     * 관리자(시드 관리자를 포함한 현재 모든 관리자, `AdminBranchRepository` KDoc)가 전부 거부돼
+     * 휴강 기능 자체가 막힌다. 그래서 [resolveBranchId]의 대체 경로와 **같은 규칙**을 쓴다:
+     * 매핑이 있으면 매핑으로 판정하고, 매핑이 하나도 없으면 지점이 정확히 하나일 때만 허용한다.
+     *
+     * 조회(GET `/schedule/board`)만 지점 소속을 확인하고 변경(POST 휴강 처리·해제)은 확인하지 않던
+     * 비대칭을 없앤다(PR #11 리뷰 Warning) — v1은 지점이 하나뿐이라 지금 뚫리는 경로는 아니지만,
+     * 지점이 늘어나는 순간 `classScheduleId`만 알면 타 지점 수업을 휴강(예약 N건 자동 취소 +
+     * 차감 복구)시킬 수 있다. `AdminScheduleControllerTest`의 지점 인가 테스트 3종이 이를 고정한다.
+     */
+    private fun assertBranchModifiable(
+        adminId: Long,
+        branchId: Long,
+    ) {
+        if (adminBranchRepository.existsByAdminIdAndBranchId(adminId, branchId)) return
+        val hasAnyMapping = adminBranchRepository.findFirstByAdminId(adminId) != null
+        if (!hasAnyMapping && branchRepository.findAll().singleOrNull()?.id == branchId) return
+        throw AdminBranchNotAssignedException()
+    }
+
+    /**
      * 휴강 처리(RESV-09, policies §7) — 활성 예약 일괄 취소 + 차감 복구(`CLASS_CANCELED_REFUND`) +
      * 세션당 1건 요약 알림(D-097). 처리 순서:
      * ① 시간표 조회 + 요일 일치 검증 → ② 세션 확보(get-or-create, D-094 "세션 없는 타임도 휴강
@@ -165,6 +193,10 @@ class AdminScheduleService(
         if (schedule.dayOfWeek != request.classDate.dayOfWeek) {
             throw ClassScheduleNotFoundException(request.classScheduleId)
         }
+        assertBranchModifiable(
+            adminId,
+            requireNotNull(schedule.branch.id) { "저장된 ClassSchedule은 항상 Branch를 참조합니다." },
+        )
         val admin =
             adminRepository.findById(adminId).orElseThrow {
                 IllegalStateException("휴강 처리를 하려는 관리자(id=$adminId)를 찾을 수 없습니다.")
@@ -256,6 +288,10 @@ class AdminScheduleService(
             classSessionRepository.findById(classSessionId).orElseThrow {
                 ClassSessionNotFoundException(classSessionId)
             }
+        assertBranchModifiable(
+            adminId,
+            requireNotNull(session.classSchedule.branch.id) { "저장된 ClassSchedule은 항상 Branch를 참조합니다." },
+        )
         session.assertResumable()
         if (classSessionRepository.resumeIfCanceled(classSessionId) == 0) {
             throw ClassSessionNotCanceledException()
