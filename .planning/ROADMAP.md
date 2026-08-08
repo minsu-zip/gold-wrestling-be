@@ -17,7 +17,7 @@
 - [x] **Phase 1: 기반** - 공통 에러 포맷(ProblemDetail), 초기 스키마(Branch/Member/Admin/AdminBranch), openapi.yaml 재생성 파이프라인 (completed 2026-07-30)
 - [x] **Phase 2: 인증·회원** - 카카오 로그인, 온보딩, JWT, 관리자 ID/PW 인증, 가입 승인, 회원 관리 (본 작업 완료 2026-08-02 / 검증 갭 클로저 진행 중 — 02-12~02-15) (completed 2026-08-03)
 - [x] **Phase 3: 이용권** - Pass 3종 등록, PassTransaction 이력, 수동 가감·기간 수정, 본인 조회 (completed 2026-08-03)
-- [ ] **Phase 4: 시간표·예약** - ClassSchedule/ClassSession, 예약 생성·취소·변경 + 즉시 차감/복구, 동시성 보장, 관리자 예약 관리·휴강, Notification 스키마·알림 레코드 생성
+- [x] **Phase 4: 시간표·예약** - ClassSchedule/ClassSession, 예약 생성·취소·변경 + 즉시 차감/복구, 동시성 보장, 관리자 예약 관리·휴강, Notification 스키마·알림 레코드 생성 (completed 2026-08-08)
 - [ ] **Phase 5: 배치** - 2주 미사용 차감, 유효기간 만료 처리, 멱등 실행
 - [ ] **Phase 6: 운영** - 출석 체크, 공지사항, 관리자 알림·활동 피드
 
@@ -113,6 +113,14 @@ Phase 4, `INACTIVITY`는 Phase 5, `EVENING_HALF`는 Phase 6이 쓴다. `PassTran
   3. 회원은 당일이 아닌 예약을 취소(즉시 복구)하거나 변경(취소+재예약)할 수 있고, 당일에는 취소·변경 모두 거부된다. 본인 예약 목록을 조회할 수 있다
   4. 정원 마지막 자리·1:1 슬롯에 여러 명이 동시에 예약을 요청하면, 정확히 정원 수만큼만 성공하고 나머지는 정원 초과 에러를 받는다(초과 예약 0건) — 성공 건수·DB 예약 행 수·`PassTransaction` 이력 건수가 서로 일치한다
   5. 관리자는 주간 스케줄 보드(요일×타임 그리드: 수업 종류·예약 n/정원·1:1 여부·셀별 예약자 명단)와 모든 회원의 예약을 조회하고, 당일 포함 제약 없이 예약을 대리 취소(복구 여부 선택, 기본 복구)·변경할 수 있으며, 특정 날짜 수업을 휴강 처리하면 해당 예약이 전부 자동 취소+차감 복구(`CLASS_CANCELED_REFUND`)+알림 생성되고 그 타임은 예약 불가로 표시된다
+
+**충족 근거** (04-15 phase 마감 검증):
+  1. 04-06(차감 대상 이용권 선택, TDD)·04-07/04-08(예약 생성 트랜잭션·API) — `MemberReservationServiceTest`·`PassDeductionCandidateTest`·`MemberReservationControllerTest`가 즉시 차감·잔여 부족 거부를 검증
+  2. 04-07/04-08 — `MemberReservationServiceTest`·`ReservationCapacityConcurrencyTest`(1:1 슬롯 케이스)가 타임당 1명 한도·즉시 차감을 검증
+  3. 04-09(TDD 판정)·04-10(API) — `ReservationCancellationPolicyTest`·`MemberReservationCancellationTest`·`MemberReservationControllerTest`가 당일 거부·즉시 복구·본인 목록(취소 숨김)을 검증
+  4. 04-08 — `ReservationCapacityConcurrencyTest`(정원 20명 동시 요청 → 정확히 10건, 1:1 10명 동시 요청 → 정확히 1건)가 초과 예약 0건과 성공 건수·DB 행·이력 건수 일치를 실증 — 04-15에서 2회 연속 재확인
+  5. 04-11(스케줄 보드)·04-12(전체 조회)·04-13(대리 취소·변경)·04-14(휴강 캐스케이드) — `AdminScheduleControllerTest`·`AdminReservationSearchTest`·`AdminReservationCancellationTest`·`ClassSessionSuspensionTest`가 각각 검증
+
 **Plans**: 15 plans / 14 waves — **3개 청크로 납품한다 (D-084)**.
 청크 A `feature/phase-04a-schedule`(wave 1~5) · 청크 B `feature/phase-04b-reservation`(wave 6~10) ·
 청크 C `feature/phase-04c-admin-ops`(wave 11~14). 청크 경계 = wave 경계이며 순차 진행한다
@@ -137,7 +145,7 @@ Phase 4, `INACTIVITY`는 Phase 5, `EVENING_HALF`는 Phase 6이 쓴다. `PassTran
 - [x] 04-12-PLAN.md — 관리자 전체 예약 조회(기간·종류·검색어·페이지네이션) (RESV-07)
 - [x] 04-13-PLAN.md — 관리자 대리 취소·변경 + 이용권 등록 취소 선행 검사(D-089) (RESV-08, NOTIF-01)
 - [x] 04-14-PLAN.md — 휴강 처리·해제 캐스케이드 + 세션당 1건 요약 알림 (RESV-09, NOTIF-01)
-- [ ] 04-15-PLAN.md — phase 마감: 전체 검증·문서 정합·openapi 재생성 + 수동 확인 (전 요구사항)
+- [x] 04-15-PLAN.md — phase 마감: 전체 검증(요구사항 13종 대응표)·문서 정합·openapi 재생성 + 수동 확인 (전 요구사항)
 
 **Note (Phase 6와의 경계)**: Notification은 이 phase에서 **스키마 마이그레이션과 알림 레코드 생성(NOTIF-01)까지만** 구현한다 — 예약 생성/변경/취소·휴강 이벤트가 모두 이 phase에서 발생하기 때문. 알림 조회·확인 처리·폴링 API·활동 피드(NOTIF-02, NOTIF-03)는 Phase 6에서 구현한다.
 
@@ -176,7 +184,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. 기반 | 3/3 | Complete   | 2026-07-30 |
 | 2. 인증·회원 | 15/15 | Complete   | 2026-08-03 |
 | 3. 이용권 | 11/11 | Complete    | 2026-08-04 |
-| 4. 시간표·예약 | 14/15 | In Progress|  |
+| 4. 시간표·예약 | 15/15 | Complete   | 2026-08-08 |
 | 5. 배치 | 0/TBD | Not started | - |
 | 6. 운영 | 0/TBD | Not started | - |
 </content>
