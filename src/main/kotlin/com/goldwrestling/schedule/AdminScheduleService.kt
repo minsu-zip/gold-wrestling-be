@@ -25,9 +25,9 @@ import java.time.LocalDate
 import java.time.OffsetDateTime
 
 /**
- * 관리자 주간 스케줄 보드 조회(SCHED-03) + 휴강 처리(RESV-09, 04-14 Task 1). 조회 전용 메서드는
- * 클래스 기본 `@Transactional(readOnly = true)`를 그대로 쓰고, 변경 메서드([suspend])만
- * `@Transactional`을 오버라이드한다(D-020). 휴강 해제(`resume`)는 04-14 Task 2가 추가한다.
+ * 관리자 주간 스케줄 보드 조회(SCHED-03) + 휴강 처리·해제(RESV-09, 04-14). 조회 전용 메서드는
+ * 클래스 기본 `@Transactional(readOnly = true)`를 그대로 쓰고, 변경 메서드([suspend]·[resume])만
+ * `@Transactional`을 오버라이드한다(D-020).
  *
  * 회원용 [ScheduleService]와 "시간표 → 그리드 뼈대 → 세션 덮어쓰기" 조립 로직을
  * [ScheduleGridSkeleton]으로 공유한다 — 복제하면 시간표 정렬·`EVENING` 취급이 두 화면에서
@@ -225,6 +225,40 @@ class AdminScheduleService(
         notificationService.createClassSessionSuspended(refreshedSession, snapshots.size)
 
         return ClassSessionResponse.from(refreshedSession, canceledReservationCount = snapshots.size)
+    }
+
+    /**
+     * 휴강 해제 — [ClassSession.assertResumable] 판정 후 [ClassSessionRepository.resumeIfCanceled]로
+     * 반영한다.
+     *
+     * **예약 복원 로직을 만들지 않는다.** 휴강으로 취소됐던 예약을 자동으로 되돌리면, 그 사이 잔여를
+     * 다른 데 써버린 회원의 잔여가 음수가 될 수 있다 — 이는 Core Value("잔여 = 실제 사용 가능
+     * 횟수")를 정면으로 깬다(CONTEXT.md "휴강 (RESV-09)" 락인, T-04-70). 회원이 직접 다시 예약한다.
+     *
+     * `reserved_count`는 0 그대로 둔다 — 취소된 예약을 복원하지 않으므로 카운트도 되돌리지 않는다
+     * ([ClassSessionRepository.resumeIfCanceled]는 취소 메타데이터 3개만 되돌리고 카운트는 건드리지
+     * 않는다).
+     *
+     * 휴강 해제 알림은 만들지 않는다 — `NotificationType`에 해당 값이 없다(D-097 이벤트 6종 미포함).
+     */
+    @Transactional
+    fun resume(
+        adminId: Long,
+        classSessionId: Long,
+    ): ClassSessionResponse {
+        val session =
+            classSessionRepository.findById(classSessionId).orElseThrow {
+                ClassSessionNotFoundException(classSessionId)
+            }
+        session.assertResumable()
+        if (classSessionRepository.resumeIfCanceled(classSessionId) == 0) {
+            throw ClassSessionNotCanceledException()
+        }
+        val refreshedSession =
+            classSessionRepository.findById(classSessionId).orElseThrow {
+                IllegalStateException("방금 휴강 해제한 세션(id=$classSessionId)을 찾을 수 없습니다.")
+            }
+        return ClassSessionResponse.from(refreshedSession)
     }
 
     private fun toCell(

@@ -92,6 +92,9 @@ enum class ErrorCode(
     /** 요청한 정기 시간표 행이 없음 */
     CLASS_SCHEDULE_NOT_FOUND(HttpStatus.NOT_FOUND),
 
+    /** 요청한 날짜별 수업(ClassSession) 행이 없음 (휴강 해제 대상 조회, RESV-09) */
+    CLASS_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND),
+
     /** 휴강된 수업에 예약·변경 시도 (policies §7) */
     CLASS_SESSION_CANCELED(HttpStatus.CONFLICT),
 

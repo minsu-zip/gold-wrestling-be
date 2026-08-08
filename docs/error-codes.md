@@ -47,6 +47,7 @@
 | 코드 | HTTP 상태 | 의미 | 발생 지점 |
 |---|---|---|---|
 | `CLASS_SCHEDULE_NOT_FOUND` | 404 | 요청한 정기 시간표 행이 없음 | `AdminScheduleService` |
+| `CLASS_SESSION_NOT_FOUND` | 404 | 요청한 날짜별 수업(ClassSession) 행이 없음 (휴강 해제 대상 조회, RESV-09) | `AdminScheduleService` |
 | `CLASS_SESSION_CANCELED` | 409 | 휴강된 수업에 예약·변경 시도 (policies §7) | `ClassSession` |
 | `CLASS_SESSION_NOT_CANCELED` | 409 | 휴강 상태가 아닌 수업에 휴강 해제 시도 | `ClassSession` |
 | `CLASS_SESSION_NOT_RESERVABLE` | 409 | 예약 대상이 아닌 수업 종류(`EVENING`) 예약 시도 (D-093) | `MemberReservationService` |

@@ -16,6 +16,19 @@ class ClassScheduleNotFoundException(
     )
 
 /**
+ * 요청한 날짜별 수업(`ClassSession`) 행이 없을 때(휴강 해제 대상 조회, RESV-09). **[classSessionId]를
+ * 메시지에 보간하지 않는다** — 존재 여부를 응답 문구로 탐색할 수 있게 되는 것을 막기 위해서다
+ * (conventions §8, `ClassScheduleNotFoundException`과 동일한 선례).
+ */
+@Suppress("UNUSED_PARAMETER")
+class ClassSessionNotFoundException(
+    classSessionId: Long?,
+) : DomainException(
+        ErrorCode.CLASS_SESSION_NOT_FOUND,
+        "날짜별 수업을 찾을 수 없습니다.",
+    )
+
+/**
  * 휴강된 수업(`ClassSession`)에 예약·변경을 시도했을 때(policies §7).
  */
 class ClassSessionCanceledException :
