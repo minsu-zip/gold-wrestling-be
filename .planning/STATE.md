@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-13-PLAN.md
-last_updated: "2026-08-08T02:07:23.503Z"
+stopped_at: Completed 04-14-PLAN.md
+last_updated: "2026-08-08T03:03:52.661Z"
 last_activity: 2026-08-08
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 44
-  completed_plans: 42
+  completed_plans: 43
   percent: 50
 ---
 
@@ -30,7 +30,7 @@ Plan: 2 of 15
 Status: Ready to execute
 Last activity: 2026-08-08
 
-Progress: [██████████] 95%
+Progress: [██████████] 98%
 
 ## Performance Metrics
 
@@ -69,6 +69,7 @@ Progress: [██████████] 95%
 | Phase 04 P11 | 35min | 2 tasks | 16 files |
 | Phase 04 P12 | 40min | 2 tasks | 9 files |
 | Phase 04 P13 | 65min | 2 tasks | 9 files |
+| Phase 04 P14 | 55min | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -110,6 +111,9 @@ Recent decisions affecting current work:
 - [Phase 04-12]: ReservationRepository.findAll(Specification, Pageable)을 @EntityGraph로 재선언 — Specification 페이지 조회에서 ManyToOne LAZY 연관을 count 쿼리에 영향 없이 N+1 없이 로딩하는 이 저장소 최초 패턴
 - [Phase 04-13]: 예약 생성/취소 복구 실행부를 회원·관리자 경로가 공유하도록 ReservationLedgerSupport 컴포넌트로 추출 — 차감/복구 경로가 두 서비스에 각자 복제되면 D-021(모든 잔여 변경이 이력을 남긴다) 보장이 흩어진다
 - [Phase 04-13]: AdminPassService.cancel의 활성 예약 선행 검사는 이용권 조회 직후, 다른 판정보다 먼저 수행 — 조건부 UPDATE 이후에 두면 거부 사유가 경쟁 패배·잔여 충돌 등 다른 실패와 뒤섞인다(D-089)
+- [Phase 04-14]: ReservationLedgerSupport.restoreAfterCancellation를 restorePassAfterCancellation(세션 정원 미반영 + reason 파라미터)로 감싸는 형태로 리팩터링 — 기존 회원/관리자 취소 호출부는 동작 불변(기본값 CANCEL_REFUND), 휴강 캐스케이드는 CLASS_CANCELED_REFUND로 호출해 원장에서 구분(T-04-67)
+- [Phase 04-14]: AdminScheduleController의 클래스 레벨 @RequestMapping을 /api/admin/schedule에서 /api/admin으로 넓히고 메서드마다 하위 경로를 붙임 — 스케줄 보드와 휴강 처리가 서로 다른 리소스 계층이라 한 컨트롤러 파일 안에서 고정 경로 두 갈래를 표현하기 위한 최소 변경
+- [Phase 04-14]: ClassSessionNotFoundException + ErrorCode.CLASS_SESSION_NOT_FOUND 신설 — 휴강 해제 대상 세션 id가 없는 경로를 plan이 명시하지 않았으나 404 처리 없이는 500이 노출되는 방어적이지 않은 API가 된다
 
 ### Pending Todos
 
@@ -135,6 +139,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-08T02:07:23.497Z
-Stopped at: Completed 04-13-PLAN.md
+Last session: 2026-08-08T03:03:52.654Z
+Stopped at: Completed 04-14-PLAN.md
 Resume file: None
