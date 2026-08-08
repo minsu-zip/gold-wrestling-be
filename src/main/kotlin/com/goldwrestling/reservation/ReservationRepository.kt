@@ -31,6 +31,15 @@ interface ReservationRepository :
      * JPA 스펙 위반이 되지만, `@EntityGraph` 힌트는 count 쿼리에는 적용되지 않고 본문 조회에만
      * 적용된다(verify-boot4-api 절차로 spring-data-jpa 4.1.0 테스트 코드
      * `RepositoryMethodsWithEntityGraphConfigRepository`에서 이 재선언 패턴을 확인).
+     *
+     * **이 재선언은 `MemberReservationService.search`에도 함께 적용된다** — `findAll(Specification,
+     * Pageable)`은 `JpaSpecificationExecutor`의 공용 메서드라, 여기에 힌트를 붙이면 호출부를 가리지
+     * 않고 모두 받는다(PR #11 리뷰 Info). 회원 경로에는 이득과 비용이 함께 있다:
+     * `ReservationResponse.from(it, it.classSession.endTime)`이 `classSession`(LAZY)에 접근하므로
+     * 그쪽 N+1도 덤으로 사라지지만, 회원 응답이 쓰지 않는 `canceledByMember`·`canceledByAdmin`까지
+     * 매번 조인된다. 회원 본인 목록은 페이지가 작아 실질 비용이 낮다고 보고 그대로 둔다.
+     * **한쪽 용도에 맞춰 공용 메서드를 재정의하면 다른 호출부의 실행 계획이 조용히 바뀐다**는 점을
+     * 남겨 둔다 — 회원 경로의 쿼리를 튜닝할 일이 생기면 여기부터 본다.
      */
     @EntityGraph(attributePaths = ["member", "classSession", "canceledByMember", "canceledByAdmin"])
     override fun findAll(
