@@ -177,6 +177,39 @@ class ReservationLedgerSupport(
             throw IllegalStateException("활성 예약이 있었던 세션(id=$sessionId)의 reservedCount가 이미 0입니다.")
         }
 
+        restorePassAfterCancellation(
+            passId = passId,
+            passStatus = passStatus,
+            refundRequested = refundRequested,
+            canceledAt = canceledAt,
+            member = member,
+            admin = admin,
+        )
+    }
+
+    /**
+     * 취소 복구의 **잔여 판정 + 이력 저장만** 담당한다(세션 정원 반영은 포함하지 않는다) —
+     * [restoreAfterCancellation](건당 1회 취소)과 `AdminScheduleService.suspend`(04-14, 휴강
+     * 캐스케이드, N건을 일괄 취소)가 공유한다.
+     *
+     * 휴강 캐스케이드는 N건을 한 트랜잭션에서 처리하며 세션 정원을 건별 [decrementReservedCount]가
+     * 아니라 `ClassSessionRepository.resetReservedCount` 단일 호출로 반영한다(N번의 UPDATE·clear를
+     * 피한다, 04-14 action 참조) — 그래서 이 메서드는 세션 갱신을 하지 않고, 호출부가 각자의 방식으로
+     * `reserved_count`를 갱신한다.
+     *
+     * [reason]은 이력 사유를 결정한다 — 회원/관리자 취소는 [TransactionReason.CANCEL_REFUND](기본값),
+     * 휴강은 [TransactionReason.CLASS_CANCELED_REFUND](D-097)를 호출부가 명시적으로 넘겨 원장에서
+     * 구분한다(T-04-67, "휴강 복구를 회원 취소와 구분 불가하게 기록"하지 않기 위해).
+     */
+    fun restorePassAfterCancellation(
+        passId: Long,
+        passStatus: PassStatus,
+        refundRequested: Boolean,
+        canceledAt: OffsetDateTime,
+        member: Member?,
+        admin: Admin?,
+        reason: TransactionReason = TransactionReason.CANCEL_REFUND,
+    ) {
         if (!ReservationRefundPolicy.shouldRestore(passStatus, refundRequested)) {
             return
         }
@@ -191,7 +224,7 @@ class ReservationLedgerSupport(
             PassTransaction(
                 pass = refreshedPass,
                 amount = ReservationPassPolicy.DEDUCTION_AMOUNT,
-                reason = TransactionReason.CANCEL_REFUND,
+                reason = reason,
                 note = null,
                 admin = admin,
                 member = member,

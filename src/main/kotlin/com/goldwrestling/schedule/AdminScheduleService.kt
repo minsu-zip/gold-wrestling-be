@@ -2,23 +2,32 @@ package com.goldwrestling.schedule
 
 import com.goldwrestling.admin.AdminBranchNotAssignedException
 import com.goldwrestling.admin.AdminBranchRepository
+import com.goldwrestling.admin.AdminRepository
 import com.goldwrestling.branch.BranchRepository
 import com.goldwrestling.common.time.WeekRange
+import com.goldwrestling.notification.NotificationService
+import com.goldwrestling.pass.PassStatus
+import com.goldwrestling.pass.TransactionReason
 import com.goldwrestling.reservation.Reservation
+import com.goldwrestling.reservation.ReservationLedgerSupport
 import com.goldwrestling.reservation.ReservationRepository
 import com.goldwrestling.reservation.ReservationStatus
 import com.goldwrestling.schedule.dto.AdminBoardCellResponse
 import com.goldwrestling.schedule.dto.AdminBoardDayResponse
 import com.goldwrestling.schedule.dto.AdminWeeklyBoardResponse
 import com.goldwrestling.schedule.dto.BoardReservationResponse
+import com.goldwrestling.schedule.dto.ClassSessionResponse
+import com.goldwrestling.schedule.dto.SuspendClassSessionRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.LocalDate
+import java.time.OffsetDateTime
 
 /**
- * 관리자 주간 스케줄 보드 조회(SCHED-03). 조회 전용이라 클래스 기본
- * `@Transactional(readOnly = true)`를 그대로 쓰고 별도 애노테이션을 붙이지 않는다(D-020).
+ * 관리자 주간 스케줄 보드 조회(SCHED-03) + 휴강 처리(RESV-09, 04-14 Task 1). 조회 전용 메서드는
+ * 클래스 기본 `@Transactional(readOnly = true)`를 그대로 쓰고, 변경 메서드([suspend])만
+ * `@Transactional`을 오버라이드한다(D-020). 휴강 해제(`resume`)는 04-14 Task 2가 추가한다.
  *
  * 회원용 [ScheduleService]와 "시간표 → 그리드 뼈대 → 세션 덮어쓰기" 조립 로직을
  * [ScheduleGridSkeleton]으로 공유한다 — 복제하면 시간표 정렬·`EVENING` 취급이 두 화면에서
@@ -26,14 +35,23 @@ import java.time.LocalDate
  * 명단은 관리자만), ② **조회 주 범위 제한이 없다** — 관리자는 과거 출석 확인·미래 계획을 위해
  * 임의의 주를 조회해야 하므로, 회원용의 [ReservationWindow.assertViewable] 같은 거부 판정을
  * 호출하지 않고 대신 [weekStart]를 그 주의 월요일로 **정규화**만 한다.
+ *
+ * 휴강 처리([suspend])는 이 phase에서 유일하게 **한 요청이 N건의 예약을 건드리는** 경로다 —
+ * 차감 복구·이력 저장은 [ReservationLedgerSupport.restorePassAfterCancellation]을
+ * [TransactionReason.CLASS_CANCELED_REFUND]와 함께 재사용해 회원/관리자 취소(`CANCEL_REFUND`)와
+ * 원장에서 구분한다(T-04-67). 알림은 세션당 1건 요약형이다(D-097, T-04-69).
  */
 @Service
 @Transactional(readOnly = true)
 class AdminScheduleService(
     private val classScheduleRepository: ClassScheduleRepository,
     private val classSessionRepository: ClassSessionRepository,
+    private val classSessionService: ClassSessionService,
     private val reservationRepository: ReservationRepository,
+    private val reservationLedgerSupport: ReservationLedgerSupport,
+    private val notificationService: NotificationService,
     private val adminBranchRepository: AdminBranchRepository,
+    private val adminRepository: AdminRepository,
     private val branchRepository: BranchRepository,
     private val clock: Clock,
 ) {
@@ -115,6 +133,100 @@ class AdminScheduleService(
             )
     }
 
+    /**
+     * 휴강 처리(RESV-09, policies §7) — 활성 예약 일괄 취소 + 차감 복구(`CLASS_CANCELED_REFUND`) +
+     * 세션당 1건 요약 알림(D-097). 처리 순서:
+     * ① 시간표 조회 + 요일 일치 검증 → ② 세션 확보(get-or-create, D-094 "세션 없는 타임도 휴강
+     * 가능") → ③ 세션을 **먼저** `CANCELED`로 전환한다(T-04-66, 경쟁 중인 새 예약을
+     * `incrementReservedCountIfCapacityAvailable`의 `status = SCHEDULED` 조건이 거부하게 하기
+     * 위해서다) → ④ 활성 예약을 배치로 조회한다(건별 조회 금지 — N+1) → ⑤ 예약별로 취소 +
+     * 복구 판정(D-091) → ⑥ `reserved_count`를 일괄 초기화한다 → ⑦ 알림을 정확히 1회 생성한다.
+     *
+     * **③~⑤에서 반복되는 벌크 UPDATE(`clearAutomatically`) 때문에, ④에서 필요한 스칼라 값
+     * (reservationId·passId·passStatus)을 [ReservationCancellationSnapshot]으로 미리 리스트에
+     * 뽑아둔다** — 그렇지 않으면 루프 도중 이전 반복의 벌크 UPDATE가 준영속화한 엔티티의 LAZY
+     * 연관에 접근해 `LazyInitializationException`이 난다(04-RESEARCH.md Pitfall 2 확장).
+     *
+     * ⑥은 건별 [ClassSessionRepository.decrementReservedCount]를 N번 부르는 대신
+     * [ClassSessionRepository.resetReservedCount] 단일 호출로 반영한다 — 건별 호출은 N번의 UPDATE와
+     * N번의 영속성 컨텍스트 clear를 유발한다. 그래서 [ReservationLedgerSupport.restoreAfterCancellation]
+     * (세션 정원까지 함께 반영)이 아니라 [ReservationLedgerSupport.restorePassAfterCancellation]
+     * (잔여 판정 + 이력 저장만)을 예약마다 호출한다.
+     */
+    @Transactional
+    fun suspend(
+        adminId: Long,
+        request: SuspendClassSessionRequest,
+    ): ClassSessionResponse {
+        val schedule =
+            classScheduleRepository.findById(request.classScheduleId).orElseThrow {
+                ClassScheduleNotFoundException(request.classScheduleId)
+            }
+        if (schedule.dayOfWeek != request.classDate.dayOfWeek) {
+            throw ClassScheduleNotFoundException(request.classScheduleId)
+        }
+        val admin =
+            adminRepository.findById(adminId).orElseThrow {
+                IllegalStateException("휴강 처리를 하려는 관리자(id=$adminId)를 찾을 수 없습니다.")
+            }
+
+        // ② 세션 확보 — 아직 예약이 없어 세션 행이 없는 타임도 휴강할 수 있어야 한다(D-094).
+        val session = classSessionService.getOrCreate(schedule, request.classDate)
+        session.assertSuspendable()
+        val sessionId = requireNotNull(session.id) { "getOrCreate가 반환한 세션은 항상 저장돼 있어야 합니다." }
+
+        // ③ 세션을 먼저 CANCELED로 전환한다(T-04-66) — 반환 0이면 경쟁 패배(이미 휴강 처리됨).
+        val now = OffsetDateTime.now(clock)
+        if (classSessionRepository.suspendIfScheduled(sessionId, request.reason, admin, now) == 0) {
+            throw ClassSessionCanceledException()
+        }
+
+        // ④ 활성 예약을 배치로 조회하고, 반복 중 안전하게 쓸 스칼라 값을 미리 뽑아둔다.
+        val activeReservations =
+            reservationRepository.findAllByClassSessionIdAndStatusWithPass(sessionId, ReservationStatus.ACTIVE)
+        val snapshots =
+            activeReservations.map { reservation ->
+                ReservationCancellationSnapshot(
+                    reservationId = requireNotNull(reservation.id) { "저장되지 않은 예약이 조회될 수 없습니다." },
+                    passId = requireNotNull(reservation.pass.id) { "저장된 예약은 항상 Pass를 참조합니다." },
+                    passStatus = reservation.pass.status,
+                )
+            }
+
+        // ⑤ 예약별 취소 + 복구 판정 — CANCEL_REFUND가 아니라 CLASS_CANCELED_REFUND를 이력에 남긴다.
+        snapshots.forEach { snapshot ->
+            if (reservationRepository.cancelByAdminIfActive(snapshot.reservationId, admin, true, now) == 0) {
+                // ④ 조회와 이 취소 사이에 회원이 스스로 취소했다면(드문 경쟁) 이미 CANCELED다 —
+                // 이중 복구를 막기 위해 이 건은 건너뛴다.
+                return@forEach
+            }
+            reservationLedgerSupport.restorePassAfterCancellation(
+                passId = snapshot.passId,
+                passStatus = snapshot.passStatus,
+                refundRequested = true,
+                canceledAt = now,
+                member = null,
+                admin = admin,
+                reason = TransactionReason.CLASS_CANCELED_REFUND,
+            )
+        }
+
+        // ⑥ reserved_count 일괄 초기화 — 건별 decrementReservedCount N번 대신 단일 호출.
+        if (classSessionRepository.resetReservedCount(sessionId) == 0) {
+            throw IllegalStateException("휴강 처리 중 세션(id=$sessionId)의 reserved_count를 초기화하지 못했습니다.")
+        }
+
+        val refreshedSession =
+            classSessionRepository.findById(sessionId).orElseThrow {
+                IllegalStateException("방금 휴강 처리한 세션(id=$sessionId)을 찾을 수 없습니다.")
+            }
+
+        // ⑦ 알림은 정확히 1회 — 반복문 밖에서 부른다(D-097 요약형).
+        notificationService.createClassSessionSuspended(refreshedSession, snapshots.size)
+
+        return ClassSessionResponse.from(refreshedSession, canceledReservationCount = snapshots.size)
+    }
+
     private fun toCell(
         schedule: ClassSchedule,
         session: ClassSession?,
@@ -150,3 +262,14 @@ class AdminScheduleService(
         )
     }
 }
+
+/**
+ * 휴강 캐스케이드([AdminScheduleService.suspend])가 활성 예약 목록을 조회한 직후에만 만드는
+ * 스칼라 스냅샷 — 반복 중 벌크 UPDATE(`clearAutomatically`)로 준영속화되는 [Reservation]·[Pass]
+ * 엔티티의 LAZY 연관을 다시 건드리지 않기 위해서다.
+ */
+private data class ReservationCancellationSnapshot(
+    val reservationId: Long,
+    val passId: Long,
+    val passStatus: PassStatus,
+)

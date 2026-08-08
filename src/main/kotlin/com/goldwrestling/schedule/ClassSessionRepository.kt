@@ -93,6 +93,20 @@ interface ClassSessionRepository : JpaRepository<ClassSession, Long> {
     ): Int
 
     /**
+     * 휴강 캐스케이드(RESV-09, 04-14)가 활성 예약 N건을 일괄 취소한 뒤 `reserved_count`를 한 번에
+     * 0으로 되돌린다 — 건별 [decrementReservedCount]를 N번 부르는 대신 이 메서드 하나로 반영한다.
+     * 건별 호출은 N번의 UPDATE와 N번의 영속성 컨텍스트 clear를 유발한다(정원 10 수업 휴강 시
+     * UPDATE 10회 대 1회). `where id = :id` 조건만 걸며 상태를 확인하지 않는다 — 호출 시점에는
+     * 이미 [suspendIfScheduled]로 세션이 `CANCELED`로 전환된 뒤이므로 별도 상태 조건이 필요 없다.
+     * flush/clear 이유는 [incrementReservedCountIfCapacityAvailable]와 같다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update ClassSession s set s.reservedCount = 0 where s.id = :id")
+    fun resetReservedCount(
+        @Param("id") id: Long,
+    ): Int
+
+    /**
      * 휴강 처리를 조건부로 반영한다(policies §7, RESV-09). `status = SCHEDULED` 조건으로 이미
      * 휴강인 세션의 재처리·경쟁 중복 반영을 DB에서 막는다(D-021). **0이면 이미 휴강 처리된
      * 것**이다 — 호출부는 [ClassSessionCanceledException]으로 변환한다. 반환값·flush/clear 이유는
