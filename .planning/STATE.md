@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-14-PLAN.md
-last_updated: "2026-08-08T03:03:52.661Z"
+stopped_at: Completed 04-15-PLAN.md — Phase 4(시간표·예약) 15/15 plans 완료
+last_updated: "2026-08-08T07:45:12.652Z"
 last_activity: 2026-08-08
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 44
-  completed_plans: 43
-  percent: 50
+  completed_plans: 44
+  percent: 67
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-30)
 
 **Core value:** 회원이 보는 잔여 횟수는 항상 실제 사용 가능 횟수와 일치한다 (즉시 차감/복구 + 전 이력 + 초과 예약 0건)
-**Current focus:** Phase 04 — schedule-reservation
+**Current focus:** Phase 04 — schedule-reservation (완료, 청크 C PR 대기)
 
 ## Current Position
 
-Phase: 04 (schedule-reservation) — EXECUTING
-Plan: 2 of 15
-Status: Ready to execute
-Last activity: 2026-08-08
+Phase: 04 (schedule-reservation) — COMPLETE (15/15 plans)
+Plan: 15 of 15
+Status: Phase complete — dev PR 생성 대기 (청크 C `feature/phase-04c-admin-ops`)
+Last activity: 2026-08-08 -- Phase 4 execution complete, Task 3 human-verify 16/16 PASS
 
-Progress: [██████████] 98%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -70,6 +70,7 @@ Progress: [██████████] 98%
 | Phase 04 P12 | 40min | 2 tasks | 9 files |
 | Phase 04 P13 | 65min | 2 tasks | 9 files |
 | Phase 04 P14 | 55min | 2 tasks | 10 files |
+| Phase 04 P15 | ~30min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -114,6 +115,8 @@ Recent decisions affecting current work:
 - [Phase 04-14]: ReservationLedgerSupport.restoreAfterCancellation를 restorePassAfterCancellation(세션 정원 미반영 + reason 파라미터)로 감싸는 형태로 리팩터링 — 기존 회원/관리자 취소 호출부는 동작 불변(기본값 CANCEL_REFUND), 휴강 캐스케이드는 CLASS_CANCELED_REFUND로 호출해 원장에서 구분(T-04-67)
 - [Phase 04-14]: AdminScheduleController의 클래스 레벨 @RequestMapping을 /api/admin/schedule에서 /api/admin으로 넓히고 메서드마다 하위 경로를 붙임 — 스케줄 보드와 휴강 처리가 서로 다른 리소스 계층이라 한 컨트롤러 파일 안에서 고정 경로 두 갈래를 표현하기 위한 최소 변경
 - [Phase 04-14]: ClassSessionNotFoundException + ErrorCode.CLASS_SESSION_NOT_FOUND 신설 — 휴강 해제 대상 세션 id가 없는 경로를 plan이 명시하지 않았으나 404 처리 없이는 500이 노출되는 방어적이지 않은 API가 된다
+- [Phase 04-15]: docs/decisions.md(D-089~101)·docs/glossary.md는 이미 실제 구현과 일치해 phase 마감 시점에 추가 수정 없음 — error-codes.md 발생 지점 열만 실제 throw 지점 기준으로 정정
+- [Phase 04-15]: Task 3 회원 예약~관리자 운영 전체 흐름 검증(16항목)은 오케스트레이터가 실제 HTTP·psql로 판정하고 사용자가 승인하는 방식으로 수행 — 16/16 PASS, 로컬 검증 데이터는 사용자 지시로 보존
 
 ### Pending Todos
 
@@ -139,6 +142,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-08T03:03:52.654Z
-Stopped at: Completed 04-14-PLAN.md
+Last session: 2026-08-08T07:44:51.549Z
+Stopped at: Completed 04-15-PLAN.md — Phase 4(시간표·예약) 15/15 plans 완료, dev PR 생성 대기
 Resume file: None
