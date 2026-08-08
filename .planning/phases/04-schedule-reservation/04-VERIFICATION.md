@@ -1,8 +1,9 @@
 ---
 phase: 04-schedule-reservation
 verified: 2026-08-08T08:01:57Z
-status: human_needed
-score: 5/5 (Success Criteria) — 13/13 requirements test-backed — 2 non-blocking WARNING follow-ups open
+status: passed
+resolved: 2026-08-08 — human_verification 2항목 모두 완료 (항목 1: 카카오 실토큰 재확인 passed / 항목 2: WR-01 수정 완료 a6fc932, WR-02 후속 이슈 #12 이월 확정). 상세는 04-HUMAN-UAT.md
+score: 5/5 (Success Criteria) — 13/13 requirements test-backed — WR-02 follow-up tracked in issue #12
 overrides_applied: 0
 human_verification:
   - test: "카카오 로그인 경로를 실제로 거쳐 발급된 회원 토큰으로 04-15 Task 3의 16개 항목 중 A(회원 흐름) 1~7을 재확인한다"
@@ -17,7 +18,7 @@ human_verification:
 
 **Phase Goal:** 회원이 주간 시간표를 보고 예약제 수업·1:1 레슨을 예약·취소·변경하면 이용권이 즉시 차감/복구되고, 동시 경쟁 상황에서도 정원을 초과하지 않으며, 관리자가 시간표와 예약 전반을 운영한다.
 **Verified:** 2026-08-08T08:01:57Z
-**Status:** human_needed
+**Status:** passed (human_needed → passed, 2026-08-08 — 아래 Human Verification 2항목 완료. 항목 1은 카카오 실토큰으로 passed, 항목 2는 WR-01 수정(a6fc932)·WR-02 이슈 #12 이월로 결정 완료)
 **Re-verification:** No — initial verification
 
 ## Goal Achievement

@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 04-15-PLAN.md — Phase 4(시간표·예약) 15/15 plans 완료
+status: phase_complete
+stopped_at: Phase 4(시간표·예약) 마감 — 청크 A·B·C PR 전부 dev 머지, VERIFICATION passed, WR-02는 이슈 #12 이월
 last_updated: "2026-08-08T07:45:12.652Z"
 last_activity: 2026-08-08
 progress:
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-30)
 
 **Core value:** 회원이 보는 잔여 횟수는 항상 실제 사용 가능 횟수와 일치한다 (즉시 차감/복구 + 전 이력 + 초과 예약 0건)
-**Current focus:** Phase 04 — schedule-reservation (완료, 청크 C PR 대기)
+**Current focus:** Phase 04 완료·마감 — 다음: Phase 05 (배치) discuss부터
 
 ## Current Position
 
 Phase: 04 (schedule-reservation) — COMPLETE (15/15 plans)
 Plan: 15 of 15
-Status: Phase complete — dev PR 생성 대기 (청크 C `feature/phase-04c-admin-ops`)
-Last activity: 2026-08-08 -- Phase 4 execution complete, Task 3 human-verify 16/16 PASS
+Status: Phase closed — 청크 A(#8)·B(#10)·C(#11) PR 전부 dev 머지, VERIFICATION passed (5/5 SC, 13/13 REQ), human UAT 2/2 완료, WR-02는 후속 이슈 #12
+Last activity: 2026-08-08 -- Phase 4 마감 (WR-02 이월 결정·이슈 #12 생성·검증 문서 passed 갱신)
 
 Progress: [██████████] 100%
 

@@ -1,14 +1,14 @@
 ---
-status: partial
+status: passed
 phase: 04-schedule-reservation
 source: [04-VERIFICATION.md]
 started: 2026-08-08T08:03:53Z
-updated: 2026-08-08T08:38:00Z
+updated: 2026-08-08T09:30:00Z
 ---
 
 ## Current Test
 
-[항목 1 완료 · 항목 2는 WR-02 이월로 partial — WR-02 수정 여부만 남았다]
+[전 항목 완료 — 항목 2의 WR-02는 후속 이슈 #12로 이월 확정 (사용자 결정, 2026-08-08)]
 
 ## Tests
 
@@ -35,7 +35,7 @@ expected: 두 WARNING을 후속 과제로만 남길지, 04-14에 대한 gap-clos
   - **WR-01** (`AdminScheduleService.kt:197-227`): 휴강 캐스케이드 중 회원이 동시에 자가 취소하면, 취소 실패분을 건너뛰는데도 알림·응답이 `snapshots.size`를 그대로 써서 `canceledReservationCount`가 실제 취소 건수보다 크게 나온다. 잔여·`PassTransaction` 이력은 정확하다. 관리자에게 틀린 숫자가 보이는 표시값 결함.
   - **WR-02** (`ReservationLedgerSupport.kt:213`): `shouldRestore(passStatus, ...)`가 스냅샷 시점의 `passStatus`를 쓰므로, 휴강 진행 중 대상 이용권이 다른 관리자에 의해 등록취소되면 조기 반환에 걸리지 않고 `adjustRemainingCount`(status=ACTIVE 조건부 UPDATE)가 0을 반환해 `IllegalStateException` → 500 + 휴강 전체 롤백. 도달에 4중 경쟁이 필요하고(등록취소 선행검사 통과 → 회원 예약 → 휴강 스냅샷 → 등록취소 커밋) 원자적으로 롤백되어 데이터는 깨지지 않는다.
 why_human: 코드 리뷰(04-REVIEW.md)가 WARNING으로 분류하고 검증에서도 코드로 재확인했지만, "이 정도면 다음 phase로 넘어가도 되는가"는 리스크 허용 판단이라 자동 검증으로 결론 낼 수 없다. 특히 WR-02의 수정 방향(복구를 조용히 생략할 것인가)은 Core Value("잔여 = 실제 사용 가능 횟수")와 맞물려 있어 `docs/policies.md` 확인이 필요하다.
-result: partial (2026-08-08 — WR-01 수정 완료, WR-02는 후속으로 이월)
+result: passed (2026-08-08 — WR-01 수정 완료, WR-02는 후속 이슈 #12로 이월 확정)
 
 사용자 결정: **WR-01만 지금 수정하고 WR-02는 후속으로 남긴다.**
 
@@ -45,17 +45,19 @@ result: partial (2026-08-08 — WR-01 수정 완료, WR-02는 후속으로 이�
   경합 창이 좁아 스레드로 재현할 수 없어 `@MockitoSpyBean`으로 `cancelByAdminIfActive`가 특정 예약 1건에만
   0을 반환하도록 주입한다. **수정을 되돌리면 이 테스트가 실패하는 것을 확인했다**(통과만 보고 회귀 테스트라
   단정하지 않기 위해). 전체 스위트 577 tests, 0 failures.
-- **WR-02 — 이월.** `ReservationLedgerSupport.restorePassAfterCancellation`이 스냅샷 `passStatus`로
+- **WR-02 — 이월 확정.** `ReservationLedgerSupport.restorePassAfterCancellation`이 스냅샷 `passStatus`로
   `shouldRestore`를 판정하는 문제. 수정 방향이 "라이브 상태 재조회" vs "조건부 UPDATE 0행이면 조용히 생략"
   둘로 갈리고, 후자는 Core Value와 맞물려 `docs/policies.md` 확인이 필요하다. 도달에 4중 경쟁이 필요하고
   원자적으로 롤백되어 데이터 정합성은 깨지지 않으므로 다음 phase로 넘긴다.
+  **후속 이슈: [#12](https://github.com/minsu-zip/gold-wrestling-be/issues/12)** (2026-08-08, 재현 방법·
+  수정 선택지 2안·완료 조건 기재). 이로써 human_verification 항목 2의 "결정" 자체는 완료됐다.
 
 ## Summary
 
 total: 2
-passed: 1
+passed: 2
 issues: 0
-pending: 1
+pending: 0
 skipped: 0
 blocked: 0
 
