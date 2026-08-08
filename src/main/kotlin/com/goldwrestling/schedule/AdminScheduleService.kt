@@ -194,12 +194,18 @@ class AdminScheduleService(
             }
 
         // ⑤ 예약별 취소 + 복구 판정 — CANCEL_REFUND가 아니라 CLASS_CANCELED_REFUND를 이력에 남긴다.
+        //
+        // **건너뛴 건은 세지 않는다.** `snapshots.size`(④ 조회 시점의 활성 예약 수)가 아니라 실제로
+        // 취소에 성공한 건수를 센다 — 조회와 취소 사이에 회원이 스스로 취소하면 이 둘이 달라지고,
+        // 그때 `snapshots.size`를 쓰면 관리자 응답과 알림 문구에 실제보다 큰 건수가 나간다(WR-01).
+        var canceledCount = 0
         snapshots.forEach { snapshot ->
             if (reservationRepository.cancelByAdminIfActive(snapshot.reservationId, admin, true, now) == 0) {
                 // ④ 조회와 이 취소 사이에 회원이 스스로 취소했다면(드문 경쟁) 이미 CANCELED다 —
                 // 이중 복구를 막기 위해 이 건은 건너뛴다.
                 return@forEach
             }
+            canceledCount++
             reservationLedgerSupport.restorePassAfterCancellation(
                 passId = snapshot.passId,
                 passStatus = snapshot.passStatus,
@@ -222,9 +228,9 @@ class AdminScheduleService(
             }
 
         // ⑦ 알림은 정확히 1회 — 반복문 밖에서 부른다(D-097 요약형).
-        notificationService.createClassSessionSuspended(refreshedSession, snapshots.size)
+        notificationService.createClassSessionSuspended(refreshedSession, canceledCount)
 
-        return ClassSessionResponse.from(refreshedSession, canceledReservationCount = snapshots.size)
+        return ClassSessionResponse.from(refreshedSession, canceledReservationCount = canceledCount)
     }
 
     /**

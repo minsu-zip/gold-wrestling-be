@@ -31,6 +31,10 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.mockito.ArgumentMatchers
+import org.mockito.ArgumentMatchers.anyBoolean
+import org.mockito.ArgumentMatchers.eq
+import org.mockito.BDDMockito.willReturn
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -38,6 +42,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.simple.JdbcClient
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
@@ -97,7 +102,13 @@ class ClassSessionSuspensionTest {
     @Autowired
     private lateinit var classSessionRepository: ClassSessionRepository
 
-    @Autowired
+    /**
+     * 스파이인 이유는 `휴강 도중 회원이 먼저 취소한 건은 취소 건수에서 제외된다` 하나뿐이다 —
+     * 그 테스트가 재현하려는 경합(스냅샷 조회와 취소 UPDATE 사이에 회원이 자가 취소)은 실제
+     * 스레드로는 창이 너무 좁아 결정론적으로 만들 수 없어서, `cancelByAdminIfActive`가 0을
+     * 반환하는 상황만 특정 예약 1건에 대해 주입한다. 나머지 테스트는 전부 실제 구현으로 위임된다.
+     */
+    @MockitoSpyBean
     private lateinit var reservationRepository: ReservationRepository
 
     @Autowired
@@ -226,6 +237,57 @@ class ClassSessionSuspensionTest {
         assertThat(notifications.first().type).isEqualTo(NotificationType.CLASS_SESSION_SUSPENDED)
         assertThat(notifications.first().reservation).isNull()
         assertThat(notifications.first().message).contains("3")
+    }
+
+    @Test
+    fun `휴강 도중 회원이 먼저 취소한 건은 취소 건수에서 제외된다`() {
+        val admin = persistAdmin()
+        val schedule = findSchedule(DayOfWeek.TUESDAY, ClassType.SESSION, LocalTime.of(11, 0))
+        val classDate = nextClassDate(DayOfWeek.TUESDAY)
+        val session = persistSession(schedule, classDate, reservedCount = 3)
+        val reservations =
+            (1..3).map {
+                val member = persistMember()
+                val pass = persistPass(member, admin, PassType.SESSION_PASS, "2.0", PassStatus.ACTIVE)
+                persistReservation(member, session, schedule, classDate, pass)
+            }
+        // 스냅샷 조회(④)에는 ACTIVE로 잡혔지만 취소 UPDATE(⑤) 시점엔 회원이 이미 취소해 0행이
+        // 갱신되는 상황 — 이 건은 취소 건수에도, 복구·이력에도 들어가면 안 된다.
+        val racedAway = reservations[1]
+        willReturn(0)
+            .given(reservationRepository)
+            .cancelByAdminIfActive(eq(racedAway.id!!), anyArg(), anyBoolean(), anyArg())
+
+        val response =
+            adminScheduleService.suspend(
+                admin.id!!,
+                SuspendClassSessionRequest(schedule.id!!, classDate, "공휴일 휴관"),
+            )
+
+        // 스냅샷은 3건이었지만 실제 취소는 2건 — 응답과 알림 문구가 모두 2를 말해야 한다.
+        assertThat(response.canceledReservationCount).isEqualTo(2)
+
+        val notifications = notificationRepository.findAll().filter { it.classSession?.id == session.id }
+        assertThat(notifications).hasSize(1)
+        assertThat(notifications.first().message).contains("2")
+        assertThat(notifications.first().message).doesNotContain("3")
+
+        // 건너뛴 건은 복구되지 않았고(잔여 그대로), 이력도 남지 않았다 — 이중 복구 방어가 유지된다.
+        val skippedPass = passRepository.findById(racedAway.pass.id!!).get()
+        assertThat(skippedPass.remainingCount).isEqualByComparingTo(BigDecimal("2.0"))
+
+        listOf(reservations[0], reservations[2]).forEach { reservation ->
+            val refreshedPass = passRepository.findById(reservation.pass.id!!).get()
+            assertThat(refreshedPass.remainingCount).isEqualByComparingTo(BigDecimal("3.0"))
+        }
+
+        val passIds = reservations.map { requireNotNull(it.pass.id) }
+        val refundTransactions =
+            passTransactionRepository.findAll().filter {
+                it.reason == TransactionReason.CLASS_CANCELED_REFUND && it.pass.id in passIds
+            }
+        assertThat(refundTransactions).hasSize(2)
+        assertThat(refundTransactions.map { it.pass.id }).doesNotContain(racedAway.pass.id)
     }
 
     @Test
@@ -549,6 +611,21 @@ class ClassSessionSuspensionTest {
     // ---------- 픽스처 ----------
 
     private fun songpaBranch(): Branch = branchRepository.findByName("송파점")!!
+
+    /**
+     * Kotlin + 순수 Mockito 조합에서 non-null 파라미터 자리에 `any()`를 그대로 넘기면, 매처가
+     * 등록되기는 하지만 반환값이 null이라 코틀린 컴파일러가 삽입한 null 검사에 먼저 걸려
+     * `NullPointerException: any(...) must not be null`이 난다. 게다가 그 예외로 스터빙이 중단되면
+     * 등록만 된 매처가 다음 호출에 잘못 적용돼 무관한 테스트까지 깨진다.
+     *
+     * 타입 파라미터를 거쳐 검사를 우회한다 — 실제로 매칭에 쓰이는 것은 위에서 등록된 매처이고
+     * 이 반환값 자체는 사용되지 않는다.
+     */
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> anyArg(): T {
+        ArgumentMatchers.any<T>()
+        return null as T
+    }
 
     private fun findSchedule(
         day: DayOfWeek,
