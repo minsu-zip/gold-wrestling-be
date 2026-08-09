@@ -757,3 +757,15 @@
 - 이유: D-101이 조회(GET 스케줄 보드)에만 적용돼, **읽기는 지점을 확인하는데 쓰기는 확인하지 않는** 비대칭이 있었다(PR #11 리뷰 Warning). v1은 지점이 하나뿐이라 실제로 뚫리는 경로는 아니지만, 지점이 늘어나는 순간 `classScheduleId`만 알면 타 지점 수업을 휴강시켜 예약 N건을 자동 취소하고 차감을 복구시킬 수 있다 — 조회보다 파급이 큰 쪽이 먼저 열려 있는 상태였다.
 - 기각 대안: `resolveBranchId`를 그대로 재사용(지점이 이미 대상 수업으로 정해져 있어 "해석"이 필요 없고, `branchId` non-null 경로는 매핑을 강제해 매핑 없는 현재 관리자 전원이 휴강 기능을 못 쓰게 된다), 다지점 phase까지 미루고 이슈로만 남기기(엔드포인트가 늘어날수록 누락 지점이 늘고, 그때 한 번에 훑는 비용이 지금 한 줄 추가보다 크다).
 - 범위 밖: `AdminReservationController`(RESV-07/08 예약 조회·대리 취소/변경)는 이번에도 검증하지 않는다 — 해당 컨트롤러 KDoc이 "다지점 운영이 시작되면 `resolveBranchId`와 같은 방식으로 확장한다"고 이미 밝혀 둔 의도적 스코프이고, 예약은 시간표와 달리 `branchId`를 직접 갖지 않아 회원→지점 경유 판정이 필요해 설계가 별건이다.
+
+## D-103. FE `ui/dialog.tsx`·`ui/sheet.tsx`의 sr-only 닫기 라벨을 한국어로 고친다
+
+- 2026-08 / shadcn 생성물의 `<span className="sr-only">Close</span>`를 `닫기`로 바꾼다. 구조·동작·클래스는 손대지 않고 문자열 한 줄만 바꾼다. 생성물이라 재생성하면 덮어써지므로 이 결정이 "다시 적용해야 한다"는 근거로 남고, 각 줄 위에 `D-103` 주석을 남겨 재생성 후 diff에서 눈에 띄게 한다. **[FE M3 후속 수정, 03-REVIEW IN-06]**
+- 이유: "UI 텍스트는 한국어" 규약(CLAUDE.md / design-system) 위반이고, M3의 다이얼로그 7개가 전부 이 문자열을 상속한다 — 스크린 리더 사용자가 전부 한국어인 플로우 중간에 "Close" 하나만 영어로 듣는다. 래퍼(`ResponsiveDialog`)는 `DialogContent` 바깥이라 이 span에 닿을 수 없다(03-06-SUMMARY가 그래서 미뤘다).
+- 기각 대안: `showCloseButton={false}`로 X 버튼 제거(ESC와 본문의 `닫기` 버튼이 남지만 마우스 사용자의 관례적 탈출구가 사라진다), 그대로 두기(접근성 계약 위반이 남고 다이얼로그가 늘 때마다 복제된다).
+
+## D-104. FE `Button variant="destructive"`를 solid fill로 바꾼다
+
+- 2026-08 / `ui/button.tsx`의 `destructive` variant를 `bg-destructive/10 text-destructive` 연한 틴트에서 `bg-destructive text-white hover:bg-destructive/90` solid fill로 바꾼다(`focus-visible:*` destructive 링은 유지, solid와 모순되는 `dark:bg-destructive/20 dark:hover:bg-destructive/30`은 제거). `--destructive-foreground` 토큰이 없어 전경색은 `text-white`를 쓴다. 적용 대상은 `Button variant="destructive"`뿐이고 `DropdownMenuItem variant="destructive"`(이용권 `등록 취소` 메뉴 항목)는 생성물의 별도 처방이라 손대지 않는다. **[FE M3 후속 수정, 03-UI-REVIEW Top-3]**
+- 이유: 되돌릴 수 없는 제출 버튼(`가입 거절`, `등록 취소`)이 본문에서 "되돌릴 수 없습니다"라고 말하면서 시각적으로는 연한 칩으로 읽혀 카피와 신호가 어긋난다. design-system SKILL.md의 색 표가 이미 "파괴적 액션 → `bg-destructive`"라고 적고 있어, 이 변경은 새 규약이 아니라 코드와 문서의 불일치 해소다. destructive는 파괴적 액션에만 쓰이므로 "화면당 primary 1개" 규약과도 충돌하지 않는다.
+- 기각 대안: 호출부(`ReasonDialog`)에서 className 보정(비가역 액션이 늘 때마다 반복되고 계약이 화면마다 갈라진다), border만 추가(대비 개선 폭이 작아 카피와 시각 신호의 어긋남이 그대로 남는다).
