@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-03-PLAN.md
-last_updated: "2026-08-15T03:32:29.192Z"
+stopped_at: Completed 05-04-PLAN.md
+last_updated: "2026-08-15T03:47:22.019Z"
 last_activity: 2026-08-15
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 53
-  completed_plans: 47
+  completed_plans: 48
   percent: 67
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 05 (batch) — EXECUTING
-Plan: 4 of 9
+Plan: 5 of 9
 Status: Ready to execute
 Last activity: 2026-08-15
 
-Progress: [█████████░] 89%
+Progress: [█████████░] 91%
 
 ## Performance Metrics
 
@@ -74,6 +74,7 @@ Progress: [█████████░] 89%
 | Phase 05-batch P01 | 15min | 3 tasks | 5 files |
 | Phase 05-batch P02 | 35min | 3 tasks | 11 files |
 | Phase 05-batch P03 | 25min | 2 tasks | 2 files |
+| Phase 05-batch P04 | 50min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -127,6 +128,8 @@ Recent decisions affecting current work:
 - [Phase 05-02]: 재복귀 테스트에서 같은 트랜잭션 내 findById 1차 캐시로 엔티티 참조가 재사용되는 버그를 발견해 스냅샷 값 비교로 수정(Rule 1)
 - [Phase 05-batch]: ktlintFormat 결과를 별도 style 커밋으로 분리 — 동작 변경과 자동 포맷 정렬을 한 커밋에 섞지 않는다
 - [Phase 05-batch]: InactivityDueDateCalculator KDoc의 'Clock' 문자열이 acceptance grep과 충돌해 '시각 주입 빈'으로 표현 변경
+- [Phase 05-batch]: D-115: 배치 벌크 조회는 Array<Any> 캐스팅 대신 인터페이스 스칼라 프로젝션(common/projection)으로 반환 — 타입 안전성을 이 저장소 관례로 고정
+- [Phase 05-batch]: CANCELED Pass 픽스처는 상태를 직접 대입하지 않고 PassRepository.cancelIfNotCanceled 실제 취소 경로로 만든다 — ck_pass_cancellation(V4)이 취소 메타데이터 완전성을 강제
 
 ### Pending Todos
 
@@ -152,6 +155,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-15T03:32:29.185Z
-Stopped at: Completed 05-03-PLAN.md
+Last session: 2026-08-15T03:47:22.013Z
+Stopped at: Completed 05-04-PLAN.md
 Resume file: None
