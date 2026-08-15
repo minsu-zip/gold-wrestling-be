@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-10-PLAN.md
-last_updated: "2026-08-15T16:17:15.673Z"
+stopped_at: Completed 05-11-PLAN.md
+last_updated: "2026-08-15T16:31:18.473Z"
 last_activity: 2026-08-15
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 60
-  completed_plans: 54
+  completed_plans: 55
   percent: 67
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 05 (batch) — EXECUTING
-Plan: 3 of 9
+Plan: 4 of 9
 Status: Ready to execute
 Last activity: 2026-08-15
 
-Progress: [█████████░] 90%
+Progress: [█████████░] 92%
 
 ## Performance Metrics
 
@@ -80,6 +80,7 @@ Progress: [█████████░] 90%
 | Phase 05-batch P07 | ~40min | 2 tasks | 2 files |
 | Phase 05-batch P08 | 45min | 3 tasks | 7 files |
 | Phase 05-batch P10 | 25min | 2 tasks | 6 files |
+| Phase 05-batch P11 | 30min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -146,6 +147,9 @@ Recent decisions affecting current work:
 - [Phase 05-batch]: AdminBatchControllerTest는 클래스 레벨 @Transactional을 쓰지 않는다 — 연속 2회 호출이 서로 다른 물리 트랜잭션으로 커밋돼야 D-106 멱등성을 HTTP 레벨에서 실증할 수 있다. 컨트롤러 테스트 clock 리셋은 Instant.now()를 쓴다 — NimbusJwtDecoder가 시스템 시각으로 exp를 검증해 과거 고정 clock이면 발급 토큰이 즉시 401 처리된다
 - [Phase 05-10]: CR-04: returnedFromLeaveAt 기록 조건을 previousStatus==ON_LEAVE && newStatus!=ON_LEAVE로 확장 — ON_LEAVE→INACTIVE→ACTIVE 우회 복귀 경로의 소급 차감을 막는다
 - [Phase 05-10]: docs/policies.md §4.3·glossary.md·decisions.md D-105/D-111을 CR-04 수정에 맞춰 같은 작업 안에서 정정 — 커밋된 V9 마이그레이션 주석은 그대로 두고 정정 사실은 V10 헤더로 미룬다
+- [Phase 05-11]: D-117: 배치 실행 직렬화는 batch_execution RUNNING 행 + status='RUNNING' 부분 유니크 인덱스(V10)로 한다 — advisory lock·원장 주기 유니크 인덱스·회원 행 비관적 락 기각
+- [Phase 05-11]: BatchExecution의 triggeredBy(@ManyToOne LAZY)를 triggeredByAdminId 스칼라로 교체 — 엔티티에 LAZY 연관이 0개가 되어 트랜잭션 밖 응답 변환이 조건 없이 안전해진다(WR-04)
+- [Phase 05-11]: BatchExecutionRepositoryTest는 @AfterEach 삭제 대신 클래스 레벨 @Transactional 롤백에 정리를 맡긴다 — 유니크 위반 단언 직후 PostgreSQL 트랜잭션이 abort 상태라 @AfterEach의 DELETE가 그 테스트를 실패시킨다
 
 ### Pending Todos
 
@@ -172,6 +176,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-15T16:17:15.667Z
-Stopped at: Completed 05-10-PLAN.md
+Last session: 2026-08-15T16:31:18.467Z
+Stopped at: Completed 05-11-PLAN.md
 Resume file: None
