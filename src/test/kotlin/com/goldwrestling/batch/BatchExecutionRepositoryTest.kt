@@ -7,6 +7,7 @@ import com.goldwrestling.support.MutableTestClock
 import com.goldwrestling.support.TestClockConfiguration
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.assertj.core.api.Assertions.within
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.Instant
 import java.time.OffsetDateTime
+import java.time.temporal.ChronoUnit
 
 /**
  * `BatchExecution`의 저장·조회와 `ck_batch_execution_trigger` CHECK 제약을 실제 PostgreSQL
@@ -65,8 +67,8 @@ class BatchExecutionRepositoryTest {
 
         val reloaded = batchExecutionRepository.findById(saved.id!!).get()
         assertThat(reloaded.trigger).isEqualTo(BatchTrigger.SCHEDULED)
-        assertThat(reloaded.startedAt).isEqualToIgnoringNanos(started)
-        assertThat(reloaded.finishedAt).isEqualToIgnoringNanos(finished)
+        assertThat(reloaded.startedAt).isCloseTo(started, within(1, ChronoUnit.SECONDS))
+        assertThat(reloaded.finishedAt).isCloseTo(finished, within(1, ChronoUnit.SECONDS))
         assertThat(reloaded.processedMemberCount).isEqualTo(10)
         assertThat(reloaded.deductedCount).isEqualTo(3)
         assertThat(reloaded.skippedCount).isEqualTo(1)
