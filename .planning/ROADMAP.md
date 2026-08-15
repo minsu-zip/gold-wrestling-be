@@ -154,13 +154,29 @@ Phase 4, `INACTIVITY`는 Phase 5, `EVENING_HALF`는 Phase 6이 쓴다. `PassTran
 **Depends on**: Phase 3 (Pass), Phase 4 (예약/차감 흐름과의 정합성)
 **Requirements**: BATCH-01, BATCH-02, BATCH-03, BATCH-04
 **Success Criteria** (what must be TRUE):
-  1. `SESSION_PASS`가 기준일(마지막 출석일과 마지막 예약의 수업일 중 더 최근 날짜, 둘 다 없으면 등록일 — D-027) 기준 2주 동안 미사용이면 1회 자동 차감되고, 이후 2주마다 반복 차감되며 이력이 `INACTIVITY` 사유로 남는다
+  1. `SESSION_PASS`가 기준일(마지막 출석일 / 마지막 취소되지 않은 예약의 수업일 / `ON_LEAVE`→`ACTIVE` 복귀일 / `SESSION_PASS` 등록일(`created_at`) / 마지막 양(+) `ADMIN_ADJUST` 일자 중 가장 최근 날짜, 판정은 회원 단위 — D-027, D-105) 기준 2주 동안 미사용이면 1회 자동 차감되고, 이후 2주마다 반복 차감되며 이력이 `INACTIVITY` 사유로 남는다
   2. `ON_LEAVE` 기간, 잔여 0, 유효기간 만료된 이용권은 자동 차감 대상에서 제외된다
-  3. 등록일로부터 1년이 지난 이용권은 사용 불가로 처리되어 더 이상 예약에 쓸 수 없다
+  3. 등록일로부터 1년이 지난 이용권은 예약에 쓸 수 없다 — 기존 조회 시점 계산(D-064)과 Phase 4 예약 거부 경로로 충족되며 이 phase는 검증 테스트로 실증한다 (D-107)
   4. 같은 날 배치를 두 번 이상 실행해도 이중 차감이 발생하지 않는다(멱등) — 매일 새벽 실행을 전제로 검증된다
-**Plans**: TBD
+**Plans**: 9 plans / 9 waves — **2개 청크로 납품한다 (D-084)**.
+청크 A `feature/phase-05a-batch-foundation`(wave 1~4, 판정 인프라 — 이 청크만으로는 차감이 일어나지 않는다) ·
+청크 B `feature/phase-05b-inactivity-batch`(wave 5~9, 차감 실행·멱등·스케줄러·API·마감).
+청크 경계 = wave 경계이며 순차 진행한다. 청크 B 마지막 플랜에서 phase를 마감한다.
 
-**Note**: 기준일(policies §4.3, D-027)은 **마지막 출석일과 마지막 예약의 수업일 중 더 최근 날짜**다. 출석(`Attendance`)은 Phase 6 소관이라 이 phase 시점에는 출석 이력이 없으므로, 기준일은 **마지막 예약의 수업일**(Phase 4 데이터) 또는 **등록일**(fallback)로 동작하며 이는 의도된 동작이다. 기준일 조회 쿼리가 `Attendance` 테이블을 필요로 하면 이 phase에서 해당 스키마를 먼저 마이그레이션할 수 있다 (Phase 6에서 재사용).
+**청크 A — 배치 기반 (wave 1~4)**
+- [ ] 05-01-PLAN.md — 용어(glossary)·재량 결정 5건 기록 + BATCH-03 문구 정정 (BATCH-01/03/04)
+- [ ] 05-02-PLAN.md — V9 스키마(pass_transaction CHECK 완화·member.returned_from_leave_at·batch_execution) + 엔티티·복귀 시각 기록 (BATCH-01/04)
+- [ ] 05-03-PLAN.md — [TDD] 기준일 max·부족분·캐치업 순수 계산 (BATCH-01/04)
+- [ ] 05-04-PLAN.md — 배치 대상·기준일 후보·이력 벌크 조회 6종 + 통합테스트 (BATCH-01/02)
+
+**청크 B — 차감 실행·운영 (wave 5~9)**
+- [ ] 05-05-PLAN.md — [TDD] 차감 1회 반영(만료 임박 한 장·부분 차감·시스템 주체 이력) (BATCH-01/02)
+- [ ] 05-06-PLAN.md — InactivityBatchRunner(조회→계산→차감→실행 이력, 트랜잭션 없는 루프) (BATCH-01/02/04)
+- [ ] 05-07-PLAN.md — 멱등·캐치업 실증 + 만료 사용 불가 실증(구현물 없음, D-107) (BATCH-02/03/04)
+- [ ] 05-08-PLAN.md — @Scheduled cron 트리거 + 관리자 수동 실행 API + openapi 재생성 (BATCH-01/04)
+- [ ] 05-09-PLAN.md — phase 마감: 요구사항 대응표·문서 정합 + 로컬 실제 실행 확인 (BATCH-01~04)
+
+**Note**: 출석(`Attendance`) 스키마는 이 phase에서 선반영하지 않는다 — 기준일 조회가 출석 테이블을 필요로 하지 않음을 05-CONTEXT에서 확인했고, 기준일 후보 ①(마지막 출석일)은 Phase 6까지 자연히 부재로 동작한다(의도된 동작). 기준일(policies §4.3, D-027·D-105)은 회원 단위로 5종 후보의 가장 최근 날짜를 취하며, 출석 후보가 없는 이 phase 시점에는 나머지 4종(예약 수업일·복귀일·등록일·+가감일)으로 동작한다.
 
 ### Phase 6: 운영
 **Goal**: 관리자가 모든 수업의 출석을 체크하고 공지사항을 운영하며, 예약 관련 이벤트를 알림·활동 피드로 실시간에 가깝게 확인할 수 있다.
@@ -185,6 +201,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 2. 인증·회원 | 15/15 | Complete   | 2026-08-03 |
 | 3. 이용권 | 11/11 | Complete    | 2026-08-04 |
 | 4. 시간표·예약 | 15/15 | Complete   | 2026-08-08 |
-| 5. 배치 | 0/TBD | Not started | - |
+| 5. 배치 | 0/9 | Planned | - |
 | 6. 운영 | 0/TBD | Not started | - |
 </content>
