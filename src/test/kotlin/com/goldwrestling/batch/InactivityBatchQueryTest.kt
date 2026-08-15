@@ -11,7 +11,19 @@ import com.goldwrestling.member.MemberStatus
 import com.goldwrestling.pass.Pass
 import com.goldwrestling.pass.PassRepository
 import com.goldwrestling.pass.PassStatus
+import com.goldwrestling.pass.PassTransaction
+import com.goldwrestling.pass.PassTransactionRepository
 import com.goldwrestling.pass.PassType
+import com.goldwrestling.pass.TransactionReason
+import com.goldwrestling.reservation.Reservation
+import com.goldwrestling.reservation.ReservationRepository
+import com.goldwrestling.reservation.ReservationStatus
+import com.goldwrestling.schedule.ClassSchedule
+import com.goldwrestling.schedule.ClassScheduleRepository
+import com.goldwrestling.schedule.ClassSession
+import com.goldwrestling.schedule.ClassSessionRepository
+import com.goldwrestling.schedule.ClassSessionStatus
+import com.goldwrestling.schedule.ClassType
 import com.goldwrestling.support.MutableTestClock
 import com.goldwrestling.support.TestClockConfiguration
 import org.assertj.core.api.Assertions.assertThat
@@ -41,6 +53,18 @@ import java.time.OffsetDateTime
 class InactivityBatchQueryTest {
     @Autowired
     private lateinit var passRepository: PassRepository
+
+    @Autowired
+    private lateinit var passTransactionRepository: PassTransactionRepository
+
+    @Autowired
+    private lateinit var reservationRepository: ReservationRepository
+
+    @Autowired
+    private lateinit var classScheduleRepository: ClassScheduleRepository
+
+    @Autowired
+    private lateinit var classSessionRepository: ClassSessionRepository
 
     @Autowired
     private lateinit var memberRepository: MemberRepository
@@ -210,6 +234,155 @@ class InactivityBatchQueryTest {
         assertThat(result).extracting<Long> { it.id }.containsExactly(partial.id)
     }
 
+    // ── findLastActiveReservationClassDates ─────────────────────────────────
+
+    @Test
+    fun `findLastActiveReservationClassDates는 회원별 ACTIVE 예약의 classDate 최댓값을 반환한다`() {
+        val member = persistMember()
+        val pass = persistSessionPass(member, remaining = "5.0", endDate = today.plusDays(30))
+        persistReservation(member, pass, classDate = today.plusDays(3))
+        persistReservation(member, pass, classDate = today.plusDays(10))
+
+        val result = reservationRepository.findLastActiveReservationClassDates(listOf(member.id!!))
+
+        assertThat(result).hasSize(1)
+        assertThat(result.first().getMemberId()).isEqualTo(member.id)
+        assertThat(result.first().getDate()).isEqualTo(today.plusDays(10))
+    }
+
+    @Test
+    fun `취소된 예약만 있는 회원은 findLastActiveReservationClassDates 결과에 없다`() {
+        val member = persistMember()
+        val pass = persistSessionPass(member, remaining = "5.0", endDate = today.plusDays(30))
+        val reservation = persistReservation(member, pass, classDate = today.plusDays(3))
+        reservationRepository.cancelByMemberIfActive(reservation.id!!, member, OffsetDateTime.now(clock))
+
+        val result = reservationRepository.findLastActiveReservationClassDates(listOf(member.id!!))
+
+        assertThat(result).isEmpty()
+    }
+
+    @Test
+    fun `findLastActiveReservationClassDates는 수업 종류를 가리지 않고 LESSON 예약도 인정한다`() {
+        val member = persistMember()
+        val pass = persistSessionPass(member, remaining = "5.0", endDate = today.plusDays(30))
+        persistReservation(member, pass, classDate = today.plusDays(3), classType = ClassType.LESSON)
+
+        val result = reservationRepository.findLastActiveReservationClassDates(listOf(member.id!!))
+
+        assertThat(result).extracting<LocalDate> { it.getDate() }.containsExactly(today.plusDays(3))
+    }
+
+    @Test
+    fun `findLastActiveReservationClassDates는 미래 날짜 예약도 최댓값으로 그대로 반환한다`() {
+        val member = persistMember()
+        val pass = persistSessionPass(member, remaining = "5.0", endDate = today.plusDays(400))
+        persistReservation(member, pass, classDate = today.plusDays(200))
+
+        val result = reservationRepository.findLastActiveReservationClassDates(listOf(member.id!!))
+
+        assertThat(result).extracting<LocalDate> { it.getDate() }.containsExactly(today.plusDays(200))
+    }
+
+    // ── findLastPositiveAdjustTimestamps ─────────────────────────────────────
+
+    @Test
+    fun `findLastPositiveAdjustTimestamps는 양(+) ADMIN_ADJUST 이력의 occurredAt 최댓값을 반환한다`() {
+        val member = persistMember()
+        val pass = persistSessionPass(member, remaining = "5.0", endDate = today.plusDays(30))
+        persistPassTransaction(pass, amount = "0.5", reason = TransactionReason.ADMIN_ADJUST, occurredAt = today.minusDays(10).atTime9am())
+        persistPassTransaction(pass, amount = "1.0", reason = TransactionReason.ADMIN_ADJUST, occurredAt = today.minusDays(2).atTime9am())
+
+        val result = passTransactionRepository.findLastPositiveAdjustTimestamps(listOf(member.id!!))
+
+        assertThat(result).hasSize(1)
+        assertThat(result.first().getTimestamp()).isEqualTo(today.minusDays(2).atTime9am())
+    }
+
+    @Test
+    fun `음수 ADMIN_ADJUST만 있는 회원은 findLastPositiveAdjustTimestamps 결과에 없다`() {
+        val member = persistMember()
+        val pass = persistSessionPass(member, remaining = "5.0", endDate = today.plusDays(30))
+        persistPassTransaction(pass, amount = "-0.5", reason = TransactionReason.ADMIN_ADJUST, occurredAt = today.minusDays(2).atTime9am())
+
+        val result = passTransactionRepository.findLastPositiveAdjustTimestamps(listOf(member.id!!))
+
+        assertThat(result).isEmpty()
+    }
+
+    @Test
+    fun `INITIAL_GRANT 같은 다른 양수 사유는 findLastPositiveAdjustTimestamps 후보에 포함되지 않는다`() {
+        val member = persistMember()
+        val pass = persistSessionPass(member, remaining = "5.0", endDate = today.plusDays(30))
+        persistPassTransaction(pass, amount = "5.0", reason = TransactionReason.INITIAL_GRANT, occurredAt = today.minusDays(2).atTime9am())
+
+        val result = passTransactionRepository.findLastPositiveAdjustTimestamps(listOf(member.id!!))
+
+        assertThat(result).isEmpty()
+    }
+
+    // ── findInactivityEventTimestamps ────────────────────────────────────────
+
+    @Test
+    fun `findInactivityEventTimestamps는 INACTIVITY 이력을 건별로 반환한다`() {
+        val member = persistMember()
+        val pass = persistSessionPass(member, remaining = "3.0", endDate = today.plusDays(30))
+        persistPassTransaction(pass, amount = "-1.0", reason = TransactionReason.INACTIVITY, occurredAt = today.minusDays(30).atTime9am())
+        persistPassTransaction(pass, amount = "-1.0", reason = TransactionReason.INACTIVITY, occurredAt = today.minusDays(16).atTime9am())
+        persistPassTransaction(pass, amount = "-1.0", reason = TransactionReason.INACTIVITY, occurredAt = today.minusDays(2).atTime9am())
+
+        val result = passTransactionRepository.findInactivityEventTimestamps(listOf(member.id!!))
+
+        assertThat(result).hasSize(3)
+    }
+
+    // ── findReturnedFromLeaveTimestamps ──────────────────────────────────────
+
+    @Test
+    fun `findReturnedFromLeaveTimestamps는 returnedFromLeaveAt이 있는 회원만 반환한다`() {
+        val returned = persistMember()
+        returned.returnedFromLeaveAt = today.minusDays(5).atTime9am()
+        memberRepository.saveAndFlush(returned)
+        val neverLeft = persistMember()
+
+        val result = memberRepository.findReturnedFromLeaveTimestamps(listOf(returned.id!!, neverLeft.id!!))
+
+        assertThat(result).extracting<Long> { it.getMemberId() }.containsExactly(returned.id)
+        assertThat(result.first().getTimestamp()).isEqualTo(today.minusDays(5).atTime9am())
+    }
+
+    // ── memberIds 범위·빈 목록 처리 ───────────────────────────────────────────
+
+    @Test
+    fun `네 조회 모두 memberIds에 없는 회원의 행을 포함하지 않고 빈 목록이면 빈 결과를 반환한다`() {
+        val inScope = persistMember()
+        val outOfScope = persistMember()
+        val pass = persistSessionPass(inScope, remaining = "5.0", endDate = today.plusDays(30))
+        persistReservation(inScope, pass, classDate = today.plusDays(3))
+        persistPassTransaction(pass, amount = "0.5", reason = TransactionReason.ADMIN_ADJUST, occurredAt = today.minusDays(2).atTime9am())
+        persistPassTransaction(pass, amount = "-1.0", reason = TransactionReason.INACTIVITY, occurredAt = today.minusDays(2).atTime9am())
+        outOfScope.returnedFromLeaveAt = today.minusDays(2).atTime9am()
+        memberRepository.saveAndFlush(outOfScope)
+
+        val scoped = listOf(inScope.id!!)
+        assertThat(reservationRepository.findLastActiveReservationClassDates(scoped))
+            .extracting<Long> { it.getMemberId() }
+            .containsOnly(inScope.id)
+        assertThat(passTransactionRepository.findLastPositiveAdjustTimestamps(scoped))
+            .extracting<Long> { it.getMemberId() }
+            .containsOnly(inScope.id)
+        assertThat(passTransactionRepository.findInactivityEventTimestamps(scoped))
+            .extracting<Long> { it.getMemberId() }
+            .containsOnly(inScope.id)
+        assertThat(memberRepository.findReturnedFromLeaveTimestamps(scoped)).isEmpty()
+
+        // 빈 memberIds — "in ()" 빈 컬렉션이 예외 없이 빈 결과를 반환하는지 실제로 실행해 확인한다.
+        assertThat(reservationRepository.findLastActiveReservationClassDates(emptyList())).isEmpty()
+        assertThat(passTransactionRepository.findLastPositiveAdjustTimestamps(emptyList())).isEmpty()
+        assertThat(passTransactionRepository.findInactivityEventTimestamps(emptyList())).isEmpty()
+        assertThat(memberRepository.findReturnedFromLeaveTimestamps(emptyList())).isEmpty()
+    }
+
     // ── fixtures ──────────────────────────────────────────────────────────
 
     private fun LocalDate.atTime9am(): OffsetDateTime = this.atStartOfDay(BatchFixtures.FIXED_TIME.offset).plusHours(9).toOffsetDateTime()
@@ -266,4 +439,60 @@ class InactivityBatchQueryTest {
                 endDate = endDate,
             ),
         )
+
+    private fun persistPassTransaction(
+        pass: Pass,
+        amount: String,
+        reason: TransactionReason,
+        occurredAt: OffsetDateTime,
+    ): PassTransaction =
+        passTransactionRepository.saveAndFlush(
+            BatchFixtures.passTransaction(pass = pass, amount = BigDecimal(amount), reason = reason, occurredAt = occurredAt),
+        )
+
+    /** [today]와 무관하게 스케줄만 다른 세션 하나를 매번 새 [classDate]로 만든다(`uq_class_session`). */
+    private fun persistReservation(
+        member: Member,
+        pass: Pass,
+        classDate: LocalDate,
+        classType: ClassType = ClassType.SESSION,
+    ): Reservation {
+        val session = persistClassSession(classDate, classType)
+        return reservationRepository.saveAndFlush(
+            Reservation(
+                member = member,
+                classSession = session,
+                pass = pass,
+                classType = session.classType,
+                classDate = session.classDate,
+                startTime = session.startTime,
+                status = ReservationStatus.ACTIVE,
+                reservedAt = OffsetDateTime.now(clock),
+                createdAt = OffsetDateTime.now(clock),
+            ),
+        )
+    }
+
+    private fun persistClassSession(
+        classDate: LocalDate,
+        classType: ClassType,
+    ): ClassSession {
+        val schedule = songpaSchedule(classType)
+        return classSessionRepository.saveAndFlush(
+            ClassSession(
+                classSchedule = schedule,
+                classDate = classDate,
+                classType = classType,
+                startTime = schedule.startTime,
+                endTime = schedule.endTime,
+                capacity = schedule.capacity,
+                reservedCount = 0,
+                status = ClassSessionStatus.SCHEDULED,
+                createdAt = OffsetDateTime.now(clock),
+            ),
+        )
+    }
+
+    private fun songpaSchedule(classType: ClassType): ClassSchedule =
+        classScheduleRepository.findAllByBranchId(songpaBranch().id!!).first { it.classType == classType }
 }
