@@ -14,6 +14,8 @@ tags:
   description: 관리자 예약 조회·대리 취소·변경
 - name: admin-schedule
   description: 관리자 주간 스케줄 보드 + 휴강 처리·해제
+- name: admin-batch
+  description: 관리자 배치 수동 실행
 - name: auth
   description: 인증·토큰
 - name: admin-pass
@@ -470,6 +472,21 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/ClassSessionResponse"
+  /api/admin/batch/inactivity-runs:
+    post:
+      tags:
+      - admin-batch
+      summary: 2주 미사용 자동 차감 배치를 즉시 실행한다
+      description: 중복 실행해도 안전하다 — 상태 기반 부족분 계산(D-106)이 이미 존재하는 차감을 다시 만들지 않는다. 배치가
+        며칠 중단됐다면 이 호출 한 번이 밀린 주기를 몰아서 보정한다.
+      operationId: runInactivityBatch
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/BatchExecutionResponse"
   /api/admin/passes/{passId}/period:
     patch:
       tags:
@@ -1448,6 +1465,57 @@ components:
       - classDate
       - classScheduleId
       - reason
+    BatchExecutionResponse:
+      type: object
+      description: 배치 실행 결과
+      properties:
+        batchExecutionId:
+          type: integer
+          format: int64
+          description: 배치 실행 이력 ID
+        trigger:
+          type: string
+          description: 트리거 종류
+          enum:
+          - SCHEDULED
+          - MANUAL
+        triggeredByAdminId:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: 수동 실행한 관리자 ID — SCHEDULED면 null
+        startedAt:
+          type: string
+          format: date-time
+          description: 실행 시작 시각
+        finishedAt:
+          type: string
+          format: date-time
+          description: 실행 종료 시각
+        processedMemberCount:
+          type: integer
+          format: int32
+          description: 차감 대상 후보로 조회된 회원 수
+        deductedCount:
+          type: integer
+          format: int32
+          description: 실제 차감된 건수
+        skippedCount:
+          type: integer
+          format: int32
+          description: 대상 소진 등으로 스킵된 건수 — 다음 실행이 상태 기반으로 이어받는다
+        status:
+          type: string
+          description: 실행 결과
+          enum:
+          - SUCCESS
+          - PARTIAL_FAILURE
+        errorSummary:
+          type:
+          - string
+          - "null"
+          description: "회원 단위 실패 요약(예외 종류만, 메시지는 담지 않는다) — 실패가 없으면 null"
     ChangePassPeriodRequest:
       type: object
       description: "기간·유효기간 수정 요청 — 저녁반은 시작·종료 모두, 횟수권은 종료일만 반영된다(D-062)"
