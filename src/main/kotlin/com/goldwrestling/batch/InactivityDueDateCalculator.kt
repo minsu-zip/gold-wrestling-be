@@ -24,9 +24,9 @@ data class InactivityDueDateCandidates(
 )
 
 /**
- * 2주 미사용 자동 차감(policies §4.3)의 판정 전부를 담은 순수 계산. Spring·DB·`Clock`에 의존하지
- * 않는다 — 오늘 날짜는 항상 파라미터로 받는다(conventions §5, 호출부가 `LocalDate.now(clock)`을
- * 넘긴다).
+ * 2주 미사용 자동 차감(policies §4.3)의 판정 전부를 담은 순수 계산. Spring·DB·시각 주입 빈에
+ * 의존하지 않는다 — 오늘 날짜는 항상 파라미터로 받는다(conventions §5, 호출부가
+ * `LocalDate.now(주입받은 시각 소스)`를 넘긴다).
  */
 object InactivityDueDateCalculator {
     /** policies §4.3의 "2주"를 표현하는 유일한 상수 — 정책이 바뀌면 여기 하나만 바뀐다. */
