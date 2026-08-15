@@ -55,10 +55,10 @@
 
 ### 배치 (M5) — BATCH
 
-- [ ] **BATCH-01**: `SESSION_PASS` 2주 미사용 시 1회 자동 차감, 이후 2주마다 반복(`INACTIVITY`) — 기준일: 마지막 출석일 / 마지막 취소되지 않은 예약의 수업일 / `ON_LEAVE`→`ACTIVE` 복귀일 / `SESSION_PASS` 등록일(`created_at`) / 마지막 양(+) `ADMIN_ADJUST` 일자 중 **가장 최근 날짜**, 판정은 회원 단위 (D-027, D-105)
+- [x] **BATCH-01**: `SESSION_PASS` 2주 미사용 시 1회 자동 차감, 이후 2주마다 반복(`INACTIVITY`) — 기준일: 마지막 출석일 / 마지막 취소되지 않은 예약의 수업일 / `ON_LEAVE`→`ACTIVE` 복귀일 / `SESSION_PASS` 등록일(`created_at`) / 마지막 양(+) `ADMIN_ADJUST` 일자 중 **가장 최근 날짜**, 판정은 회원 단위 (D-027, D-105)
 - [ ] **BATCH-02**: 차감 예외가 지켜진다 — `ON_LEAVE` 기간, 잔여 0, 유효기간 만료 이용권은 차감하지 않음
-- [ ] **BATCH-03**: 유효기간(등록일+1년) 만료 이용권이 사용 불가 처리된다 — **별도 배치 구현물 없이** 기존 메커니즘(D-064 조회 시점 `displayStatus` 계산 + Phase 4 예약 경로의 수업날 기준 거부)으로 충족하고, Phase 5는 이를 **검증 테스트로 실증**한다 (D-107)
-- [ ] **BATCH-04**: 배치는 멱등하다 — 같은 날 중복 실행돼도 이중 차감 0건 (매일 새벽 실행)
+- [x] **BATCH-03**: 유효기간(등록일+1년) 만료 이용권이 사용 불가 처리된다 — **별도 배치 구현물 없이** 기존 메커니즘(D-064 조회 시점 `displayStatus` 계산 + Phase 4 예약 경로의 수업날 기준 거부)으로 충족하고, Phase 5는 이를 **검증 테스트로 실증**한다 (D-107)
+- [x] **BATCH-04**: 배치는 멱등하다 — 같은 날 중복 실행돼도 이중 차감 0건 (매일 새벽 실행)
 
 ### 운영 (M6) — ATTEND / NOTICE / NOTIF
 
@@ -137,10 +137,10 @@
 | RESV-08 | Phase 4 | Complete |
 | RESV-09 | Phase 4 | Complete |
 | NOTIF-01 | Phase 4 | Complete |
-| BATCH-01 | Phase 5 | Pending |
+| BATCH-01 | Phase 5 | Complete |
 | BATCH-02 | Phase 5 | Pending |
-| BATCH-03 | Phase 5 | Pending |
-| BATCH-04 | Phase 5 | Pending |
+| BATCH-03 | Phase 5 | Complete |
+| BATCH-04 | Phase 5 | Complete |
 | ATTEND-01 | Phase 6 | Pending |
 | ATTEND-02 | Phase 6 | Pending |
 | NOTICE-01 | Phase 6 | Pending |
