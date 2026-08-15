@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-05-PLAN.md
-last_updated: "2026-08-15T04:41:08.012Z"
+stopped_at: Completed 05-06-PLAN.md
+last_updated: "2026-08-15T04:54:04.745Z"
 last_activity: 2026-08-15
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 53
-  completed_plans: 49
+  completed_plans: 50
   percent: 67
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 05 (batch) — EXECUTING
-Plan: 5 of 9
+Plan: 6 of 9
 Status: Ready to execute
 Last activity: 2026-08-15
 
-Progress: [█████████░] 92%
+Progress: [█████████░] 94%
 
 ## Performance Metrics
 
@@ -76,6 +76,7 @@ Progress: [█████████░] 92%
 | Phase 05-batch P03 | 25min | 2 tasks | 2 files |
 | Phase 05-batch P04 | 50min | 2 tasks | 9 files |
 | Phase 05-batch P05 | 55min | 1 tasks | 3 files |
+| Phase 05-batch P06 | 35min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -134,6 +135,8 @@ Recent decisions affecting current work:
 - [Phase 05-05]: 잔여 0인 SESSION_PASS 테스트 픽스처는 INITIAL_GRANT 이력을 생성하지 않는다 — ck_pass_transaction_amount_nonzero(V4)가 금액 0인 이력을 거부한다
 - [Phase 05-05]: 취소된 SESSION_PASS 픽스처는 cancelIfNotCanceled 대신 취소 메타데이터를 채운 Pass를 직접 saveAndFlush한다 — 커스텀 @Modifying 쿼리는 명시적 @Transactional 없이 호출하면 기본 readOnly 트랜잭션이 붙어 flush가 실패한다
 - [Phase 05-05]: Mockito 5는 Kotlin non-null 인터페이스 파라미터에 any()/anyLong() 매처를 쓰면 NPE를 던진다 — 매처 없이 실제 값을 그대로 인자로 넘겨 우회한다
+- [Phase 05-06]: repeat+return@repeat 대신 for+break로 부족분 루프 구현 — return@repeat은 continue 의미라 대상 소진 후에도 반복이 계속돼 'skippedCount 1건만 증가하고 중단'이라는 명시된 behavior를 만족하지 못한다
+- [Phase 05-06]: InactivityBatchRunner KDoc의 '@Transactional' 리터럴이 acceptance grep(0건 기대)과 충돌해 '트랜잭션 애노테이션'으로 표현 변경 — 05-03·05-04의 동일 유형 충돌과 같은 해결
 
 ### Pending Todos
 
@@ -160,6 +163,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-15T04:40:50.673Z
-Stopped at: Completed 05-05-PLAN.md
+Last session: 2026-08-15T04:54:04.739Z
+Stopped at: Completed 05-06-PLAN.md
 Resume file: None
