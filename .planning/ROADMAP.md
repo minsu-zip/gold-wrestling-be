@@ -18,7 +18,7 @@
 - [x] **Phase 2: 인증·회원** - 카카오 로그인, 온보딩, JWT, 관리자 ID/PW 인증, 가입 승인, 회원 관리 (본 작업 완료 2026-08-02 / 검증 갭 클로저 진행 중 — 02-12~02-15) (completed 2026-08-03)
 - [x] **Phase 3: 이용권** - Pass 3종 등록, PassTransaction 이력, 수동 가감·기간 수정, 본인 조회 (completed 2026-08-03)
 - [x] **Phase 4: 시간표·예약** - ClassSchedule/ClassSession, 예약 생성·취소·변경 + 즉시 차감/복구, 동시성 보장, 관리자 예약 관리·휴강, Notification 스키마·알림 레코드 생성 (completed 2026-08-08)
-- [ ] **Phase 5: 배치** - 2주 미사용 차감, 유효기간 만료 처리, 멱등 실행 (플랜 9/9 실행 완료, 검증 gaps_found — 05-VERIFICATION.md)
+- [ ] **Phase 5: 배치** - 2주 미사용 차감, 유효기간 만료 처리, 멱등 실행 (본 작업 9/9 완료, 검증 gaps_found → 갭 클로저 플랜 05-10~05-16 계획됨, 청크 D)
 - [ ] **Phase 6: 운영** - 출석 체크, 공지사항, 관리자 알림·활동 피드
 
 ## Phase Details
@@ -179,7 +179,7 @@ Phase 4, `INACTIVITY`는 Phase 5, `EVENING_HALF`는 Phase 6이 쓴다. `PassTran
 설계하지 않으면 가드가 있어도 관리자가 계속 그 경로를 밟는다. 05-08은 API description에 운영
 회피책("응답이 오지 않아도 재호출하지 않는다")만 넣어 둔 상태다.
 
-**Plans**: 9 plans / 9 waves — **3개 청크로 납품했다 (D-084)**. 계획은 2개 청크였으나 청크 B가
+**Plans**: 16 plans / 16 waves — **4개 청크로 납품한다 (D-084)**. 본 작업 9 + 갭 클로저 7. 계획은 2개 청크였으나 청크 B가
 너무 커져 실행 중 wave 7/8 경계에서 한 번 더 갈랐다.
 청크 A `feature/phase-05a-batch-foundation`(wave 1~4, 판정 인프라 — 이 청크만으로는 차감이 일어나지 않는다) ·
 청크 B `feature/phase-05b-inactivity-deduction`(wave 5~7, 차감 실행·멱등 실증) ·
@@ -200,6 +200,20 @@ Phase 4, `INACTIVITY`는 Phase 5, `EVENING_HALF`는 Phase 6이 쓴다. `PassTran
 **청크 C — 트리거·마감 (wave 8~9)**
 - [x] 05-08-PLAN.md — @Scheduled cron 트리거 + 관리자 수동 실행 API + openapi 재생성 (BATCH-01/04)
 - [x] 05-09-PLAN.md — phase 마감: 요구사항 대응표·문서 정합 + 로컬 실제 실행 확인 (BATCH-01~04)
+
+**청크 D — 갭 클로저 (wave 10~16, `feature/phase-05d-gap-closure`)**
+05-VERIFICATION.md가 실패로 판정한 truth 3개(BATCH-01·02·04)를 닫는다. 설계는
+`05-GAP-CONTEXT.md`에서 사용자 확인을 거쳐 확정했다. dev 대상 PR 1개로 납품하며 머지는 사용자가 한다.
+- [ ] 05-10-PLAN.md — CR-04: 휴회에서 벗어나는 모든 전이에 복귀 시각 기록 + 소급 차감 방지 실증 (BATCH-02)
+- [ ] 05-11-PLAN.md — V10(finished_at 완화 + RUNNING 부분 유니크 인덱스) + 실행 이력 모델·스칼라 전환(WR-04) (BATCH-04)
+- [ ] 05-12-PLAN.md — 배치 설정 3종 + BatchAlreadyRunningException(409) + BatchExecutionRecorder (BATCH-04)
+- [ ] 05-13-PLAN.md — 러너·스케줄러 통합(FAILED 이력, WR-02) + 동시 run() 총 차감 1회 동시성 테스트 (BATCH-04)
+- [ ] 05-14-PLAN.md — CR-02: 정책 시행일 하한 + 1회 실행당 회원 1명 1회 상한 (BATCH-01)
+- [ ] 05-15-PLAN.md — WR-05: 202 접수 + 비동기 실행 + 실행 조회 API 2종 + openapi 재생성 (BATCH-01/04)
+- [ ] 05-16-PLAN.md — 전체 회귀·문서 정합 점검 + 로컬 실기동 확인 + 표기 갱신 (BATCH-01~04)
+
+**범위 밖(의도적)**: CR-03(출석일 후보 부재) — 아래 Note의 설계 결정이며, 운영 배포 시
+`BATCH_INACTIVITY_SCHEDULER_ENABLED=false`로 cron을 꺼 둔 채 올리는 것으로 대응한다(D-116).
 
 **Note**: 출석(`Attendance`) 스키마는 이 phase에서 선반영하지 않는다 — 기준일 조회가 출석 테이블을 필요로 하지 않음을 05-CONTEXT에서 확인했고, 기준일 후보 ①(마지막 출석일)은 Phase 6까지 자연히 부재로 동작한다(의도된 동작). 기준일(policies §4.3, D-027·D-105)은 회원 단위로 5종 후보의 가장 최근 날짜를 취하며, 출석 후보가 없는 이 phase 시점에는 나머지 4종(예약 수업일·복귀일·등록일·+가감일)으로 동작한다.
 
