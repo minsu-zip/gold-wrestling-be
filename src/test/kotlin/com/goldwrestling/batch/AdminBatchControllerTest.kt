@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Import
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
@@ -73,6 +74,9 @@ class AdminBatchControllerTest {
 
     @Autowired
     private lateinit var batchExecutionRepository: BatchExecutionRepository
+
+    @Autowired
+    private lateinit var applicationContext: ApplicationContext
 
     @Autowired
     private lateinit var tokenService: TokenService
@@ -129,6 +133,21 @@ class AdminBatchControllerTest {
             .sql("delete from admin where login_id like :prefix")
             .param("prefix", "$ADMIN_LOGIN_PREFIX%")
             .update()
+    }
+
+    /**
+     * 테스트 컨텍스트에서 cron 스케줄러가 꺼져 있는지 확인한다(D-116).
+     *
+     * 이 단언이 깨지면 `@EnableScheduling`이 살아 있는 컨텍스트에서 테스트가 도는 것이고, CI가
+     * 04:00 `Asia/Seoul`을 걸치는 순간 실제 배치가 이 클래스가 만든 회원의 잔여를 깎아
+     * **재현되지 않는 실패**를 만든다. 끄는 주체는 `build.gradle.kts`의 테스트 태스크가 넣는
+     * `goldwrestling.batch.inactivity-scheduler-enabled=false` system property다.
+     *
+     * 수동 실행 API는 이 게이트와 무관하게 동작해야 한다 — 아래 테스트들이 그걸 증명한다.
+     */
+    @Test
+    fun `테스트 컨텍스트에는 cron 스케줄러 빈이 등록되지 않는다`() {
+        assertThat(applicationContext.getBeanNamesForType(InactivityBatchScheduler::class.java)).isEmpty()
     }
 
     @Test

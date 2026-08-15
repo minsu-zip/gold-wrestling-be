@@ -99,6 +99,12 @@ tasks.withType<Test> {
     // System property는 application.yml 클래스패스 리소스 검색에 영향을 주지 않아(리소스를
     // 가리는 위험이 없어) 이 전역 기본값 주입에 안전하다. 실값 아님 — 32바이트 이상 명백한 더미.
     systemProperty("goldwrestling.jwt.secret", "test-only-jwt-secret-value-do-not-use-in-production")
+    // 미사용 차감 cron을 테스트 컨텍스트에서 끈다 (D-116). 이 줄이 없으면 모든 @SpringBootTest가
+    // @EnableScheduling이 살아 있는 컨텍스트를 띄우므로, CI가 04:00 Asia/Seoul을 걸치는 순간
+    // 실제 배치가 Testcontainers DB의 잔여 횟수를 깎아 재현되지 않는 실패를 만든다.
+    // src/test/resources/application.yml 로 끄지 않는 이유: 그 파일은 main의 application.yml을
+    // 클래스패스에서 통째로 가려 나머지 설정까지 날린다 (위 jwt.secret 주석과 같은 이유).
+    systemProperty("goldwrestling.batch.inactivity-scheduler-enabled", "false")
     testLogging {
         events("passed", "skipped", "failed")
     }

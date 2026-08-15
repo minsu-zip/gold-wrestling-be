@@ -922,3 +922,22 @@
   형태를 이 저장소의 관례로 고정해 둔다 — 다음 phase가 형태를 다시 고르지 않게 한다.
 - 기각 대안: `List<Array<Any>>` + 호출부 캐스팅(RESEARCH 초안) — 인덱스 오타가 컴파일 타임에
   잡히지 않는다.
+
+
+## D-116. 미사용 차감 cron은 프로퍼티로 끌 수 있다 (`goldwrestling.batch.inactivity-scheduler-enabled`)
+
+- 2026-08-15 / `InactivityBatchScheduler`에 `@ConditionalOnProperty(matchIfMissing = true)`를 붙여
+  기본은 켜 두되 `BATCH_INACTIVITY_SCHEDULER_ENABLED=false`로 빈 등록 자체를 막을 수 있게 한다.
+  **관리자 수동 실행 API는 이 값과 무관하게 계속 동작한다** — 끄는 것은 "자동 실행"뿐이다.
+- 이유 ①(운영): 이 배치는 사람 개입 없이 회원 잔여를 깎는 유일한 경로다. 잘못 돌 때 코드 배포
+  없이 즉시 멈출 수단이 없으면 매일 04:00마다 피해가 누적된다. 특히 최초 배포는 소급 차감
+  위험(05-REVIEW.md CR-02)이 있어 꺼 둔 채 올리고 데이터를 확인한 뒤 켜는 순서가 안전하다.
+- 이유 ②(테스트): 게이트가 없으면 모든 `@SpringBootTest`가 `@EnableScheduling`이 살아 있는
+  컨텍스트를 띄워, CI가 04:00 `Asia/Seoul`을 걸치면 실제 배치가 Testcontainers DB의 잔여를 깎아
+  재현되지 않는 실패를 만든다. `build.gradle.kts`의 테스트 태스크가 이 값을 `false`로 고정한다.
+- 기각 대안: `src/test/resources/application.yml`로 끄기(main의 `application.yml`을 클래스패스에서
+  통째로 가려 나머지 설정까지 날린다), `@Profile("!test")`(테스트가 `test` 프로파일을 쓰지 않아
+  전 테스트 클래스에 `@ActiveProfiles` 추가가 필요), 스케줄러 메서드 안에서 플래그 검사(빈은
+  여전히 등록돼 "트리거만 한다"는 계약이 깨지고 조건문이 스케줄러로 들어온다).
+- 이 프로퍼티는 **CR-01(동시 이중 차감)의 해결책이 아니다** — 자동 실행을 끄면 진입점이 하나로
+  줄어 위험이 낮아질 뿐, 관리자가 동시에 두 번 호출하는 경로는 그대로 남는다.

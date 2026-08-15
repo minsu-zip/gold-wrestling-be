@@ -37,7 +37,7 @@ key-decisions:
   - "AdminBatchControllerTest는 클래스 레벨 @Transactional을 쓰지 않는다 — 연속 2회 호출이 서로 다른 물리 트랜잭션으로 커밋돼야 D-106 멱등성을 HTTP 레벨에서 실증할 수 있다"
 
 patterns-established:
-  - "스케줄러 컴포넌트(config/ 설정 클래스 + 위임만 하는 @Scheduled 메서드)는 conventions §10.0 면제 대상 — 테스트하지 않고 KDoc에 면제 사유만 남긴다"
+  - "SchedulingConfig(config/ 설정 클래스)만 conventions §10.0 면제 대상이다. InactivityBatchScheduler는 batch/ 패키지의 @Component이고 §10.0 면제 목록의 'getter/setter 수준의 위임'보다 계약이 크다(트리거 종류·관리자 id·cron 값) — 이 판단이 틀렸고 PR #15 2차 리뷰가 지적해 InactivityBatchSchedulerTest를 추가했다(D-116 커밋)"
 
 requirements-completed: [BATCH-01, BATCH-04]
 

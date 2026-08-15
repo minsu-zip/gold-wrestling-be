@@ -14,8 +14,14 @@ import org.springframework.web.bind.annotation.RestController
  * `/api/admin` 하위 전체가 `hasRole("ADMIN")` 전용이므로, **이 컨트롤러에는 별도 권한 애노테이션을
  * 붙이지 않는다**(D-040) — 역할 구분은 URL 인가 규칙이 담당한다.
  *
- * 경로가 복수형 `inactivity-runs`인 이유: 이 호출이 "배치 실행"이라는 리소스 1건을 새로 만드는
- * 것이라 REST 관례상 컬렉션에 대한 POST(리소스 생성)로 표현한다.
+ * 경로가 복수형 `inactivity-runs`인 이유: 이 호출이 `batch_execution` 이력 1건을 남기므로 실행
+ * 컬렉션에 대한 POST로 표현한다.
+ *
+ * **그런데도 `201 Created`가 아니라 `200 OK`다** — 이 저장소에서 `201`은 클라이언트가 이후에
+ * 다시 다룰 도메인 리소스를 만들 때만 쓴다(이용권 등록·예약 생성 2곳뿐. 나머지 POST 15개는 200).
+ * 배치 실행 이력은 조회 엔드포인트가 없어 `Location`으로 가리킬 곳이 없고, 클라이언트가 원하는
+ * 것은 새 리소스의 주소가 아니라 **이번 실행의 결과 수치**다. 이력 조회 API가 생기면 그때
+ * `201` + `Location`으로 바꾸는 것을 재검토한다.
  *
  * 트랜잭션 애노테이션·`try-catch`를 붙이지 않는다 — 트랜잭션 경계는 [InactivityBatchRunner]와
  * 그 협력자(D-020·D-112), 에러 응답은 `GlobalExceptionHandler`가 담당한다(D-017).

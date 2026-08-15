@@ -75,6 +75,12 @@ logging:
     org.hibernate.orm.jdbc.bind: info
 
 goldwrestling:
+  batch:
+    # 2주 미사용 차감 cron(매일 04:00 Asia/Seoul)의 킬 스위치 (decisions.md D-116).
+    # 이 배치는 사람 개입 없이 회원 잔여를 깎는 유일한 경로라 즉시 멈출 수단이 필요하다.
+    # false 로 두면 InactivityBatchScheduler 빈 자체가 등록되지 않는다 —
+    # 관리자 수동 실행 API(POST /api/admin/batch/inactivity-runs)는 이 값과 무관하게 계속 동작한다.
+    inactivity-scheduler-enabled: ${BATCH_INACTIVITY_SCHEDULER_ENABLED:true}
   cors:
     # FE dev 서버는 5180 / preview 5181 고정 (decisions.md D-012)
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5180,http://localhost:5181}
