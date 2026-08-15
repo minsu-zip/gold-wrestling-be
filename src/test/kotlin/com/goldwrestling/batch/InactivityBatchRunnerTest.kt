@@ -149,11 +149,13 @@ class InactivityBatchRunnerTest {
     }
 
     @Test
-    fun `기준일 42일 전인 회원은 3회 차감된다(캐치업)`() {
+    fun `기준일 42일 전인 회원은 실행 3번에 걸쳐 3회 차감된다(캐치업 + 1회 실행 상한)`() {
         val member = persistMember()
         val pass = persistSessionPass(member, remaining = "5.0", endDate = today.plusDays(60), createdAt = today.minusDays(42).atTime9am())
 
-        inactivityBatchRunner.run(BatchTrigger.SCHEDULED, null).let { createdBatchExecutionIds += it.id!! }
+        // 1회 실행 상한(D-119)이 한 실행의 차감을 1회로 자른다 — 밀린 3주기는 사라지지 않고
+        // 다음 실행들이 상태 기반으로 이어받는다(D-106). 총량은 상한 도입 전과 같다.
+        repeat(3) { inactivityBatchRunner.run(BatchTrigger.SCHEDULED, null).let { createdBatchExecutionIds += it.id!! } }
 
         assertThat(remainingOf(pass.id!!)).isEqualByComparingTo(BigDecimal("2.0"))
         assertThat(inactivityCountOf(pass.id!!)).isEqualTo(3)

@@ -38,6 +38,18 @@ import java.time.ZoneId
  * (별도 빈)의 `REQUIRES_NEW` 트랜잭션에서 일어난다 — 그래야 `RUNNING` 행이 본문이 끝나기 전에
  * 커밋돼 다른 실행에게 보인다.
  *
+ * ### 정책 값 두 개가 차감량을 제한한다 (D-119, CR-02)
+ * 둘 다 [InactivityBatchProperties]에서 온다 — 코드 상수가 아니라 설정이므로 사고가 나면 재배포
+ * 없이 환경변수로 되돌릴 수 있다.
+ * - **정책 시행일 하한**(`policyEffectiveDate`, 기본 `2026-09-01`): 기준일이 이 날짜보다 이르면
+ *   시행일을 기준일로 본다([InactivityDueDateCalculator.resolveDueDate]에 넘긴다). 이 하한이 없으면
+ *   D-106의 캐치업이 "배치가 아예 없었던 과거 전체"까지 몰아서 차감한다 — 200일 전에 등록되고 한
+ *   번도 쓰이지 않은 `SESSION_PASS`는 배포 후 첫 실행에서 잔여가 0이 될 수 있다.
+ * - **1회 실행 상한**(`maxDeductionsPerRun`, 기본 `1`): 매일 04:00 배치에서 정상 부족분은 0 또는
+ *   1이고 2 이상은 사고다. **하루 1회로 묶으면 사고가 나도 피해가 하루 1회씩만 누적돼 관리자가
+ *   킬 스위치(D-116)를 켤 시간이 생긴다.** 잘린 주기는 사라지지 않고 다음 실행들이 상태 기반으로
+ *   이어받는다 — 상한은 캐치업의 **속도**만 늦추고 **총량**은 바꾸지 않는다.
+ *
  * **`batch_execution`을 "오늘 이미 실행했나" 판단에 쓰지 않는다**(D-106). 이 테이블은 이제 중복
  * 실행 거부에 쓰이지만, **부족분 계산의 근거는 여전히 원장(`PassTransaction`)의 `INACTIVITY`
  * 건수뿐이다.** 둘을 섞으면 상태 기반 캐치업(D-106)이 무너진다.
@@ -159,10 +171,26 @@ class InactivityBatchRunner(
                                 inactivityEventDatesByMember[memberId].orEmpty(),
                             )
 
+                        // 1회 실행 상한(D-119) — 부족분이 아무리 커도 한 실행이 회원 1명에게서
+                        // 깎는 횟수는 여기서 잘린다. 잘린 주기는 사라지지 않고 다음 실행들이
+                        // 상태 기반으로 이어받는다(D-106).
+                        val deductionTarget = minOf(shortfallCount, properties.maxDeductionsPerRun)
+                        if (shortfallCount > deductionTarget) {
+                            // **`skippedCount`를 올리지 않는다** — 그 필드는 대상 소진·경쟁 패배 전용이고
+                            // (D-113), 상한 적용은 사고가 아니라 정상 예정 동작이다. 올리면 운영자가
+                            // 집계만 보고 "차감에 실패했다"로 오독한다.
+                            logger.info(
+                                "회원 {}의 부족분 {}회 중 {}회만 차감합니다(1회 실행 상한) — 나머지는 다음 실행이 이어받습니다.",
+                                memberId,
+                                shortfallCount,
+                                deductionTarget,
+                            )
+                        }
+
                         // 반복 횟수를 세는 인덱스를 쓰지 않는다 — 회차 번호는 어디에도 쓰이지 않고
                         // (회당 재선택 D-109이라 회차마다 대상이 달라진다), 소진 시 `break`가
                         // 필요해 `repeat`(람다 안에서 break 불가)도 쓸 수 없다.
-                        var remainingShortfall = shortfallCount
+                        var remainingShortfall = deductionTarget
                         while (remainingShortfall > 0) {
                             if (inactivityDeductionService.deductOnce(memberId)) {
                                 deductedCount++
