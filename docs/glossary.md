@@ -70,7 +70,7 @@
 | 배치 실행 결과         | `BatchExecutionStatus`   | `SUCCESS` / `PARTIAL_FAILURE` — 경쟁 패배로 인한 스킵은 정상 경로라 `SUCCESS`이며 스킵 건수만 별도로 센다(D-108 보강) |
 | 미사용 판정 기준일     | `dueDate`                | 5종 후보 중 가장 최근 날짜(D-105). 회원 단위로 계산한다                                                          |
 | 부족분                 | `shortfall`              | `floor(기준일→오늘 경과일 / 14)` − 기준일 이후 `INACTIVITY` 이력 건수(D-106)                                     |
-| 휴회 복귀 시각         | `returnedFromLeaveAt`    | DB `member.returned_from_leave_at` — `ON_LEAVE` → `ACTIVE` 전이 시각. 다른 상태 전이에서는 기록하지 않는다(D-105 기준일 후보 ③ 전용) |
+| 휴회 복귀 시각         | `returnedFromLeaveAt`    | DB `member.returned_from_leave_at` — `ON_LEAVE`에서 벗어난 전이의 시각(대상 상태 무관). 그 외 상태 전이에서는 기록하지 않는다(D-105 기준일 후보 ③ 전용, D-111 CR-04 정정) |
 
 ## 회원 상태 (MemberStatus)
 
