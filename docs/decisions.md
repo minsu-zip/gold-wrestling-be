@@ -840,8 +840,10 @@
   실행 1회가 `batch_execution`에 `RUNNING` 행을 먼저 넣고 종료 시 확정하며, 그 행의 유일성을
   V10 부분 유니크 인덱스(`uq_batch_execution_running`, D-117)가 보장한다 — 겹친 두 번째 실행은
   INSERT 단계에서 거부돼 409 `BATCH_ALREADY_RUNNING`(D-118)이 되고 **본문이 아예 돌지 않는다.**
-  실증 근거는 `InactivityBatchRunConcurrencyTest`다: 네 스레드가 동시에 `run()`을 호출해도
-  `INACTIVITY` 이력이 정확히 1건이고, 실행 이력들의 `deductedCount` 합도 1이다.
+  실증 근거는 `InactivityBatchRunConcurrencyTest`, `AdminBatchRunConcurrencyTest`다:
+  전자는 네 스레드가 동시에 `run()`을 호출해도 `INACTIVITY` 이력이 정확히 1건이고 실행
+  이력들의 `deductedCount` 합도 1임을, 후자는 동시 POST에서 202가 정확히 1건·나머지는
+  409임을 HTTP 계층에서 실제 PostgreSQL로 각각 단언한다.
   경쟁에서 진 쪽이 **거부되지 않고 뒤늦게 시작하는 경우에도** 총 차감은 1회다 — 그때는 원장에
   이미 이력이 있어 부족분 0이 계산되기 때문이다(D-106). 두 경로 모두 같은 불변식으로 수렴한다.
 - **"단일 EC2라 분산 락이 필요 없다"는 결론은 유지하되 근거가 바뀌었다(2026-08-16).**
