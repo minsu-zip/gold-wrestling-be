@@ -121,7 +121,7 @@ class InactivityBatchFailureIsolationTest {
         val healthy = persistMember()
         val failingPass = persistDeductiblePass(failing)
         val healthyPass = persistDeductiblePass(healthy)
-        willThrow(IllegalStateException("의도적 실패")).given(inactivityDeductionService).deductOnce(failing.id!!)
+        willThrow(IllegalStateException(LEAKY_MESSAGE)).given(inactivityDeductionService).deductOnce(failing.id!!)
 
         val result = inactivityBatchRunner.run(BatchTrigger.SCHEDULED, null)
         createdBatchExecutionIds += result.id!!
@@ -138,7 +138,7 @@ class InactivityBatchFailureIsolationTest {
         val healthy = persistMember()
         persistDeductiblePass(failing)
         persistDeductiblePass(healthy)
-        willThrow(IllegalStateException("의도적 실패")).given(inactivityDeductionService).deductOnce(failing.id!!)
+        willThrow(IllegalStateException(LEAKY_MESSAGE)).given(inactivityDeductionService).deductOnce(failing.id!!)
 
         val result = inactivityBatchRunner.run(BatchTrigger.SCHEDULED, null)
         createdBatchExecutionIds += result.id!!
@@ -146,7 +146,23 @@ class InactivityBatchFailureIsolationTest {
         assertThat(result.status).isEqualTo(BatchExecutionStatus.PARTIAL_FAILURE)
         assertThat(result.processedMemberCount).isEqualTo(2)
         assertThat(result.deductedCount).isEqualTo(1)
-        assertThat(result.errorSummary).contains("memberId=${failing.id}", "의도적 실패")
+        assertThat(result.errorSummary).contains("memberId=${failing.id}", "IllegalStateException")
+    }
+
+    /**
+     * `errorSummary`는 D-114의 관리자 수동 실행 응답으로 그대로 나간다 — 예외 **메시지**가 담기면
+     * DB 제약조건명·SQL 조각이 API로 새어 나간다(conventions §8, D-017). 예외 종류만 남는지 고정한다.
+     */
+    @Test
+    fun `errorSummary에는 예외 종류만 남고 예외 메시지는 담기지 않는다`() {
+        val failing = persistMember()
+        persistDeductiblePass(failing)
+        willThrow(IllegalStateException(LEAKY_MESSAGE)).given(inactivityDeductionService).deductOnce(failing.id!!)
+
+        val result = inactivityBatchRunner.run(BatchTrigger.SCHEDULED, null)
+        createdBatchExecutionIds += result.id!!
+
+        assertThat(result.errorSummary).doesNotContain(LEAKY_MESSAGE)
     }
 
     @Test
@@ -225,5 +241,8 @@ class InactivityBatchFailureIsolationTest {
         const val KAKAO_ID_BASE = 9_710_000_000L
         const val ADMIN_LOGIN_PREFIX = "admin-inactivity-batch-failure-"
         const val ABSENT_ADMIN_ID = 9_999_999L
+
+        /** 실제 DB 예외 메시지를 흉내 낸 문자열 — 이런 내용이 `errorSummary`로 새지 않아야 한다. */
+        const val LEAKY_MESSAGE = "ERROR: duplicate key value violates unique constraint \"uq_pass_transaction\""
     }
 }

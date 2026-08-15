@@ -7,6 +7,7 @@ import com.goldwrestling.member.MemberRepository
 import com.goldwrestling.pass.PassRepository
 import com.goldwrestling.pass.PassTransactionRepository
 import com.goldwrestling.reservation.ReservationRepository
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import java.time.Clock
 import java.time.LocalDate
@@ -117,7 +118,11 @@ class InactivityBatchRunner(
                         }
                     }
                 } catch (e: Exception) {
-                    failedMembers += memberId to (e.message ?: e.javaClass.simpleName)
+                    // 진단 정보(메시지·스택)는 로그로만 남긴다 — errorSummary는 관리자 수동 실행
+                    // 응답(D-114 `BatchExecutionResponse`)으로 그대로 나가므로 예외 메시지를 담으면
+                    // DB 제약조건명·SQL 조각이 API로 새어 나간다(conventions §8, D-017).
+                    logger.error("미사용 차감 배치에서 회원 처리 실패 (memberId={})", memberId, e)
+                    failedMembers += memberId to e.javaClass.simpleName
                 }
             }
         }
@@ -169,5 +174,6 @@ class InactivityBatchRunner(
 
     companion object {
         private const val MAX_ERROR_SUMMARY_LENGTH = 1000
+        private val logger = LoggerFactory.getLogger(InactivityBatchRunner::class.java)
     }
 }
