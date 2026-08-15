@@ -100,4 +100,136 @@ class InactivityDueDateCalculatorTest {
             lastSessionPassRegistrationDate = lastSessionPassRegistrationDate,
             lastPositiveAdjustDate = lastPositiveAdjustDate,
         )
+
+    // ── expectedDeductionCount: 2주 경과마다 1회 반복 (policies §4.3) ──────────
+
+    @Test
+    fun `경과 0일이면 존재해야 할 차감 수는 0이다`() {
+        assertThat(InactivityDueDateCalculator.expectedDeductionCount(DUE_DATE, DUE_DATE)).isEqualTo(0)
+    }
+
+    @Test
+    fun `경과 13일이면 존재해야 할 차감 수는 0이다`() {
+        assertThat(InactivityDueDateCalculator.expectedDeductionCount(DUE_DATE, DUE_DATE.plusDays(13))).isEqualTo(0)
+    }
+
+    @Test
+    fun `경과 14일이면 1회 차감이 존재해야 한다`() {
+        assertThat(InactivityDueDateCalculator.expectedDeductionCount(DUE_DATE, DUE_DATE.plusDays(14))).isEqualTo(1)
+    }
+
+    @Test
+    fun `경과 27일이면 존재해야 할 차감 수는 여전히 1이다`() {
+        assertThat(InactivityDueDateCalculator.expectedDeductionCount(DUE_DATE, DUE_DATE.plusDays(27))).isEqualTo(1)
+    }
+
+    @Test
+    fun `경과 28일이면 2회 차감이 존재해야 한다`() {
+        assertThat(InactivityDueDateCalculator.expectedDeductionCount(DUE_DATE, DUE_DATE.plusDays(28))).isEqualTo(2)
+    }
+
+    @Test
+    fun `경과 41일이면 존재해야 할 차감 수는 여전히 2다`() {
+        assertThat(InactivityDueDateCalculator.expectedDeductionCount(DUE_DATE, DUE_DATE.plusDays(41))).isEqualTo(2)
+    }
+
+    @Test
+    fun `경과 42일이면 3회 차감이 존재해야 한다`() {
+        assertThat(InactivityDueDateCalculator.expectedDeductionCount(DUE_DATE, DUE_DATE.plusDays(42))).isEqualTo(3)
+    }
+
+    @Test
+    fun `기준일이 오늘보다 미래면 존재해야 할 차감 수는 0이다 — 미래 수업일 예약이 음수 차감을 만들지 않는다`() {
+        assertThat(InactivityDueDateCalculator.expectedDeductionCount(DUE_DATE, DUE_DATE.minusDays(1))).isEqualTo(0)
+    }
+
+    // ── shortfall: 상태 기반 부족분 = 멱등 + 캐치업 (D-106) ────────────────────
+
+    @Test
+    fun `경과 14일에 이력이 없으면 부족분은 1이다`() {
+        val shortfall =
+            InactivityDueDateCalculator.shortfall(DUE_DATE, DUE_DATE.plusDays(14), inactivityEventDates = emptyList())
+
+        assertThat(shortfall).isEqualTo(1)
+    }
+
+    @Test
+    fun `경과 14일에 기준일 이후 이력이 1건 있으면 부족분은 0이다 — 같은 날 두 번째 실행이 이중 차감하지 않는다`() {
+        val shortfall =
+            InactivityDueDateCalculator.shortfall(
+                DUE_DATE,
+                DUE_DATE.plusDays(14),
+                inactivityEventDates = listOf(DUE_DATE.plusDays(14)),
+            )
+
+        assertThat(shortfall).isEqualTo(0)
+    }
+
+    @Test
+    fun `경과 42일에 이력이 없으면 부족분은 3이다 — 배치가 6주 밀려도 밀린 주기를 몰아서 차감한다`() {
+        val shortfall =
+            InactivityDueDateCalculator.shortfall(DUE_DATE, DUE_DATE.plusDays(42), inactivityEventDates = emptyList())
+
+        assertThat(shortfall).isEqualTo(3)
+    }
+
+    @Test
+    fun `경과 42일에 이력이 1건 있으면 부족분은 2다`() {
+        val shortfall =
+            InactivityDueDateCalculator.shortfall(
+                DUE_DATE,
+                DUE_DATE.plusDays(42),
+                inactivityEventDates = listOf(DUE_DATE.plusDays(14)),
+            )
+
+        assertThat(shortfall).isEqualTo(2)
+    }
+
+    @Test
+    fun `이력 날짜가 기준일보다 이전이면 세지 않는다 — 기준일이 리셋되면 그 전 이력은 무관하다`() {
+        val shortfall =
+            InactivityDueDateCalculator.shortfall(
+                DUE_DATE,
+                DUE_DATE.plusDays(14),
+                inactivityEventDates = listOf(DUE_DATE.minusDays(1)),
+            )
+
+        assertThat(shortfall).isEqualTo(1)
+    }
+
+    @Test
+    fun `이력 날짜가 기준일 당일이면 센다`() {
+        val shortfall =
+            InactivityDueDateCalculator.shortfall(
+                DUE_DATE,
+                DUE_DATE.plusDays(14),
+                inactivityEventDates = listOf(DUE_DATE),
+            )
+
+        assertThat(shortfall).isEqualTo(0)
+    }
+
+    @Test
+    fun `이력이 기대 횟수보다 많으면 부족분은 음수가 아니라 0을 반환한다`() {
+        val shortfall =
+            InactivityDueDateCalculator.shortfall(
+                DUE_DATE,
+                DUE_DATE.plusDays(14),
+                inactivityEventDates = listOf(DUE_DATE.plusDays(14), DUE_DATE.plusDays(20)),
+            )
+
+        assertThat(shortfall).isEqualTo(0)
+    }
+
+    @Test
+    fun `이력 리스트가 비어 있고 경과 13일이면 부족분은 0이다`() {
+        val shortfall =
+            InactivityDueDateCalculator.shortfall(DUE_DATE, DUE_DATE.plusDays(13), inactivityEventDates = emptyList())
+
+        assertThat(shortfall).isEqualTo(0)
+    }
+
+    companion object {
+        private val DUE_DATE: LocalDate = LocalDate.of(2026, 1, 1)
+    }
 }
