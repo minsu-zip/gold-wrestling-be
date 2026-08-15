@@ -151,7 +151,26 @@ class InactivityBatchRunner(
         )
     }
 
-    /** `trigger = MANUAL`이면 관리자를 조회해 채우고, `SCHEDULED`면 항상 null이다(`ck_batch_execution_trigger`). */
+    /**
+     * `trigger = MANUAL`이면 관리자를 조회해 채우고, `SCHEDULED`면 항상 null이다(`ck_batch_execution_trigger`).
+     *
+     * **두 예외 모두 `AdminBatchController`의 HTTP 경로에서는 도달 불가하다**(05-08, PR #14 리뷰
+     * Info 이월 확인):
+     * - `requireNotNull(triggeredByAdminId)`: 호출부(`AdminBatchController.runInactivityBatch`)가
+     *   넘기는 값은 [AuthenticatedPrincipal.requireAdminId]의 반환값인데, 이 함수의 시그니처가
+     *   non-null `Long`이라 컴파일 타임에 null이 될 수 없다 — Kotlin 타입 시스템이 보장한다.
+     * - 관리자 조회 실패 `IllegalStateException`: `JwtAuthenticationFilter.authenticate`가 매
+     *   요청마다 `AuthenticationPrincipalResolver.resolve`로 관리자 존재 여부를 먼저 확인하고,
+     *   없으면(삭제됨) `null`을 반환해 인증 자체가 실패한다(401, 컨트롤러 진입 전 차단). 게다가
+     *   `AdminRepository`에는 관리자 삭제 기능이 아예 없다(`JpaRepository` 상속 메서드를 호출하는
+     *   곳이 저장소 어디에도 없음) — 그래서 이 예외는 지금 이 저장소에서 관리자를 삭제할 방법이
+     *   생기기 전까지는 이론적으로도 발생하지 않는다.
+     *
+     * 두 경로 모두 도메인 예외·`ErrorCode`를 새로 만들지 않는다(D-114 "새 에러코드는 추가하지
+     * 않는다"). 이 두 예외는 여전히 `runner.run()`을 직접 호출하는 테스트
+     * (`InactivityBatchFailureIsolationTest`)의 계약 검증용으로 남는다 — 프로그래밍 오류(잘못된
+     * 인자로 러너를 직접 호출)를 조기에 드러내는 방어 코드다.
+     */
     private fun resolveTriggeredBy(
         trigger: BatchTrigger,
         triggeredByAdminId: Long?,
