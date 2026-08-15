@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-06-PLAN.md
-last_updated: "2026-08-15T04:54:04.745Z"
+stopped_at: Completed 05-07-PLAN.md
+last_updated: "2026-08-15T05:06:39.927Z"
 last_activity: 2026-08-15
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 53
-  completed_plans: 50
+  completed_plans: 51
   percent: 67
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 05 (batch) — EXECUTING
-Plan: 6 of 9
+Plan: 7 of 9
 Status: Ready to execute
 Last activity: 2026-08-15
 
-Progress: [█████████░] 94%
+Progress: [██████████] 96%
 
 ## Performance Metrics
 
@@ -77,6 +77,7 @@ Progress: [█████████░] 94%
 | Phase 05-batch P04 | 50min | 2 tasks | 9 files |
 | Phase 05-batch P05 | 55min | 1 tasks | 3 files |
 | Phase 05-batch P06 | 35min | 1 tasks | 2 files |
+| Phase 05-batch P07 | ~40min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -137,6 +138,8 @@ Recent decisions affecting current work:
 - [Phase 05-05]: Mockito 5는 Kotlin non-null 인터페이스 파라미터에 any()/anyLong() 매처를 쓰면 NPE를 던진다 — 매처 없이 실제 값을 그대로 인자로 넘겨 우회한다
 - [Phase 05-06]: repeat+return@repeat 대신 for+break로 부족분 루프 구현 — return@repeat은 continue 의미라 대상 소진 후에도 반복이 계속돼 'skippedCount 1건만 증가하고 중단'이라는 명시된 behavior를 만족하지 못한다
 - [Phase 05-06]: InactivityBatchRunner KDoc의 '@Transactional' 리터럴이 acceptance grep(0건 기대)과 충돌해 '트랜잭션 애노테이션'으로 표현 변경 — 05-03·05-04의 동일 유형 충돌과 같은 해결
+- [Phase 05-07]: ADMIN_ADJUST 픽스처는 배치 차감(조건부 UPDATE) 이후 낡은 메모리 참조가 아니라 DB 재조회 값 위에 가감한다 — 재조회 없이 가감하면 이미 반영된 배치 차감분이 되살아난다
+- [Phase 05-07]: 만료 검증 테스트 @AfterEach 정리 순서에 pass_period_change 삭제를 pass 삭제보다 앞에 추가 — AdminPassService.changePeriod가 남기는 이력(D-057)이 FK로 남아 있으면 pass 삭제가 실패한다
 
 ### Pending Todos
 
@@ -163,6 +166,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-15T04:54:04.739Z
-Stopped at: Completed 05-06-PLAN.md
+Last session: 2026-08-15T05:06:39.921Z
+Stopped at: Completed 05-07-PLAN.md
 Resume file: None
