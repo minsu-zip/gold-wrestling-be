@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-04-PLAN.md
-last_updated: "2026-08-15T03:47:22.019Z"
+stopped_at: Completed 05-05-PLAN.md
+last_updated: "2026-08-15T04:41:08.012Z"
 last_activity: 2026-08-15
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 53
-  completed_plans: 48
+  completed_plans: 49
   percent: 67
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 05 (batch) — EXECUTING
-Plan: 5 of 9
+Plan: 2 of 9
 Status: Ready to execute
 Last activity: 2026-08-15
 
-Progress: [█████████░] 91%
+Progress: [█████████░] 92%
 
 ## Performance Metrics
 
@@ -75,6 +75,7 @@ Progress: [█████████░] 91%
 | Phase 05-batch P02 | 35min | 3 tasks | 11 files |
 | Phase 05-batch P03 | 25min | 2 tasks | 2 files |
 | Phase 05-batch P04 | 50min | 2 tasks | 9 files |
+| Phase 05-batch P05 | 55min | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -130,6 +131,9 @@ Recent decisions affecting current work:
 - [Phase 05-batch]: InactivityDueDateCalculator KDoc의 'Clock' 문자열이 acceptance grep과 충돌해 '시각 주입 빈'으로 표현 변경
 - [Phase 05-batch]: D-115: 배치 벌크 조회는 Array<Any> 캐스팅 대신 인터페이스 스칼라 프로젝션(common/projection)으로 반환 — 타입 안전성을 이 저장소 관례로 고정
 - [Phase 05-batch]: CANCELED Pass 픽스처는 상태를 직접 대입하지 않고 PassRepository.cancelIfNotCanceled 실제 취소 경로로 만든다 — ck_pass_cancellation(V4)이 취소 메타데이터 완전성을 강제
+- [Phase 05-05]: 잔여 0인 SESSION_PASS 테스트 픽스처는 INITIAL_GRANT 이력을 생성하지 않는다 — ck_pass_transaction_amount_nonzero(V4)가 금액 0인 이력을 거부한다
+- [Phase 05-05]: 취소된 SESSION_PASS 픽스처는 cancelIfNotCanceled 대신 취소 메타데이터를 채운 Pass를 직접 saveAndFlush한다 — 커스텀 @Modifying 쿼리는 명시적 @Transactional 없이 호출하면 기본 readOnly 트랜잭션이 붙어 flush가 실패한다
+- [Phase 05-05]: Mockito 5는 Kotlin non-null 인터페이스 파라미터에 any()/anyLong() 매처를 쓰면 NPE를 던진다 — 매처 없이 실제 값을 그대로 인자로 넘겨 우회한다
 
 ### Pending Todos
 
@@ -138,6 +142,7 @@ None yet.
 ### Blockers/Concerns
 
 - REQUIREMENTS.md 문서 상단의 "v1 requirements: 36 total" 표기가 실제 v1 목록(FOUND~NOTIF, 42건)과 불일치했음. 로드맵 작성 시 실제 목록 42건 전부를 매핑하고 Coverage 섹션을 42로 정정함 — 원 문서(docs/)와의 스펙 차이가 아니라 REQUIREMENTS.md 자체의 집계 오류로 판단.
+- STATE.md의 'Plan: X of 9' 표시값이 실제 완료 플랜 수(현재 5/9, 05-01~05-05 SUMMARY 존재)와 어긋나 있음 — Phase 05 시작 시점부터 드리프트가 있었고(05-04 완료 후에도 'Plan: 1 of 9'), state advance-plan은 상대 증분만 하므로 근본 원인(오케스트레이터의 카운터 초기값)은 별도 조사 필요. 다음 플랜(05-06) 실행 전 STATE.md의 Plan 위치를 수동 확인 권장
 
 ### Quick Tasks Completed
 
@@ -155,6 +160,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-15T03:47:22.013Z
-Stopped at: Completed 05-04-PLAN.md
+Last session: 2026-08-15T04:40:50.673Z
+Stopped at: Completed 05-05-PLAN.md
 Resume file: None

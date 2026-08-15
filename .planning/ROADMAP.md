@@ -170,7 +170,7 @@ Phase 4, `INACTIVITY`는 Phase 5, `EVENING_HALF`는 Phase 6이 쓴다. `PassTran
 - [x] 05-04-PLAN.md — 배치 대상·기준일 후보·이력 벌크 조회 6종 + 통합테스트 (BATCH-01/02)
 
 **청크 B — 차감 실행·운영 (wave 5~9)**
-- [ ] 05-05-PLAN.md — [TDD] 차감 1회 반영(만료 임박 한 장·부분 차감·시스템 주체 이력) (BATCH-01/02)
+- [x] 05-05-PLAN.md — [TDD] 차감 1회 반영(만료 임박 한 장·부분 차감·시스템 주체 이력) (BATCH-01/02)
 - [ ] 05-06-PLAN.md — InactivityBatchRunner(조회→계산→차감→실행 이력, 트랜잭션 없는 루프) (BATCH-01/02/04)
 - [ ] 05-07-PLAN.md — 멱등·캐치업 실증 + 만료 사용 불가 실증(구현물 없음, D-107) (BATCH-02/03/04)
 - [ ] 05-08-PLAN.md — @Scheduled cron 트리거 + 관리자 수동 실행 API + openapi 재생성 (BATCH-01/04)
@@ -201,6 +201,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 2. 인증·회원 | 15/15 | Complete   | 2026-08-03 |
 | 3. 이용권 | 11/11 | Complete    | 2026-08-04 |
 | 4. 시간표·예약 | 15/15 | Complete   | 2026-08-08 |
-| 5. 배치 | 4/9 | In Progress|  |
+| 5. 배치 | 5/9 | In Progress|  |
 | 6. 운영 | 0/TBD | Not started | - |
 </content>
