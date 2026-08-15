@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 05 (batch) — EXECUTING
-Plan: 2 of 9
+Plan: 5 of 9
 Status: Ready to execute
 Last activity: 2026-08-15
 
@@ -142,7 +142,7 @@ None yet.
 ### Blockers/Concerns
 
 - REQUIREMENTS.md 문서 상단의 "v1 requirements: 36 total" 표기가 실제 v1 목록(FOUND~NOTIF, 42건)과 불일치했음. 로드맵 작성 시 실제 목록 42건 전부를 매핑하고 Coverage 섹션을 42로 정정함 — 원 문서(docs/)와의 스펙 차이가 아니라 REQUIREMENTS.md 자체의 집계 오류로 판단.
-- STATE.md의 'Plan: X of 9' 표시값이 실제 완료 플랜 수(현재 5/9, 05-01~05-05 SUMMARY 존재)와 어긋나 있음 — Phase 05 시작 시점부터 드리프트가 있었고(05-04 완료 후에도 'Plan: 1 of 9'), state advance-plan은 상대 증분만 하므로 근본 원인(오케스트레이터의 카운터 초기값)은 별도 조사 필요. 다음 플랜(05-06) 실행 전 STATE.md의 Plan 위치를 수동 확인 권장
+- ~~STATE.md의 'Plan: X of 9' 표시값 드리프트~~ **해소(2026-08-15)** — 원인은 청크 실행 시 오케스트레이터가 매번 호출하는 `state.begin-phase`가 Plan 카운터를 1로 리셋하는 것. `advance-plan`은 상대 증분만 하므로 리셋된 값에서 다시 세어 어긋났다. 실제 완료 수(5/9)로 수동 정정했고, 청크 단위 실행(D-084)에서는 wave 시작마다 `begin-phase`가 재호출되므로 다음 청크에서도 같은 드리프트가 재발할 수 있다 — 표시 전용 필드이며 SUMMARY 존재 여부가 실제 진행의 근거다
 
 ### Quick Tasks Completed
 
