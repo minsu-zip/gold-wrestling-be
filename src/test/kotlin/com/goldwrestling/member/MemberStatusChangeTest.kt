@@ -348,8 +348,11 @@ class MemberStatusChangeTest {
         (clock as MutableTestClock).setTo(firstReturn)
 
         mockMvc.perform(statusRequest(member.id!!, adminToken, "ACTIVE")).andExpect(status().isOk)
-        val afterFirstReturn = memberRepository.findById(member.id!!).orElseThrow()
-        assertThat(afterFirstReturn.returnedFromLeaveAt).isEqualTo(OffsetDateTime.ofInstant(firstReturn, clock.zone))
+        // 같은 트랜잭션 안에서는 findById가 영속성 컨텍스트의 동일 인스턴스를 돌려주므로(1차 캐시),
+        // 엔티티 참조가 아니라 이 시점의 값만 별도 변수로 떼어 둔다 — 그렇지 않으면 두 번째 복귀
+        // 이후 값도 같은 인스턴스를 통해 갱신되어 "더 최근으로 바뀌었는지" 비교가 항상 참이 된다.
+        val afterFirstReturn = memberRepository.findById(member.id!!).orElseThrow().returnedFromLeaveAt
+        assertThat(afterFirstReturn).isEqualTo(OffsetDateTime.ofInstant(firstReturn, clock.zone))
 
         mockMvc.perform(statusRequest(member.id!!, adminToken, "ON_LEAVE")).andExpect(status().isOk)
         val secondReturn = Instant.parse("2026-09-05T03:30:00Z")
@@ -358,7 +361,7 @@ class MemberStatusChangeTest {
 
         val reloaded = memberRepository.findById(member.id!!).orElseThrow()
         assertThat(reloaded.returnedFromLeaveAt).isEqualTo(OffsetDateTime.ofInstant(secondReturn, clock.zone))
-        assertThat(reloaded.returnedFromLeaveAt).isNotEqualTo(afterFirstReturn.returnedFromLeaveAt)
+        assertThat(reloaded.returnedFromLeaveAt).isNotEqualTo(afterFirstReturn)
     }
 
     @Test
