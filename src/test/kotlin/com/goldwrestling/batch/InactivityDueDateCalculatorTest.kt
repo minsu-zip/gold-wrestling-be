@@ -10,10 +10,14 @@ import java.time.LocalDate
  */
 class InactivityDueDateCalculatorTest {
     // ── resolveDueDate: 기준일 5종 후보의 max (D-105) ──────────────────────────
+    //
+    // 아래 6종은 시행일 하한(D-119)이 **발동하지 않는** 값([ANCIENT_EFFECTIVE_DATE])을 넘겨
+    // 기존 계약(후보 max 선택)을 그대로 고정한다 — 하한이 기존 규칙을 덮어쓰지 않는지 확인하는
+    // 회귀 방어다.
 
     @Test
     fun `후보가 5개 전부 null이면 기준일이 없다`() {
-        val dueDate = InactivityDueDateCalculator.resolveDueDate(candidates())
+        val dueDate = InactivityDueDateCalculator.resolveDueDate(candidates(), ANCIENT_EFFECTIVE_DATE)
 
         assertThat(dueDate).isNull()
     }
@@ -29,6 +33,7 @@ class InactivityDueDateCalculatorTest {
                     lastSessionPassRegistrationDate = LocalDate.of(2026, 6, 1),
                     lastPositiveAdjustDate = LocalDate.of(2026, 5, 1),
                 ),
+                ANCIENT_EFFECTIVE_DATE,
             )
 
         assertThat(dueDate).isEqualTo(LocalDate.of(2026, 7, 10))
@@ -43,6 +48,7 @@ class InactivityDueDateCalculatorTest {
                     returnedFromLeaveDate = LocalDate.of(2026, 8, 1),
                     lastSessionPassRegistrationDate = LocalDate.of(2026, 2, 1),
                 ),
+                ANCIENT_EFFECTIVE_DATE,
             )
 
         assertThat(dueDate).isEqualTo(LocalDate.of(2026, 8, 1))
@@ -57,6 +63,7 @@ class InactivityDueDateCalculatorTest {
                     lastSessionPassRegistrationDate = LocalDate.of(2026, 2, 1),
                     lastPositiveAdjustDate = LocalDate.of(2026, 8, 1),
                 ),
+                ANCIENT_EFFECTIVE_DATE,
             )
 
         assertThat(dueDate).isEqualTo(LocalDate.of(2026, 8, 1))
@@ -67,6 +74,7 @@ class InactivityDueDateCalculatorTest {
         val dueDate =
             InactivityDueDateCalculator.resolveDueDate(
                 candidates(lastSessionPassRegistrationDate = LocalDate.of(2026, 8, 1)),
+                ANCIENT_EFFECTIVE_DATE,
             )
 
         assertThat(dueDate).isEqualTo(LocalDate.of(2026, 8, 1))
@@ -81,9 +89,88 @@ class InactivityDueDateCalculatorTest {
                     lastActiveReservationClassDate = sameDate,
                     lastSessionPassRegistrationDate = sameDate,
                 ),
+                ANCIENT_EFFECTIVE_DATE,
             )
 
         assertThat(dueDate).isEqualTo(sameDate)
+    }
+
+    // ── resolveDueDate: 정책 시행일 하한 (D-119, CR-02) ────────────────────────
+
+    @Test
+    fun `후보 max가 정책 시행일보다 이르면 기준일은 정책 시행일이다`() {
+        val dueDate =
+            InactivityDueDateCalculator.resolveDueDate(
+                candidates(lastSessionPassRegistrationDate = LocalDate.of(2026, 1, 15)),
+                POLICY_EFFECTIVE_DATE,
+            )
+
+        assertThat(dueDate).isEqualTo(POLICY_EFFECTIVE_DATE)
+    }
+
+    @Test
+    fun `후보 max가 정책 시행일보다 늦으면 기준일은 후보 max 그대로다`() {
+        val afterEffective = POLICY_EFFECTIVE_DATE.plusDays(1)
+        val dueDate =
+            InactivityDueDateCalculator.resolveDueDate(
+                candidates(
+                    lastSessionPassRegistrationDate = LocalDate.of(2026, 1, 15),
+                    lastPositiveAdjustDate = afterEffective,
+                ),
+                POLICY_EFFECTIVE_DATE,
+            )
+
+        assertThat(dueDate).isEqualTo(afterEffective)
+    }
+
+    @Test
+    fun `후보 max가 정책 시행일과 같으면 그대로 정책 시행일이 기준일이다`() {
+        val dueDate =
+            InactivityDueDateCalculator.resolveDueDate(
+                candidates(lastSessionPassRegistrationDate = POLICY_EFFECTIVE_DATE),
+                POLICY_EFFECTIVE_DATE,
+            )
+
+        assertThat(dueDate).isEqualTo(POLICY_EFFECTIVE_DATE)
+    }
+
+    @Test
+    fun `후보가 전부 null이면 정책 시행일이 있어도 기준일은 여전히 null이다`() {
+        val dueDate = InactivityDueDateCalculator.resolveDueDate(candidates(), POLICY_EFFECTIVE_DATE)
+
+        assertThat(dueDate).isNull()
+    }
+
+    @Test
+    fun `정책 시행일이 미래면 기준일도 미래가 되어 존재해야 할 차감 수는 0이다 — 배포 전 데이터는 소급 차감되지 않는다`() {
+        val today = LocalDate.of(2026, 8, 2)
+        val futureEffectiveDate = LocalDate.of(2026, 9, 1)
+
+        val dueDate =
+            InactivityDueDateCalculator.resolveDueDate(
+                candidates(lastSessionPassRegistrationDate = today.minusDays(200)),
+                futureEffectiveDate,
+            )
+
+        assertThat(dueDate).isEqualTo(futureEffectiveDate)
+        assertThat(InactivityDueDateCalculator.expectedDeductionCount(dueDate!!, today)).isZero()
+    }
+
+    @Test
+    fun `200일 전 등록 회원도 정책 시행일이 30일 전이면 기대 차감 수는 14가 아니라 2다`() {
+        val today = LocalDate.of(2026, 8, 2)
+        val effectiveDate = today.minusDays(30)
+
+        val dueDate =
+            InactivityDueDateCalculator.resolveDueDate(
+                candidates(lastSessionPassRegistrationDate = today.minusDays(200)),
+                effectiveDate,
+            )
+
+        assertThat(dueDate).isEqualTo(effectiveDate)
+        assertThat(InactivityDueDateCalculator.expectedDeductionCount(dueDate!!, today)).isEqualTo(2)
+        // 하한이 없었다면 200 / 14 = 14회다 — 잔여 5회짜리 이용권이 한 실행에 0이 된다(CR-02).
+        assertThat(InactivityDueDateCalculator.expectedDeductionCount(today.minusDays(200), today)).isEqualTo(14)
     }
 
     private fun candidates(
@@ -231,5 +318,15 @@ class InactivityDueDateCalculatorTest {
 
     companion object {
         private val DUE_DATE: LocalDate = LocalDate.of(2026, 1, 1)
+
+        /**
+         * 하한이 **발동하지 않는** 시행일 — 이 값을 넘긴 테스트는 D-119 이전의 기존 계약을 그대로
+         * 검증한다. 프로덕션 기본값(2026-09-01)을 여기에 쓰면 모든 후보가 시행일로 끌어올려져
+         * "후보 max를 고른다"는 계약이 사라진다.
+         */
+        private val ANCIENT_EFFECTIVE_DATE: LocalDate = LocalDate.of(2000, 1, 1)
+
+        /** 하한이 실제로 발동하는 시행일 — 아래 후보 날짜들과의 전후 관계가 검증 대상이다. */
+        private val POLICY_EFFECTIVE_DATE: LocalDate = LocalDate.of(2026, 6, 1)
     }
 }
