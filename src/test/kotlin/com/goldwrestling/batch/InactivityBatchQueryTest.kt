@@ -133,7 +133,8 @@ class InactivityBatchQueryTest {
     @Test
     fun `등록 취소된 SESSION_PASS만 가진 회원은 제외된다`() {
         val member = persistMember()
-        persistSessionPass(member, remaining = "1.0", endDate = today.plusDays(30), status = PassStatus.CANCELED)
+        val pass = persistSessionPass(member, remaining = "1.0", endDate = today.plusDays(30))
+        cancelPass(pass)
 
         val ids = passRepository.findMemberIdsWithDeductibleSessionPass(today)
 
@@ -163,13 +164,9 @@ class InactivityBatchQueryTest {
         // 더 최근에 등록됐지만 만료·소진·취소돼 후보가 아닌 장 3개 — 이 중 어느 것도 반환되면 안 된다.
         persistSessionPass(member, remaining = "1.0", endDate = today.minusDays(1), createdAt = today.minusDays(1).atTime9am())
         persistSessionPass(member, remaining = "0.0", endDate = today.plusDays(30), createdAt = today.minusDays(1).atTime9am())
-        persistSessionPass(
-            member,
-            remaining = "1.0",
-            endDate = today.plusDays(30),
-            createdAt = today.minusDays(1).atTime9am(),
-            status = PassStatus.CANCELED,
-        )
+        val canceled =
+            persistSessionPass(member, remaining = "1.0", endDate = today.plusDays(30), createdAt = today.minusDays(1).atTime9am())
+        cancelPass(canceled)
 
         val result = passRepository.findLastDeductibleSessionPassRegistrationDates(listOf(member.id!!), today)
 
@@ -227,6 +224,11 @@ class InactivityBatchQueryTest {
     private fun persistAdmin(): Admin {
         fixtureCounter++
         return adminRepository.saveAndFlush(BatchFixtures.admin(loginId = "admin-batch-query-$fixtureCounter"))
+    }
+
+    /** 실제 취소 경로로 취소한다 — `status = CANCELED`만 직접 대입하면 `ck_pass_cancellation`(V4)이 거부한다. */
+    private fun cancelPass(pass: Pass) {
+        passRepository.cancelIfNotCanceled(pass.id!!, "테스트 취소", persistAdmin(), OffsetDateTime.now(clock))
     }
 
     private fun persistSessionPass(
