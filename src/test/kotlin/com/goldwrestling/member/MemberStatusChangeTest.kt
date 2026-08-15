@@ -290,6 +290,93 @@ class MemberStatusChangeTest {
         mockMvc.perform(statusRequest(toPending.id!!, adminToken, "PENDING")).andExpect(status().isOk)
     }
 
+    // ---------- 휴회 복귀 시각 기록 (D-105 기준일 후보 ③, D-111) ----------
+
+    @Test
+    fun `ON_LEAVE 회원을 ACTIVE로 바꾸면 returnedFromLeaveAt이 Clock 기준 현재 시각으로 채워진다`() {
+        val member = persistMember(kakaoId = 9218L, status = MemberStatus.ON_LEAVE)
+        val adminToken = adminAccessToken(loginId = "admin-status-return-fill")
+        val fixedInstant = Instant.parse("2026-08-20T01:00:00Z")
+        (clock as MutableTestClock).setTo(fixedInstant)
+
+        mockMvc.perform(statusRequest(member.id!!, adminToken, "ACTIVE")).andExpect(status().isOk)
+
+        val reloaded = memberRepository.findById(member.id!!).orElseThrow()
+        assertThat(reloaded.returnedFromLeaveAt).isEqualTo(OffsetDateTime.now(clock))
+    }
+
+    @Test
+    fun `PENDING 회원을 ACTIVE로 바꾸면 returnedFromLeaveAt은 여전히 null이다`() {
+        val member =
+            persistMember(kakaoId = 9219L, status = MemberStatus.PENDING, name = "김복귀", phoneNumber = "01088887777")
+        val adminToken = adminAccessToken(loginId = "admin-status-return-pending")
+
+        mockMvc.perform(statusRequest(member.id!!, adminToken, "ACTIVE")).andExpect(status().isOk)
+
+        val reloaded = memberRepository.findById(member.id!!).orElseThrow()
+        assertThat(reloaded.returnedFromLeaveAt).isNull()
+    }
+
+    @Test
+    fun `INACTIVE 회원을 ACTIVE로 바꿔도 returnedFromLeaveAt은 여전히 null이다`() {
+        val member =
+            persistMember(kakaoId = 9220L, status = MemberStatus.INACTIVE, name = "김재활성화", phoneNumber = "01077776666")
+        val adminToken = adminAccessToken(loginId = "admin-status-return-inactive")
+
+        mockMvc.perform(statusRequest(member.id!!, adminToken, "ACTIVE")).andExpect(status().isOk)
+
+        val reloaded = memberRepository.findById(member.id!!).orElseThrow()
+        assertThat(reloaded.returnedFromLeaveAt).isNull()
+    }
+
+    @Test
+    fun `ACTIVE 회원을 ON_LEAVE로 바꾸면 returnedFromLeaveAt은 갱신되지 않는다`() {
+        val member = persistMember(kakaoId = 9221L, status = MemberStatus.ACTIVE)
+        val adminToken = adminAccessToken(loginId = "admin-status-return-onleave-start")
+
+        mockMvc.perform(statusRequest(member.id!!, adminToken, "ON_LEAVE")).andExpect(status().isOk)
+
+        val reloaded = memberRepository.findById(member.id!!).orElseThrow()
+        assertThat(reloaded.returnedFromLeaveAt).isNull()
+    }
+
+    @Test
+    fun `두 번째 휴회 후 다시 복귀하면 returnedFromLeaveAt이 더 최근 시각으로 덮어써진다`() {
+        val member = persistMember(kakaoId = 9222L, status = MemberStatus.ON_LEAVE)
+        val adminToken = adminAccessToken(loginId = "admin-status-return-twice")
+        val firstReturn = Instant.parse("2026-08-20T01:00:00Z")
+        (clock as MutableTestClock).setTo(firstReturn)
+
+        mockMvc.perform(statusRequest(member.id!!, adminToken, "ACTIVE")).andExpect(status().isOk)
+        val afterFirstReturn = memberRepository.findById(member.id!!).orElseThrow()
+        assertThat(afterFirstReturn.returnedFromLeaveAt).isEqualTo(OffsetDateTime.ofInstant(firstReturn, clock.zone))
+
+        mockMvc.perform(statusRequest(member.id!!, adminToken, "ON_LEAVE")).andExpect(status().isOk)
+        val secondReturn = Instant.parse("2026-09-05T03:30:00Z")
+        (clock as MutableTestClock).setTo(secondReturn)
+        mockMvc.perform(statusRequest(member.id!!, adminToken, "ACTIVE")).andExpect(status().isOk)
+
+        val reloaded = memberRepository.findById(member.id!!).orElseThrow()
+        assertThat(reloaded.returnedFromLeaveAt).isEqualTo(OffsetDateTime.ofInstant(secondReturn, clock.zone))
+        assertThat(reloaded.returnedFromLeaveAt).isNotEqualTo(afterFirstReturn.returnedFromLeaveAt)
+    }
+
+    @Test
+    fun `approve로 PENDING에서 ACTIVE가 되어도 returnedFromLeaveAt을 건드리지 않는다`() {
+        val member =
+            persistMember(kakaoId = 9223L, status = MemberStatus.PENDING, name = "김승인", phoneNumber = "01066665555")
+        val adminToken = adminAccessToken(loginId = "admin-status-return-approve")
+
+        mockMvc
+            .perform(
+                post("/api/admin/members/${member.id}/approval")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $adminToken"),
+            ).andExpect(status().isOk)
+
+        val reloaded = memberRepository.findById(member.id!!).orElseThrow()
+        assertThat(reloaded.returnedFromLeaveAt).isNull()
+    }
+
     private fun statusRequest(
         memberId: Long,
         token: String,
