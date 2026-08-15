@@ -1,6 +1,7 @@
 package com.goldwrestling.batch
 
 import com.goldwrestling.SEOUL_ZONE_ID
+import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -8,16 +9,20 @@ import org.springframework.stereotype.Component
 /**
  * 2주 미사용 자동 차감(BATCH-01·04, D-108)의 매일 새벽 cron 트리거. **트리거만 하고 로직을 두지
  * 않는다**(RESEARCH Pattern 1) — 조건문·쿼리·트랜잭션은 [InactivityBatchRunner]와 그 협력자가
- * 담당한다.
+ * 담당한다. 아래 `try-catch`는 **로깅이지 로직이 아니다** — 여기에 조건문·쿼리·이력 기록을
+ * 추가하면 자동 실행과 수동 실행(`AdminBatchController`)의 차감 규칙이 갈라지기 시작한다.
  *
  * cron은 6필드(초 분 시 일 월 요일, D-114). JVM 기본 시간대가 이미 `Asia/Seoul`이지만
  * (`GoldWrestlingApplication.main`) `zone`을 명시하는 것이 conventions §5("시간대는 Asia/Seoul
  * 명시")와 일치한다.
  *
- * **분산 락(ShedLock)을 쓰지 않는다** — 단일 EC2 인스턴스 전제다(D-108). 다만 이 근거만으로는
- * 부족하다: 이 cron(스케줄러 스레드)과 `AdminBatchController`(Tomcat 스레드)가 겹치면 인스턴스가
- * 하나여도 같은 주기가 이중 차감될 수 있다 — 조건부 UPDATE가 잔여 음수만 막고 주기 중복은 막지
- * 않기 때문이다(05-REVIEW.md CR-01, D-108 정정 항목). 차감 원자성 보장은 갭 클로저에서 정한다.
+ * **분산 락(ShedLock)을 쓰지 않는다.** 근거가 05-13에서 **바뀌었다** — 예전 근거는 "단일 EC2
+ * 인스턴스 전제"(D-108)였는데, 그것만으로는 부족했다. 이 cron(스케줄러 스레드)과
+ * `AdminBatchController`(Tomcat 스레드)의 경쟁은 인스턴스 *간*이 아니라 한 JVM 안에서 일어나므로
+ * 인스턴스가 하나여도 이중 차감이 났다(05-REVIEW.md CR-01). 지금은 `batch_execution`의
+ * `RUNNING` 부분 유니크 인덱스(V10 `uq_batch_execution_running`, D-117)가 **DB에서** 두 실행을
+ * 직렬화한다 — 인스턴스 수와 무관하게 성립하므로 다중 인스턴스가 되어도 같은 보장이 유지되고,
+ * 그래서 분산 락이 여전히 필요 없다.
  *
  * **[goldwrestling.batch.inactivity-scheduler-enabled]로 끌 수 있다**(D-116). 두 가지 목적이다:
  * ① 배포 킬 스위치 — 이 배치는 사람 개입 없이 회원 잔여를 깎는 유일한 경로라 잘못 돌 때 즉시
@@ -34,8 +39,26 @@ import org.springframework.stereotype.Component
 class InactivityBatchScheduler(
     private val runner: InactivityBatchRunner,
 ) {
+    /**
+     * **예외를 밖으로 내보내지 않는다**(WR-02). 스케줄러 메서드에서 예외가 빠져나가면 스프링 기본
+     * 핸들러가 스택 한 덩어리를 찍고 끝나서, 운영자는 "그날 배치가 왜 안 됐는지"를 로그에서
+     * 되짚기 어렵다. 여기서 원인별로 분류해 남기고, **실행 이력은 러너가 이미 `FAILED`로
+     * 확정했으므로 여기서 추가로 기록하지 않는다.**
+     */
     @Scheduled(cron = "0 0 4 * * *", zone = SEOUL_ZONE_ID)
     fun runDaily() {
-        runner.run(trigger = BatchTrigger.SCHEDULED, triggeredByAdminId = null)
+        try {
+            runner.run(trigger = BatchTrigger.SCHEDULED, triggeredByAdminId = null)
+        } catch (e: BatchAlreadyRunningException) {
+            // 에러가 아니다 — 관리자 수동 실행과 겹쳤을 뿐이고, 건너뛴 주기는 상태 기반 캐치업
+            // (D-106)이 다음 실행에서 자연 보정한다.
+            logger.info("이미 실행 중인 배치가 있어 이번 cron 실행을 건너뜁니다.", e)
+        } catch (e: Exception) {
+            logger.error("미사용 차감 배치의 cron 실행이 실패했습니다. 실행 이력(batch_execution)에서 원인을 확인하세요.", e)
+        }
+    }
+
+    companion object {
+        private val logger = LoggerFactory.getLogger(InactivityBatchScheduler::class.java)
     }
 }
