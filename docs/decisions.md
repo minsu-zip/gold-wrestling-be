@@ -961,6 +961,33 @@
   근거("거부할 요청이 없다")가 바로 앞 정정으로 무너졌기 때문이다 — 동시 호출은 거부해야 한다.
   `ErrorCode.BATCH_ALREADY_RUNNING`(409)이 추가됐고 근거는 D-118에 있다. 수동 실행 API의 상태코드·
   응답 형태도 202 Accepted + 실행 상태 조회로 바뀐다(05-GAP-CONTEXT §2.4, 05-15).
+- **갱신(2026-08-16, 05-REVIEW.md WR-05·IN-03)**: 수동 실행 API가 **엔드포인트 1개 → 3개**가 됐다.
+  - `POST /api/admin/batch/inactivity-runs` — 실행을 **접수만** 하고 **202 Accepted** + `Location`
+    (단건 조회 경로)을 즉시 반환한다. `RUNNING` 행 INSERT(직렬화 진입)만 동기로 하고 본문은 전용
+    실행기에 넘긴다. 이미 실행 중이면 **409** `BATCH_ALREADY_RUNNING`이다.
+  - `GET /api/admin/batch/inactivity-runs/{batchExecutionId}` — 진행 상태·결과 폴링.
+    없으면 404 `BATCH_EXECUTION_NOT_FOUND`(신규 에러코드).
+  - `GET /api/admin/batch/inactivity-runs?limit=` — 최근 실행 목록(기본 20, 1..100 보정).
+    D-108의 "배치가 안 돌았는지는 실행 이력으로 확인한다"를 실제로 가능하게 만든다.
+- 이유: 기존 동기 호출은 배치가 끝날 때까지 요청 스레드를 붙잡아, 프록시·로드밸런서 타임아웃
+  (흔히 60초)으로 관리자가 응답을 못 받고 재시도하게 만들었다 — **CR-01(동시 실행 이중 차감)의 가장
+  현실적인 트리거**였다(WR-05). 가드(D-117·D-118)가 있어도 그 경로를 계속 밟으면 운영이 불편하고
+  가드가 매번 발동한다. 이 변경은 그 경로 자체를 없앤다. `201`이 아니라 `202`인 이유는 이 호출이
+  만드는 것이 도메인 리소스가 아니라 **아직 끝나지 않은 작업**이기 때문이다.
+- 실행기: `BatchExecutorConfig`의 **전용 단일 스레드 빈**(`inactivityBatchExecutor`, 큐 1)이다.
+  스프링 기본 실행기에 암묵적으로 얹지 않는다 — 배치가 요청 처리용 풀을 잠식하면 무관한 API 응답이
+  함께 느려지고, 어느 풀에서 도는지 로그로 추적할 수 없다. 스레드 1개로 충분한 이유는 어차피
+  `uq_batch_execution_running`이 동시 실행을 막기 때문이다. 부트의 `applicationTaskExecutor`가
+  `@ConditionalOnMissingBean(Executor)` 조건이라 `defaultCandidate = false`로 등록해 기본 실행기를
+  밀어내지 않게 했고, 그 사실을 `AdminBatchControllerTest`가 단언한다.
+- 문서: `openapi.yaml`에 남아 있던 **잘못된 안전성 서술**(동시 실행이 위험하다는 경고와 "응답을
+  못 받아도 재호출하지 말라"는 안내)은 이 변경으로 **거짓이 되어 전면 재작성**했다 — 이제 겹치면
+  409로 거부되고, 애초에 응답을 기다릴 일이 없다(FE가 이 파일로 타입과 동작을 정한다).
+  IN-03(POST가 200을 반환하고 실패 응답이 명세에 없던 문제)도 `@ApiResponses`로 202·401·403·404·409를
+  명시하면서 함께 정리됐다.
+- 실증: `AdminBatchRunConcurrencyTest`가 동시 POST에서 **202 정확히 1건 / 나머지 409**를 실제
+  PostgreSQL로 단언한다. 결정론은 실행기 빈을 무동작 모의로 대체해 확보한다 — 실제 실행기를 쓰면
+  첫 실행이 두 번째 요청보다 먼저 끝나 둘 다 202가 될 수 있다.
 
 ## D-115. 배치 벌크 조회는 인터페이스 스칼라 프로젝션(`common/projection`)으로 반환한다
 
