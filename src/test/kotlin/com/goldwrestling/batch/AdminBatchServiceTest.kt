@@ -56,7 +56,10 @@ class AdminBatchServiceTest {
 
     @Test
     fun `실행기에 넘긴 작업이 돌면 시작된 실행의 본문이 실행된다`() {
-        given(runner.start(BatchTrigger.MANUAL, ADMIN_ID)).willReturn(runningExecution(EXECUTION_ID))
+        // 모의 객체를 인자 자리에서 만들지 않는다 — 진행 중인 stubbing 안에서 다른 stubbing이
+        // 시작돼 Mockito가 UnfinishedStubbingException을 던진다
+        val started = runningExecution(EXECUTION_ID)
+        given(runner.start(BatchTrigger.MANUAL, ADMIN_ID)).willReturn(started)
 
         service.launchInactivityRun(ADMIN_ID)
 
@@ -67,7 +70,8 @@ class AdminBatchServiceTest {
 
     @Test
     fun `본문이 실패해도 실행기 스레드 밖으로 예외가 새어 나가지 않는다`() {
-        given(runner.start(BatchTrigger.MANUAL, ADMIN_ID)).willReturn(runningExecution(EXECUTION_ID))
+        val started = runningExecution(EXECUTION_ID)
+        given(runner.start(BatchTrigger.MANUAL, ADMIN_ID)).willReturn(started)
         given(runner.runStarted(EXECUTION_ID)).willThrow(IllegalStateException("벌크 조회 실패"))
 
         service.launchInactivityRun(ADMIN_ID)
@@ -89,7 +93,8 @@ class AdminBatchServiceTest {
 
     @Test
     fun `실행기가 작업을 거부하면 방금 만든 실행 중 이력을 FAILED로 정리한 뒤 예외를 던진다`() {
-        given(runner.start(BatchTrigger.MANUAL, ADMIN_ID)).willReturn(runningExecution(EXECUTION_ID))
+        val started = runningExecution(EXECUTION_ID)
+        given(runner.start(BatchTrigger.MANUAL, ADMIN_ID)).willReturn(started)
         doThrow(RejectedExecutionException("pool is full"))
             .`when`(executor)
             .execute(any(Runnable::class.java))
