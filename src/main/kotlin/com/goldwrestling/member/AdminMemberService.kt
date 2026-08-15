@@ -10,6 +10,8 @@ import org.springframework.data.domain.Sort
 import org.springframework.data.jpa.domain.Specification
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
+import java.time.OffsetDateTime
 
 /**
  * 관리자 회원 검색·상세 조회·승인·거절·상태 변경(MEMBER-01, MEMBER-02, MEMBER-03, D-035, D-044).
@@ -23,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional
 class AdminMemberService(
     private val memberRepository: MemberRepository,
     private val tokenService: TokenService,
+    private val clock: Clock,
 ) {
     /**
      * 검색어·상태·온보딩완료 조건을 조합해 회원을 페이지 단위로 조회한다. 정렬은 `createdAt`
@@ -117,6 +120,10 @@ class AdminMemberService(
      * [MemberStatus.PENDING]으로 되돌리면 거절 사유를 지운다 — D-034의 재신청 처리(관리자가 상태를
      * PENDING으로 되돌리는 것)가 이 메서드로만 가능하다. `UpdateMemberStatusRequest`가 요구사항
      * 문구(ACTIVE/ON_LEAVE/INACTIVE 3종)를 넘어 PENDING까지 허용하는 이유이기도 하다.
+     *
+     * **휴회 복귀 시각은 여기서만 기록된다.** 이 값은 2주 미사용 차감의 기준일 후보 ③이며
+     * (D-105), 복귀하면 유예 2주가 새로 시작한다 — 기록이 누락되면 복귀 직후 회원이 밀린 주기만큼
+     * 소급 차감된다(D-111).
      */
     @Transactional
     fun changeStatus(
@@ -127,7 +134,11 @@ class AdminMemberService(
         if (newStatus == MemberStatus.ACTIVE && !member.isOnboardingCompleted()) {
             throw MemberStateConflictException("회원이 이름·전화번호를 등록해야 활성 상태로 바꿀 수 있습니다.")
         }
+        val previousStatus = member.status
         member.status = newStatus
+        if (previousStatus == MemberStatus.ON_LEAVE && newStatus == MemberStatus.ACTIVE) {
+            member.returnedFromLeaveAt = OffsetDateTime.now(clock)
+        }
         if (newStatus == MemberStatus.PENDING) {
             member.rejectionReason = null
         }

@@ -192,22 +192,28 @@ class PassRepositoryTest {
     }
 
     @Test
-    fun `PassTransaction 주체가 둘 다 비어 있으면 ck_pass_transaction_subject 위반으로 저장이 실패한다`() {
+    fun `PassTransaction 주체가 둘 다 비어 있으면 시스템 주체(배치)로 저장에 성공한다`() {
+        // V9(D-110)이 ck_pass_transaction_subject를 "정확히 하나"에서 "최대 하나"로 완화해
+        // admin·member 둘 다 null인 배치(INACTIVITY) 주체 저장을 허용한다.
         val pass = persistPass(remaining = BigDecimal("1.0"))
 
-        assertThatThrownBy {
+        val saved =
             passTransactionRepository.saveAndFlush(
                 PassTransaction(
                     pass = pass,
                     amount = BigDecimal("-1.0"),
-                    reason = TransactionReason.RESERVE,
+                    reason = TransactionReason.INACTIVITY,
                     note = null,
                     admin = null,
                     member = null,
                     occurredAt = OffsetDateTime.now(clock),
                 ),
             )
-        }.isInstanceOf(DataIntegrityViolationException::class.java)
+
+        assertThat(saved.id).isNotNull()
+        val reloaded = passTransactionRepository.findById(saved.id!!).get()
+        assertThat(reloaded.admin).isNull()
+        assertThat(reloaded.member).isNull()
     }
 
     private fun songpaBranch(): Branch = branchRepository.findByName("송파점")!!

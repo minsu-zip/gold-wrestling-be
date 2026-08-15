@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: phase_complete
-stopped_at: Phase 4(시간표·예약) 마감 — 청크 A·B·C PR 전부 dev 머지, VERIFICATION passed, WR-02는 이슈 #12 이월
-last_updated: "2026-08-08T07:45:12.652Z"
-last_activity: 2026-08-08
+status: executing
+stopped_at: Completed 05-04-PLAN.md
+last_updated: "2026-08-15T03:47:22.019Z"
+last_activity: 2026-08-15
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 44
-  completed_plans: 44
+  total_plans: 53
+  completed_plans: 48
   percent: 67
 ---
 
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-30)
 
 **Core value:** 회원이 보는 잔여 횟수는 항상 실제 사용 가능 횟수와 일치한다 (즉시 차감/복구 + 전 이력 + 초과 예약 0건)
-**Current focus:** Phase 04 완료·마감 — 다음: Phase 05 (배치) discuss부터
+**Current focus:** Phase 05 — batch
 
 ## Current Position
 
-Phase: 04 (schedule-reservation) — COMPLETE (15/15 plans)
-Plan: 15 of 15
-Status: Phase closed — 청크 A(#8)·B(#10)·C(#11) PR 전부 dev 머지, VERIFICATION passed (5/5 SC, 13/13 REQ), human UAT 2/2 완료, WR-02는 후속 이슈 #12
-Last activity: 2026-08-08 -- Phase 4 마감 (WR-02 이월 결정·이슈 #12 생성·검증 문서 passed 갱신)
+Phase: 05 (batch) — EXECUTING
+Plan: 5 of 9
+Status: Ready to execute
+Last activity: 2026-08-15
 
-Progress: [██████████] 100%
+Progress: [█████████░] 91%
 
 ## Performance Metrics
 
@@ -71,6 +71,10 @@ Progress: [██████████] 100%
 | Phase 04 P13 | 65min | 2 tasks | 9 files |
 | Phase 04 P14 | 55min | 2 tasks | 10 files |
 | Phase 04 P15 | ~30min | 2 tasks | 3 files |
+| Phase 05-batch P01 | 15min | 3 tasks | 5 files |
+| Phase 05-batch P02 | 35min | 3 tasks | 11 files |
+| Phase 05-batch P03 | 25min | 2 tasks | 2 files |
+| Phase 05-batch P04 | 50min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -117,6 +121,15 @@ Recent decisions affecting current work:
 - [Phase 04-14]: ClassSessionNotFoundException + ErrorCode.CLASS_SESSION_NOT_FOUND 신설 — 휴강 해제 대상 세션 id가 없는 경로를 plan이 명시하지 않았으나 404 처리 없이는 500이 노출되는 방어적이지 않은 API가 된다
 - [Phase 04-15]: docs/decisions.md(D-089~101)·docs/glossary.md는 이미 실제 구현과 일치해 phase 마감 시점에 추가 수정 없음 — error-codes.md 발생 지점 열만 실제 throw 지점 기준으로 정정
 - [Phase 04-15]: Task 3 회원 예약~관리자 운영 전체 흐름 검증(16항목)은 오케스트레이터가 실제 HTTP·psql로 판정하고 사용자가 승인하는 방식으로 수행 — 16/16 PASS, 로컬 검증 데이터는 사용자 지시로 보존
+- [Phase 05-01]: D-110~D-114: 배치 CHECK 완화·복귀 시각 컬럼·트랜잭션 경계·실행 이력 스키마·cron/API 경로 확정 (05-01)
+- [Phase 05-01]: docs/policies.md §4.3, docs/decisions.md D-105·D-108 보강 문구는 discuss-phase에서 작성됐으나 미커밋 상태였던 것을 05-01에서 함께 커밋
+- [Phase 05-02]: PassRepositoryTest의 '둘 다 비어 있으면 실패' 테스트를 '시스템 주체로 성공'으로 교체 — V9이 그 행동 자체를 바꿨으므로 옛 단언을 남겨두면 틀린 것을 검증하는 통과 테스트가 될 위험이 있었다
+- [Phase 05-02]: AdminMemberService 생성자에 Clock 추가는 별도 이관 작업 없이 안전 — 저장소 전체에서 수동 인스턴스화 호출부가 없어 Spring DI가 자동으로 새 파라미터를 채운다
+- [Phase 05-02]: 재복귀 테스트에서 같은 트랜잭션 내 findById 1차 캐시로 엔티티 참조가 재사용되는 버그를 발견해 스냅샷 값 비교로 수정(Rule 1)
+- [Phase 05-batch]: ktlintFormat 결과를 별도 style 커밋으로 분리 — 동작 변경과 자동 포맷 정렬을 한 커밋에 섞지 않는다
+- [Phase 05-batch]: InactivityDueDateCalculator KDoc의 'Clock' 문자열이 acceptance grep과 충돌해 '시각 주입 빈'으로 표현 변경
+- [Phase 05-batch]: D-115: 배치 벌크 조회는 Array<Any> 캐스팅 대신 인터페이스 스칼라 프로젝션(common/projection)으로 반환 — 타입 안전성을 이 저장소 관례로 고정
+- [Phase 05-batch]: CANCELED Pass 픽스처는 상태를 직접 대입하지 않고 PassRepository.cancelIfNotCanceled 실제 취소 경로로 만든다 — ck_pass_cancellation(V4)이 취소 메타데이터 완전성을 강제
 
 ### Pending Todos
 
@@ -142,6 +155,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-08T07:44:51.549Z
-Stopped at: Completed 04-15-PLAN.md — Phase 4(시간표·예약) 15/15 plans 완료, dev PR 생성 대기
+Last session: 2026-08-15T03:47:22.013Z
+Stopped at: Completed 05-04-PLAN.md
 Resume file: None

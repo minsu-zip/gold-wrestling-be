@@ -1,6 +1,7 @@
 package com.goldwrestling.pass
 
 import com.goldwrestling.admin.Admin
+import com.goldwrestling.common.projection.MemberTimestampProjection
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor
 import org.springframework.data.jpa.repository.Modifying
@@ -139,5 +140,72 @@ interface PassRepository :
         @Param("type") type: PassType,
         @Param("classDate") classDate: LocalDate,
         @Param("requiredAmount") requiredAmount: BigDecimal,
+    ): List<Pass>
+
+    /**
+     * 배치 대상 회원 벌크 조회(BATCH-01·02, Phase 5) — 차감 가능한 `SESSION_PASS`를 가진 회원 id를
+     * 중복 없이 오름차순으로 반환한다.
+     *
+     * **BATCH-02의 예외 3종(휴회·잔여 0·만료)이 전부 이 한 쿼리의 필터로 구현된다** — 다른 곳에
+     * 같은 예외를 다시 구현하지 않는다(RESEARCH Pitfall 2). 과거 휴회 기간을 경과일에서 빼는 로직을
+     * 추가하지 않는다 — 복귀일 기준일 리셋(D-105)이 이미 그 역할을 한다.
+     *
+     * - `endDate >= :today` — [Pass.isExpired]가 쓰는 것과 같은 비교축(D-066 종료일 포함 판정)
+     * - `remainingCount > 0` — 소진된 이용권은 대상이 아니다
+     * - `member.status <> ON_LEAVE` — 휴회 중인 회원은 현재 상태로 즉시 제외한다
+     */
+    @Query(
+        "select distinct p.member.id from Pass p " +
+            "where p.type = com.goldwrestling.pass.PassType.SESSION_PASS " +
+            "and p.status = com.goldwrestling.pass.PassStatus.ACTIVE " +
+            "and p.endDate >= :today and p.remainingCount > 0 " +
+            "and p.member.status <> com.goldwrestling.member.MemberStatus.ON_LEAVE " +
+            "order by p.member.id asc",
+    )
+    fun findMemberIdsWithDeductibleSessionPass(
+        @Param("today") today: LocalDate,
+    ): List<Long>
+
+    /**
+     * 기준일 후보 ④(D-105) 벌크 조회 — 회원별로 **차감 가능한 장** 중 가장 최근 등록일을 반환한다.
+     *
+     * **`startDate`가 아니라 `createdAt`이다**(D-105·RESEARCH Pitfall 4) — 과거 시작일 등록(D-055)이
+     * 등록 즉시 소급 차감으로 이어지는 것을 막는다. 범위는 [findMemberIdsWithDeductibleSessionPass]와
+     * 같은 필터(차감 가능한 장)로 한정한다(D-105 보강, 2026-08-15 사용자 확정) — 만료·소진·취소된
+     * 장의 등록일은 새 장 등록으로 시계를 리셋하는 원리(D-105 "부채가 쌓이지 않는다")와 무관하다.
+     *
+     * [memberIds]가 빈 컬렉션이면 빈 결과를 반환한다 — 호출부가 빈 목록으로 이 쿼리를 호출해도
+     * 안전하다.
+     */
+    @Query(
+        "select p.member.id as memberId, max(p.createdAt) as timestamp from Pass p " +
+            "where p.member.id in :memberIds " +
+            "and p.type = com.goldwrestling.pass.PassType.SESSION_PASS " +
+            "and p.status = com.goldwrestling.pass.PassStatus.ACTIVE " +
+            "and p.endDate >= :today and p.remainingCount > 0 " +
+            "group by p.member.id",
+    )
+    fun findLastDeductibleSessionPassRegistrationDates(
+        @Param("memberIds") memberIds: Collection<Long>,
+        @Param("today") today: LocalDate,
+    ): List<MemberTimestampProjection>
+
+    /**
+     * 차감 대상 이용권 재조회(D-109 "회당 재선택") — [findDeductionCandidates](예약용,
+     * `remainingCount >= requiredAmount`)와 달리 잔여가 차감량(1.0)보다 적은 장(0.5)도 포함한다 —
+     * 부분 차감(D-109)의 실현부이기 때문이다. 05-05가 **차감 1회마다 다시 호출**한다(RESEARCH
+     * Pitfall 1) — 한 번 조회한 리스트를 여러 회차에 걸쳐 재사용하면 앞선 차감으로 소진된 장을
+     * 계속 대상으로 잡는다.
+     */
+    @Query(
+        "select p from Pass p where p.member.id = :memberId " +
+            "and p.type = com.goldwrestling.pass.PassType.SESSION_PASS " +
+            "and p.status = com.goldwrestling.pass.PassStatus.ACTIVE " +
+            "and p.endDate >= :today and p.remainingCount > 0 " +
+            "order by p.endDate asc, p.id asc",
+    )
+    fun findDeductibleSessionPasses(
+        @Param("memberId") memberId: Long,
+        @Param("today") today: LocalDate,
     ): List<Pass>
 }

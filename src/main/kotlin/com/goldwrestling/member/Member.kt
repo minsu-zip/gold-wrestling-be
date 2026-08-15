@@ -26,6 +26,10 @@ import java.time.OffsetDateTime
  *
  * [kakaoNickname]·[kakaoProfileImageUrl]은 카카오가 준 **표시용 보조 정보**이지 운영 기준 신원이
  * 아니다(D-083). 매 로그인마다 [applyKakaoProfile]로 갱신되며, 동의가 없으면 값이 없는 것이 정상이다.
+ *
+ * [returnedFromLeaveAt]은 `ON_LEAVE` → `ACTIVE` 전이에서만 갱신한다 — 다른 상태 전이는 이 값을
+ * 건드리지 않는다(D-105 기준일 후보 ③, D-111). `Reservation.canceledAt`과 같은 단일 목적 시각
+ * 컬럼이다.
  */
 @Entity
 @Table(name = "member")
@@ -50,6 +54,8 @@ class Member(
     var kakaoNickname: String? = null,
     @Column(name = "kakao_profile_image_url", length = MAX_KAKAO_PROFILE_IMAGE_URL_LENGTH)
     var kakaoProfileImageUrl: String? = null,
+    @Column(name = "returned_from_leave_at")
+    var returnedFromLeaveAt: OffsetDateTime? = null,
 ) {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

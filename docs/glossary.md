@@ -61,6 +61,17 @@
 | 휴강 처리                  | `suspend`                                   | 특정 날짜의 수업을 휴강 상태로 전환하는 동작                                                       |
 | 휴강 해제                  | `resume`                                    | 휴강된 수업을 다시 예약 가능 상태로 되돌리는 동작 (취소된 예약은 자동 복원하지 않는다)               |
 
+## 배치 (Phase 5)
+
+| 한국어                 | 코드 네이밍             | 설명                                                                                                          |
+| ---------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| 배치 실행 이력         | `BatchExecution`         | DB `batch_execution` — 배치 1회 실행의 시각·처리 건수·결과를 남기는 append-only 기록. **관측·복구 판단용이며 멱등성의 근거가 아니다**(D-108) |
+| 배치 트리거 종류       | `BatchTrigger`           | `SCHEDULED`(매일 새벽 cron) / `MANUAL`(관리자 수동 실행 API)                                                    |
+| 배치 실행 결과         | `BatchExecutionStatus`   | `SUCCESS` / `PARTIAL_FAILURE` — 경쟁 패배로 인한 스킵은 정상 경로라 `SUCCESS`이며 스킵 건수만 별도로 센다(D-108 보강) |
+| 미사용 판정 기준일     | `dueDate`                | 5종 후보 중 가장 최근 날짜(D-105). 회원 단위로 계산한다                                                          |
+| 부족분                 | `shortfall`              | `floor(기준일→오늘 경과일 / 14)` − 기준일 이후 `INACTIVITY` 이력 건수(D-106)                                     |
+| 휴회 복귀 시각         | `returnedFromLeaveAt`    | DB `member.returned_from_leave_at` — `ON_LEAVE` → `ACTIVE` 전이 시각. 다른 상태 전이에서는 기록하지 않는다(D-105 기준일 후보 ③ 전용) |
+
 ## 회원 상태 (MemberStatus)
 
 `PENDING`(승인대기) / `ACTIVE`(활성) / `ON_LEAVE`(휴회) / `INACTIVE`(비활성)
