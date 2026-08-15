@@ -30,7 +30,16 @@ data class BatchExecutionResponse(
     @field:Schema(description = "회원 단위 실패 요약(예외 종류만, 메시지는 담지 않는다) — 실패가 없으면 null") val errorSummary: String?,
 ) {
     companion object {
-        /** **트랜잭션이 열려 있는 서비스 계층 안에서만 호출한다** — 위 클래스 KDoc 참고. */
+        /**
+         * **트랜잭션 밖(컨트롤러)에서 호출해도 안전하다** — 실제로 유일한 호출부인
+         * `AdminBatchController`가 트랜잭션 밖이다. 위 클래스 KDoc의 근거대로 [BatchExecution]의
+         * 스칼라 필드와 `triggeredBy?.id`만 읽고 LAZY 연관의 다른 필드는 건드리지 않기 때문이다.
+         *
+         * **이 안전성은 "무엇을 읽는가"에 달려 있지 "어디서 호출하는가"에 달려 있지 않다** —
+         * 여기에 `triggeredBy?.name` 같은 필드를 추가하는 순간 프록시 초기화가 필요해져
+         * 트랜잭션 밖에서는 `LazyInitializationException`이 난다. 필드를 늘릴 때는 그 필드가
+         * 연관 객체의 `id`인지 먼저 확인한다.
+         */
         fun from(execution: BatchExecution): BatchExecutionResponse =
             BatchExecutionResponse(
                 batchExecutionId = requireNotNull(execution.id) { "저장되지 않은 BatchExecution은 응답으로 변환할 수 없습니다." },
