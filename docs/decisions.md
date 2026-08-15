@@ -896,3 +896,14 @@
   요청이 없다.
 - 기각 대안: 실행 파라미터(기준일 override 등)를 받는 API(테스트 목적의 소급 차감 경로가 열려
   원장이 오염된다).
+
+## D-115. 배치 벌크 조회는 인터페이스 스칼라 프로젝션(`common/projection`)으로 반환한다
+
+- 2026-08 / 회원 id ↔ 날짜/타임스탬프 쌍을 `GROUP BY`로 가져오는 배치 조회는 `Array<Any>` 캐스팅
+  대신 `MemberDateProjection`/`MemberTimestampProjection`(`common/projection`) 인터페이스
+  프로젝션을 반환한다. JPQL `as memberId`/`as date`/`as timestamp` 별칭이 getter 이름과 일치하면
+  Spring Data JPA(4.1.0, context7로 Tuple 기반 매핑 확인)가 프록시로 매핑한다.
+- 이유: `pass`·`reservation`·`member` 세 패키지가 함께 쓰는 첫 스칼라 프로젝션이라 타입 안전한
+  형태를 이 저장소의 관례로 고정해 둔다 — 다음 phase가 형태를 다시 고르지 않게 한다.
+- 기각 대안: `List<Array<Any>>` + 호출부 캐스팅(RESEARCH 초안) — 인덱스 오타가 컴파일 타임에
+  잡히지 않는다.
