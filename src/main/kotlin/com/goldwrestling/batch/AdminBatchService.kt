@@ -23,7 +23,7 @@ import java.util.concurrent.RejectedExecutionException
  * - 본문은 전용 실행기(`inactivityBatchExecutor`)에 넘긴 뒤 즉시 반환한다.
  *
  * ### 실행기를 인터페이스 타입으로 받는다
- * `ThreadPoolTaskExecutor`(구현체)가 아니라 [TaskExecutor](인터페이스) + `@Qualifier`로 받는다 —
+ * 스레드 풀 구현 클래스가 아니라 [TaskExecutor](인터페이스) + `@Qualifier`로 받는다 —
  * 그래야 테스트가 이 빈을 무동작 모의로 대체해 "실행 중" 상태를 붙잡아 둘 수 있다
  * (`AdminBatchRunConcurrencyTest`). 실제 실행기를 쓰면 첫 실행이 두 번째 요청보다 먼저 끝나 버려
  * 동시 호출 경쟁이 재현되지 않는다.
