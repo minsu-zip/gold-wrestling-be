@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 5 context gathered
-last_updated: "2026-08-15T03:05:53.989Z"
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-08-15T03:23:11.234Z"
 last_activity: 2026-08-15
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 53
-  completed_plans: 45
+  completed_plans: 46
   percent: 67
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 05 (batch) — EXECUTING
-Plan: 2 of 9
+Plan: 3 of 9
 Status: Ready to execute
 Last activity: 2026-08-15
 
-Progress: [█████████░] 85%
+Progress: [█████████░] 87%
 
 ## Performance Metrics
 
@@ -72,6 +72,7 @@ Progress: [█████████░] 85%
 | Phase 04 P14 | 55min | 2 tasks | 10 files |
 | Phase 04 P15 | ~30min | 2 tasks | 3 files |
 | Phase 05-batch P01 | 15min | 3 tasks | 5 files |
+| Phase 05-batch P02 | 35min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -120,6 +121,9 @@ Recent decisions affecting current work:
 - [Phase 04-15]: Task 3 회원 예약~관리자 운영 전체 흐름 검증(16항목)은 오케스트레이터가 실제 HTTP·psql로 판정하고 사용자가 승인하는 방식으로 수행 — 16/16 PASS, 로컬 검증 데이터는 사용자 지시로 보존
 - [Phase 05-01]: D-110~D-114: 배치 CHECK 완화·복귀 시각 컬럼·트랜잭션 경계·실행 이력 스키마·cron/API 경로 확정 (05-01)
 - [Phase 05-01]: docs/policies.md §4.3, docs/decisions.md D-105·D-108 보강 문구는 discuss-phase에서 작성됐으나 미커밋 상태였던 것을 05-01에서 함께 커밋
+- [Phase 05-02]: PassRepositoryTest의 '둘 다 비어 있으면 실패' 테스트를 '시스템 주체로 성공'으로 교체 — V9이 그 행동 자체를 바꿨으므로 옛 단언을 남겨두면 틀린 것을 검증하는 통과 테스트가 될 위험이 있었다
+- [Phase 05-02]: AdminMemberService 생성자에 Clock 추가는 별도 이관 작업 없이 안전 — 저장소 전체에서 수동 인스턴스화 호출부가 없어 Spring DI가 자동으로 새 파라미터를 채운다
+- [Phase 05-02]: 재복귀 테스트에서 같은 트랜잭션 내 findById 1차 캐시로 엔티티 참조가 재사용되는 버그를 발견해 스냅샷 값 비교로 수정(Rule 1)
 
 ### Pending Todos
 
@@ -145,6 +149,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-15T03:05:51.120Z
-Stopped at: Phase 5 context gathered
+Last session: 2026-08-15T03:23:11.228Z
+Stopped at: Completed 05-02-PLAN.md
 Resume file: None
