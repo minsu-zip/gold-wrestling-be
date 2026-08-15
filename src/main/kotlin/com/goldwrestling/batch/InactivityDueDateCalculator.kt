@@ -50,7 +50,10 @@ object InactivityDueDateCalculator {
      * (policies §4.3 "2주 경과 시 1회, 이후 2주마다 반복"). 기준일이 오늘보다 미래(경과일 음수)면
      * 0을 반환한다 — 미래 수업일을 예약해 둔 회원이 음수 차감을 받지 않는다.
      */
-    fun expectedDeductionCount(dueDate: LocalDate, today: LocalDate): Int {
+    fun expectedDeductionCount(
+        dueDate: LocalDate,
+        today: LocalDate,
+    ): Int {
         val elapsedDays = ChronoUnit.DAYS.between(dueDate, today)
         if (elapsedDays < GRACE_PERIOD_DAYS) return 0
         return (elapsedDays / GRACE_PERIOD_DAYS).toInt()
