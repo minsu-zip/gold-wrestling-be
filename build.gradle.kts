@@ -105,6 +105,13 @@ tasks.withType<Test> {
     // src/test/resources/application.yml 로 끄지 않는 이유: 그 파일은 main의 application.yml을
     // 클래스패스에서 통째로 가려 나머지 설정까지 날린다 (위 jwt.secret 주석과 같은 이유).
     systemProperty("goldwrestling.batch.inactivity-scheduler-enabled", "false")
+    // 미사용 차감의 정책 시행일 하한(D-119)을 테스트 전역에서 과거로 고정한다.
+    // 프로덕션 기본값(2026-09-01)은 배치 테스트의 고정 시각(BatchFixtures.FIXED_TODAY = 2026-08-02)보다
+    // **미래**라, 고정하지 않으면 모든 배치 테스트의 기준일이 시행일로 끌어올려져 기대 차감 수가 0이
+    // 된다 — 멱등·캐치업·차감 테스트가 "아무것도 차감하지 않음"을 검증하는 빈 껍데기가 되면서도
+    // 초록불로 통과한다(통과하는데 아무것도 증명하지 못하는, 가장 나쁜 실패 형태다).
+    // 시행일 하한 자체를 검증하는 테스트는 @SpringBootTest(properties = ...)로 클래스마다 덮어쓴다.
+    systemProperty("goldwrestling.batch.inactivity.policy-effective-date", "2000-01-01")
     testLogging {
         events("passed", "skipped", "failed")
     }

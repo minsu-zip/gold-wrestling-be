@@ -2,6 +2,7 @@ package com.goldwrestling.batch
 
 import com.goldwrestling.SEOUL_ZONE_ID
 import com.goldwrestling.admin.AdminRepository
+import com.goldwrestling.config.InactivityBatchProperties
 import com.goldwrestling.member.MemberRepository
 import com.goldwrestling.pass.PassRepository
 import com.goldwrestling.pass.PassTransactionRepository
@@ -53,6 +54,7 @@ class InactivityBatchRunner(
     private val adminRepository: AdminRepository,
     private val inactivityDeductionService: InactivityDeductionService,
     private val recorder: BatchExecutionRecorder,
+    private val properties: InactivityBatchProperties,
     private val clock: Clock,
 ) {
     /**
@@ -147,7 +149,9 @@ class InactivityBatchRunner(
                                 lastPositiveAdjustDate = lastPositiveAdjustDates[memberId],
                             )
 
-                        val dueDate = InactivityDueDateCalculator.resolveDueDate(candidates) ?: continue
+                        val dueDate =
+                            InactivityDueDateCalculator.resolveDueDate(candidates, properties.policyEffectiveDate)
+                                ?: continue
                         val shortfallCount =
                             InactivityDueDateCalculator.shortfall(
                                 dueDate,
