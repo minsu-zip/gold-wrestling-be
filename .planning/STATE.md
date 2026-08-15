@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-15-PLAN.md
+stopped_at: 05-16-PLAN.md Task 1·3 완료 — Task 2(로컬 실기동 확인) 사용자 승인 대기
 last_updated: "2026-08-16T00:00:00.000Z"
 last_activity: 2026-08-16
 progress:
@@ -27,10 +27,11 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 
 Phase: 05 (batch) — EXECUTING
 Plan: 16 of 16 (본 작업 9 + 갭 클로저 7, 청크 D)
-Status: 05-15 완료 — 다음은 05-16(마감 검증)
+Status: 05-16(마감 검증) Task 1(전체 회귀·문서 정합)·Task 3(ROADMAP/REQUIREMENTS/VALIDATION/PATTERNS 갱신) 완료.
+  Task 2(로컬 실기동 202 접수·조회·잔여 변화 확인)는 **사용자 승인 대기** — 아직 아무도 확인하지 않았다.
 Last activity: 2026-08-16
 
-Progress: [██████████] 98%
+Progress: [█████████░] 98% (05-16 Task 2 승인 시 100%)
 
 ## Performance Metrics
 
@@ -160,6 +161,8 @@ Recent decisions affecting current work:
 - [Phase 5]: D-112 보강: 러너에는 @Transactional을 붙이지 않고 실행 이력의 시작·확정만 BatchExecutionRecorder의 REQUIRES_NEW에서 처리한다
 - [Phase 5]: D-119: 미사용 차감에 정책 시행일 하한(기본 2026-09-01)과 1회 실행 상한(기본 1)을 둔다 — 둘 다 설정값이라 재배포 없이 되돌릴 수 있다
 - [Phase 5]: 테스트 전역 시행일을 2000-01-01로 고정한다 — 고정하지 않으면 배치 테스트가 '차감 0'을 검증하는 빈 껍데기가 되면서 초록불로 통과한다
+- [Phase 05-16]: 전체 회귀(./gradlew cleanTest test 763건, 0 failures) + ./gradlew build 모두 캐시 없이 그린. "동시 실행은 아직 안전하지 않다"·"응답이 오지 않아도 재호출하지 않는다"·"차감 원자성 보장은 갭 클로저에서 정한다"·"ON_LEAVE→ACTIVE 복귀일" 서술이 src/·docs/ 전체에서 0건임을 grep으로 확인
+- [Phase 05-16]: REQUIREMENTS.md BATCH-01·02·04를 Complete로 전환 — BATCH-01은 CR-03(출석일 후보 부재, Phase 6 범위)이 열려 있는 동안 운영 배포는 cron을 꺼 둔 채 한다는 조건을 함께 명시. 사용자 로컬 실기동 확인(Task 2)은 아직 미완료이므로 05-16 플랜 자체는 완료 처리하지 않음
 
 ### Pending Todos
 
@@ -169,6 +172,7 @@ None yet.
 
 - REQUIREMENTS.md 문서 상단의 "v1 requirements: 36 total" 표기가 실제 v1 목록(FOUND~NOTIF, 42건)과 불일치했음. 로드맵 작성 시 실제 목록 42건 전부를 매핑하고 Coverage 섹션을 42로 정정함 — 원 문서(docs/)와의 스펙 차이가 아니라 REQUIREMENTS.md 자체의 집계 오류로 판단.
 - ~~STATE.md의 'Plan: X of 9' 표시값 드리프트~~ **해소(2026-08-15)** — 원인은 청크 실행 시 오케스트레이터가 매번 호출하는 `state.begin-phase`가 Plan 카운터를 1로 리셋하는 것. `advance-plan`은 상대 증분만 하므로 리셋된 값에서 다시 세어 어긋났다. 실제 완료 수(5/9)로 수동 정정했고, 청크 단위 실행(D-084)에서는 wave 시작마다 `begin-phase`가 재호출되므로 다음 청크에서도 같은 드리프트가 재발할 수 있다 — 표시 전용 필드이며 SUMMARY 존재 여부가 실제 진행의 근거다
+- **05-16-PLAN.md Task 2(로컬 실기동 확인)는 사용자 승인 대기 중** — 관리자 토큰으로 `POST /api/admin/batch/inactivity-runs` 호출 → 202/조회/목록/409/psql `RUNNING` 잔존 0건을 사용자가 직접 관찰하고 "승인"으로 응답해야 05-16이 완료된다. 그 전까지 `requirements-completed`·ROADMAP 05-16 체크박스는 미완료로 남는다. Phase 5 dev→main 병합(cron 활성 배포)은 이 승인과 무관하게 CR-03이 열려 있는 한 보류된다(D-116·D-119)
 
 ### Quick Tasks Completed
 
@@ -186,6 +190,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-15T17:52:05.372Z
-Stopped at: Completed 05-12-PLAN.md
-Resume file: None
+Last session: 2026-08-16T00:00:00.000Z
+Stopped at: 05-16-PLAN.md Task 1·3 완료, Task 2(로컬 실기동 확인) 사용자 승인 대기
+Resume file: .planning/phases/05-batch/05-16-PLAN.md
