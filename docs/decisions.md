@@ -1042,3 +1042,56 @@
     새 행이 없어 나중에 무슨 일이 있었는지 추적할 수 없다.
 - 응답 본문에는 제약조건명(`uq_batch_execution_running`)·SQL을 담지 않는다(conventions §8).
   HTTP 계약(409 + `ProblemDetail` 본문 형태)의 검증은 컨트롤러가 바뀌는 05-15가 담당한다.
+
+## D-119. 미사용 차감에 정책 시행일 하한과 1회 실행 상한을 둔다
+
+- 2026-08-16 / 2주 미사용 차감(policies §4.3)에 두 가지 제한을 넣는다. 둘 다
+  `InactivityBatchProperties`(prefix `goldwrestling.batch.inactivity`, D-118)의 설정값이라
+  재배포 없이 환경변수로 되돌릴 수 있다.
+  - **정책 시행일 하한** `policy-effective-date`, 기본 `2026-09-01`
+    (`BATCH_INACTIVITY_POLICY_EFFECTIVE_DATE`) — 기준일 후보 5종(D-105)의 max가 이 날짜보다
+    이르면 시행일을 기준일로 본다(`InactivityDueDateCalculator.resolveDueDate`의
+    `coerceAtLeast`). **후보가 전부 null이면 여전히 null이다** — 판정 대상 자체가 아니므로
+    시행일로 대체하지 않는다.
+  - **1회 실행 상한** `max-deductions-per-run`, 기본 `1`
+    (`BATCH_INACTIVITY_MAX_DEDUCTIONS_PER_RUN`) — `InactivityBatchRunner`의 회원 루프에서
+    `minOf(부족분, 상한)`으로 자른다. 잘린 부족분은 `skippedCount`에 세지 않고 로그로만 남긴다
+    (그 필드는 대상 소진·경쟁 패배 전용 D-113이고, 상한 적용은 사고가 아니라 정상 예정 동작이다).
+- 이유 ①: **D-106의 상태 기반 캐치업은 "배치가 이미 돌고 있었다"는 전제 위의 설계다.** 그래서
+  "배치가 며칠 죽었던 기간"과 "배치가 아예 없었던 기간"을 구분하지 못한다. 하한이 없으면 배포 후
+  첫 실행이 과거 전체를 밀린 주기로 계산해, 200일 전 등록되고 한 번도 쓰이지 않은 `SESSION_PASS`가
+  14회 부족분으로 잡혀 한 실행에 잔여가 0이 된다(05-REVIEW.md CR-02, BATCH-01 실패 판정).
+  시행일은 그 전제를 코드에 명시하는 유일한 장치다.
+- 이유 ②: 상한은 사고 피해의 **속도**를 묶는다. 매일 04:00 배치에서 정상 부족분은 0 또는 1이고
+  2 이상은 배치가 2주 넘게 죽었거나 계산이 틀린 상황이다. 하루 1회로 묶으면 계산이 틀려도 피해가
+  하루 1회씩만 누적돼 관리자가 킬 스위치(D-116)를 켤 시간이 생긴다. 밀린 주기는 사라지지 않고
+  다음 실행들이 이어받으므로 **캐치업의 총량은 그대로다** — 상한은 속도만 늦춘다.
+- 시행일을 `InactivityDueDateCalculator`에 주입하지 않고 **파라미터로 넘긴다** — 이 object는 순수
+  계산이라 Spring·DB·시각 빈에 의존하지 않는다(conventions §5). 설정을 직접 읽으면 이 계산을
+  검증하는 데 스프링 컨텍스트가 필요해지고 "같은 입력이면 같은 출력"이 깨진다.
+- 기각 대안:
+  - *상한 3회*: 첫 실행 피해가 여전히 크다(잔여 3회짜리가 한 번에 0이 된다). 정상 부족분이 0 또는
+    1인 이상 3은 사고를 막지도, 정상 동작을 돕지도 않는다.
+  - *배치 도입일 자동 감지(`batch_execution` 최초 행)*: 실행 이력을 지우거나 테이블을 옮기는 순간
+    소급 차감이 되살아난다. 게다가 D-106은 "실행 이력을 부족분 계산의 근거로 쓰지 않는다"를 명시적
+    원칙으로 두고 있어(멱등의 근거는 원장뿐), 그 원칙과 정면으로 충돌한다.
+  - *하한 없이 킬 스위치(D-116)만*: cron을 끈 채 배포하면 당장은 안전하지만, 켜는 순간 같은 사고가
+    난다. 킬 스위치는 사고를 **멈추는** 수단이지 **막는** 수단이 아니다.
+- **테스트 전역 기본값을 과거로 고정한다.** `build.gradle.kts`의 `tasks.withType<Test>`가
+  `goldwrestling.batch.inactivity.policy-effective-date=2000-01-01`을 준다. 기본값(`2026-09-01`)이
+  배치 테스트의 고정 시각(`BatchFixtures.FIXED_TODAY` = 2026-08-02)보다 **미래**라, 고정하지 않으면
+  모든 배치 테스트의 기준일이 시행일로 끌어올려져 기대 차감 수가 0이 되고 멱등·캐치업 테스트가
+  "아무것도 차감하지 않음"을 검증하는 빈 껍데기가 되면서도 초록불로 통과한다. 시행일·상한 자체를
+  검증하는 테스트만 `@SpringBootTest(properties = ...)`로 클래스마다 덮어쓴다
+  (`InactivityBatchPolicyLimitTest`, `InactivityBatchDeductionLimitOverrideTest`).
+- **부작용 하나: 상한 `1` 아래에서 "대상 소진 스킵"은 경쟁 없이는 도달할 수 없다.** 회원당
+  `deductOnce` 호출이 최대 1회인데, 그 첫 호출은 대상 회원 벌크 조회
+  (`findMemberIdsWithDeductibleSessionPass`)와 필터가 같아 단일 스레드에서는 항상 성공한다.
+  그 분기는 죽지 않았고(상한을 올리거나 경쟁이 나면 즉시 살아난다) 계약도
+  `InactivityBatchDeductionLimitOverrideTest`가 계속 지킨다.
+- **CR-03(출석일 후보 부재)은 이번 범위 밖이다.** 기준일 후보 ①(마지막 출석일)은 Phase 6이
+  `Attendance`를 도입하기 전까지 항상 null이라, 저녁반만 다니는 회원은 출석해도 기준일이 갱신되지
+  않아 부당 차감될 수 있다(ROADMAP Phase 5 Note의 설계 결정). 시행일 하한은 이 문제를 **줄이지만
+  없애지 않는다** — 시행일 이후 2주가 지나면 같은 문제가 다시 생긴다. 그래서 운영 배포는
+  **`BATCH_INACTIVITY_SCHEDULER_ENABLED=false`로 cron을 꺼 둔 채** 올리고, 출석 후보가 생기는
+  Phase 6에서 켠다(D-116). 수동 실행 API는 이 값과 무관하게 동작하므로 그때까지 실행하지 않는다.
