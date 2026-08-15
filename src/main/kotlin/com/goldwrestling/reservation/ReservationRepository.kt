@@ -1,6 +1,7 @@
 package com.goldwrestling.reservation
 
 import com.goldwrestling.admin.Admin
+import com.goldwrestling.common.projection.MemberDateProjection
 import com.goldwrestling.member.Member
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -186,4 +187,23 @@ interface ReservationRepository :
         @Param("refunded") refunded: Boolean,
         @Param("canceledAt") canceledAt: OffsetDateTime,
     ): Int
+
+    /**
+     * 기준일 후보 ②(D-105) 벌크 조회 — 회원별 **취소되지 않은(ACTIVE)** 예약의 `classDate` 최댓값을
+     * 반환한다(Phase 5).
+     *
+     * 취소된 예약을 제외하는 이유: 취소는 차감이 복구된 것이라 "사용"이 아니다(D-105). 수업 종류는
+     * 가리지 않는다 — `SESSION`/`LESSON`을 구분하지 않고 인정한다. 1:1 레슨을 다니는 회원을
+     * 예약제 수업 미사용만으로 판정하면 정책 취지에 반한다.
+     *
+     * [memberIds]가 빈 컬렉션이면 빈 결과를 반환한다.
+     */
+    @Query(
+        "select r.member.id as memberId, max(r.classDate) as date from Reservation r " +
+            "where r.member.id in :memberIds and r.status = com.goldwrestling.reservation.ReservationStatus.ACTIVE " +
+            "group by r.member.id",
+    )
+    fun findLastActiveReservationClassDates(
+        @Param("memberIds") memberIds: Collection<Long>,
+    ): List<MemberDateProjection>
 }
