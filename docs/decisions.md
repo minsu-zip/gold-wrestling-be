@@ -907,6 +907,15 @@
   상태 기반 설계가 예정한 정상 동작을 실패로 표시하면 운영자가 매일 오탐을 본다.
 - 기각 대안: 스킵을 `PARTIAL_FAILURE`로 집계(운영 오탐 유발), 회원별 처리 상세 저장(원장이
   이미 이력을 갖고 있어 이중 기록).
+- **갱신(2026-08-16, V10 / D-117)**: 실행 이력이 "종료 시 1건 INSERT"에서 "시작 시 INSERT →
+  종료 시 확정"으로 바뀌면서 스키마가 세 곳 달라졌다.
+  - `status`에 `RUNNING`(실행 중)과 `FAILED`(실행 전체 실패)가 추가됐다. `status`는 값 CHECK가
+    없는 `VARCHAR(20)`이라 DDL 변경 없이 enum에만 추가하면 된다.
+  - `finished_at`이 nullable이 됐다 — `RUNNING` 행은 아직 끝나지 않았다.
+  - `triggered_by_admin_id`를 엔티티에서 `Admin` 연관(`@ManyToOne(LAZY)`)이 아니라 **스칼라
+    필드**로 매핑한다(05-REVIEW.md WR-04). 실행 이력을 트랜잭션 밖에서 응답 DTO로 변환하는
+    경로에서 `LazyInitializationException`이 날 여지를 없앤다. FK와 CHECK는 DB에 그대로 남아
+    무결성은 계속 DB가 보장한다.
 
 ## D-114. cron은 매일 04:00 `Asia/Seoul`, 수동 실행은 `POST /api/admin/batch/inactivity-runs` 1개
 
@@ -951,3 +960,33 @@
   여전히 등록돼 "트리거만 한다"는 계약이 깨지고 조건문이 스케줄러로 들어온다).
 - 이 프로퍼티는 **CR-01(동시 이중 차감)의 해결책이 아니다** — 자동 실행을 끄면 진입점이 하나로
   줄어 위험이 낮아질 뿐, 관리자가 동시에 두 번 호출하는 경로는 그대로 남는다.
+
+## D-117. 배치 실행 직렬화는 `batch_execution` `RUNNING` 행 + 부분 유니크 인덱스로 한다
+
+- 2026-08-16 / 실행 시작 시점에 `status = 'RUNNING'`, `finished_at = NULL`인 행을 먼저 INSERT하고
+  종료 시점에 같은 행을 `SUCCESS`/`PARTIAL_FAILURE`/`FAILED`로 확정한다. V10의
+  `CREATE UNIQUE INDEX uq_batch_execution_running ON batch_execution (status) WHERE status = 'RUNNING'`
+  가 **동시에 존재할 수 있는 실행 중 행은 최대 1건**임을 DB 수준에서 보장하고, 두 번째 실행의
+  INSERT는 유니크 위반으로 거부된다(호출부는 이를 409로 변환한다).
+- 이유 ①: D-021 "동시성은 DB 제약으로 막는다"와 같은 방식이면서, 제약이 걸리는 대상이
+  **원장(`pass_transaction`)이 아니라 실행 이력**이라 되돌리기 비용이 V11의 `DROP INDEX` 한 줄이다.
+  원장에 컬럼을 새로 만드는 방식과 달리 데이터에 영구 흔적이 남지 않는다.
+- 이유 ②: "배치 전체 실패 시 이력이 한 줄도 안 남는다"(05-REVIEW.md WR-02)를 별도 설계 없이
+  흡수한다 — 시작 기록이 먼저 남기 때문이다. `FAILED` 상태값도 이 구조에서 자연히 필요해진다.
+- 이유 ③: 조회 후 판정(“지금 도는 배치가 있나?”)은 조회와 INSERT 사이에 경쟁 창이 남지만,
+  유니크 인덱스는 그 창 자체가 없다. 애플리케이션 코드로는 같은 보장을 얻을 수 없다.
+- 기각 대안:
+  - *PostgreSQL advisory lock*: 마이그레이션이 0건이지만 락 상태를 운영에서 관측할 수 없고,
+    세션 스코프 락은 커넥션 하나를 배치 내내 붙잡는 수명 관리를 직접 해야 한다.
+  - *`pass_transaction` 주기 유니크 인덱스*: 키가 `(회원, 주기)`여야 하는데 원장의 `member_id`는
+    소유자가 아니라 **조작 주체** 컬럼이고 `INACTIVITY`는 그 값이 NULL이다. 소유 회원 컬럼과 주기
+    키 컬럼을 원장에 신설해야 하며, 인덱스를 지워도 그 컬럼은 영구히 남는다.
+  - *회원 행 비관적 락*: 여기서 일어나는 것은 lost update가 아니라 **조건 재평가 없는 중복 실행**이라
+    락을 걸어도 두 트랜잭션이 줄을 서서 둘 다 차감한다.
+- 알려진 약점: 앱이 죽으면 `RUNNING` 행이 남아 배치가 영구 차단된다. `started_at`이 임계 시간
+  (기본 30분)을 넘긴 `RUNNING` 행은 죽은 것으로 보고 `FAILED`(`error_summary = "STALE"`)로 정리한
+  뒤 새 행을 넣는다 — 정리 쿼리(`BatchExecutionRepository.markStaleRunningAsFailed`)는 05-11이
+  만들고, 실행 시작 경로에 배선하는 것은 05-12가 맡는다. 정리와 INSERT 사이 경쟁에서 진 쪽은
+  409를 받는데 그것이 안전한 결과다.
+- 확장 경로: 배치 종류가 하나뿐이라 `status` 단독 인덱스로 충분하다. 두 번째 배치가 생기면
+  `batch_type` 컬럼 + `(batch_type, status)` 복합 부분 인덱스로 바꾼다.

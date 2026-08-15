@@ -65,9 +65,11 @@
 
 | 한국어                 | 코드 네이밍             | 설명                                                                                                          |
 | ---------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| 배치 실행 이력         | `BatchExecution`         | DB `batch_execution` — 배치 1회 실행의 시각·처리 건수·결과를 남기는 append-only 기록. **관측·복구 판단용이며 멱등성의 근거가 아니다**(D-108) |
+| 배치 실행 이력         | `BatchExecution`         | DB `batch_execution` — 배치 1회 실행의 시각·처리 건수·결과를 남기는 기록. 실행 1회당 행 1건으로, 시작 시 `RUNNING`으로 넣고 종료 시 같은 행을 확정한다(D-117). **관측·복구 판단용이며 "오늘 이미 실행했나"(멱등성)의 근거가 아니다**(D-108) |
 | 배치 트리거 종류       | `BatchTrigger`           | `SCHEDULED`(매일 새벽 cron) / `MANUAL`(관리자 수동 실행 API)                                                    |
-| 배치 실행 결과         | `BatchExecutionStatus`   | `SUCCESS` / `PARTIAL_FAILURE` — 경쟁 패배로 인한 스킵은 정상 경로라 `SUCCESS`이며 스킵 건수만 별도로 센다(D-108 보강) |
+| 배치 실행 결과         | `BatchExecutionStatus`   | `RUNNING`(실행 중, 종료 시각 없음) / `SUCCESS`(완주) / `PARTIAL_FAILURE`(일부 회원 처리 실패) / `FAILED`(실행 전체 실패, 루프 미완주). 경쟁 패배·대상 소진 스킵은 정상 경로라 `SUCCESS`이며 스킵 건수만 별도로 센다(D-108 보강·D-117) |
+| 실행 중 배치           | `RUNNING` 행             | `batch_execution`에서 아직 끝나지 않은 행. **동시에 최대 1건만 존재할 수 있고**(V10 `uq_batch_execution_running`) 이 유일성이 배치 실행의 직렬화 장치다(D-117) |
+| 방치된 실행 중 행      | stale `RUNNING`          | 앱이 죽어 확정되지 못한 채 남은 `RUNNING` 행. `started_at`이 임계 시간(기본 30분)을 넘기면 `FAILED`(`errorSummary = "STALE"`)로 정리한다(D-117) |
 | 미사용 판정 기준일     | `dueDate`                | 5종 후보 중 가장 최근 날짜(D-105). 회원 단위로 계산한다                                                          |
 | 부족분                 | `shortfall`              | `floor(기준일→오늘 경과일 / 14)` − 기준일 이후 `INACTIVITY` 이력 건수(D-106)                                     |
 | 휴회 복귀 시각         | `returnedFromLeaveAt`    | DB `member.returned_from_leave_at` — `ON_LEAVE`에서 벗어난 전이의 시각(대상 상태 무관). 그 외 상태 전이에서는 기록하지 않는다(D-105 기준일 후보 ③ 전용, D-111 CR-04 정정) |
