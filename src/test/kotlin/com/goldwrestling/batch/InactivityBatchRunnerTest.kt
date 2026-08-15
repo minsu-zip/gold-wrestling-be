@@ -290,8 +290,15 @@ class InactivityBatchRunnerTest {
         assertThat(remainingOf(untouchedPass.id!!)).isEqualByComparingTo(BigDecimal("2.0"))
     }
 
+    /**
+     * 상한 도입(D-119) 전에는 이 시나리오가 "부족분 2 → 1회 차감 + 대상 소진 스킵 1건"이었다.
+     * 상한 `1`이 부족분을 먼저 자르므로 `deductOnce`가 한 번만 호출되고, 그 호출은 대상 회원
+     * 벌크 조회와 필터가 같아 단일 스레드에서는 항상 성공한다 — **스킵은 더 이상 발생하지
+     * 않는다.** 대상 소진 스킵의 계약은 상한을 올린 전용 컨텍스트
+     * (`InactivityBatchDeductionLimitOverrideTest`)로 옮겼다.
+     */
     @Test
-    fun `부족분이 2인데 잔여 1dot0인 장 한 장뿐이면 1회만 차감되고 스킵 1건으로 루프가 멈춘다`() {
+    fun `부족분이 2여도 한 실행에서는 1회만 차감하고 상한으로 잘린 주기는 스킵으로 세지 않는다`() {
         val member = persistMember()
         val pass = persistSessionPass(member, remaining = "1.0", endDate = today.plusDays(30), createdAt = today.minusDays(28).atTime9am())
 
@@ -299,7 +306,7 @@ class InactivityBatchRunnerTest {
         createdBatchExecutionIds += result.id!!
 
         assertThat(result.deductedCount).isEqualTo(1)
-        assertThat(result.skippedCount).isEqualTo(1)
+        assertThat(result.skippedCount).isZero()
         assertThat(result.status).isEqualTo(BatchExecutionStatus.SUCCESS)
         assertThat(remainingOf(pass.id!!)).isEqualByComparingTo(BigDecimal.ZERO)
         assertThat(inactivityCountOf(pass.id!!)).isEqualTo(1)
