@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-11-PLAN.md
-last_updated: "2026-08-15T16:31:18.473Z"
+stopped_at: Completed 05-12-PLAN.md
+last_updated: "2026-08-15T16:49:28.963Z"
 last_activity: 2026-08-15
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 60
-  completed_plans: 55
+  completed_plans: 56
   percent: 67
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 05 (batch) — EXECUTING
-Plan: 4 of 9
+Plan: 5 of 9
 Status: Ready to execute
 Last activity: 2026-08-15
 
-Progress: [█████████░] 92%
+Progress: [█████████░] 93%
 
 ## Performance Metrics
 
@@ -81,6 +81,7 @@ Progress: [█████████░] 92%
 | Phase 05-batch P08 | 45min | 3 tasks | 7 files |
 | Phase 05-batch P10 | 25min | 2 tasks | 6 files |
 | Phase 05-batch P11 | 30min | 3 tasks | 12 files |
+| Phase 5 P12 | 15min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -150,6 +151,8 @@ Recent decisions affecting current work:
 - [Phase 05-11]: D-117: 배치 실행 직렬화는 batch_execution RUNNING 행 + status='RUNNING' 부분 유니크 인덱스(V10)로 한다 — advisory lock·원장 주기 유니크 인덱스·회원 행 비관적 락 기각
 - [Phase 05-11]: BatchExecution의 triggeredBy(@ManyToOne LAZY)를 triggeredByAdminId 스칼라로 교체 — 엔티티에 LAZY 연관이 0개가 되어 트랜잭션 밖 응답 변환이 조건 없이 안전해진다(WR-04)
 - [Phase 05-11]: BatchExecutionRepositoryTest는 @AfterEach 삭제 대신 클래스 레벨 @Transactional 롤백에 정리를 맡긴다 — 유니크 위반 단언 직후 PostgreSQL 트랜잭션이 abort 상태라 @AfterEach의 DELETE가 그 테스트를 실패시킨다
+- [Phase 5]: D-118: 배치 중복 실행은 409 BATCH_ALREADY_RUNNING으로 거부한다 — D-114의 '새 에러코드는 추가하지 않는다'를 철회 — 근거였던 '거부할 요청이 없다'는 전제가 CR-01(동시 호출 이중 차감)로 깨졌다
+- [Phase 5]: BatchExecutionRecorder는 별도 스프링 빈 + REQUIRES_NEW로 시작·종료를 기록한다 — 러너에 @Transactional을 붙이면 실패 격리(D-112)가 깨지고, 같은 클래스 내부 호출은 프록시를 우회해 트랜잭션 경계가 생기지 않는다. REQUIRED로 두면 RUNNING 행이 호출부 종료까지 커밋되지 않아 직렬화가 성립하지 않는다
 
 ### Pending Todos
 
@@ -176,6 +179,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-15T16:31:18.467Z
-Stopped at: Completed 05-11-PLAN.md
+Last session: 2026-08-15T16:49:28.956Z
+Stopped at: Completed 05-12-PLAN.md
 Resume file: None
