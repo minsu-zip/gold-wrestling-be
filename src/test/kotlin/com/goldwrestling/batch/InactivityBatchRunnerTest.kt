@@ -45,9 +45,9 @@ import java.time.OffsetDateTime
  * 독립 트랜잭션을 커밋해야 그 결과를 이 테스트가 실제로 관측할 수 있다(`InactivityDeductionServiceTest`
  * 선례) — 대신 `@AfterEach`에서 이 테스트가 만든 행을 직접 지운다.
  *
- * 회원 단위 예외 격리 케이스(한 회원의 예외가 나머지 회원 처리를 막지 않는다)는 실행 이력 하나의
- * 트랜잭션 밖에서 예외를 안정적으로 유발하기 어려워 여기서 다루지 않는다 — 05-07 멱등성 플랜에서
- * 다룬다(SUMMARY 참조).
+ * 회원 단위 예외 격리(한 회원의 예외가 나머지 회원 처리를 막지 않는다)와 `PARTIAL_FAILURE` 집계는
+ * 예외 주입에 스파이 빈이 필요해 스프링 컨텍스트가 갈리므로 [InactivityBatchFailureIsolationTest]가
+ * 맡는다.
  */
 @SpringBootTest
 @Import(TestcontainersConfiguration::class, TestClockConfiguration::class)
