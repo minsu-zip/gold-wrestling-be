@@ -14,14 +14,14 @@ tags:
   description: 관리자 예약 조회·대리 취소·변경
 - name: admin-schedule
   description: 관리자 주간 스케줄 보드 + 휴강 처리·해제
-- name: admin-batch
-  description: 관리자 배치 수동 실행
 - name: auth
   description: 인증·토큰
 - name: admin-pass
   description: 관리자 이용권 관리
 - name: member-pass
   description: 회원 본인 이용권·이력 조회
+- name: admin-batch
+  description: 관리자 배치 수동 실행·실행 이력 조회
 - name: member
   description: 회원 본인 정보
 - name: member-schedule
@@ -473,26 +473,66 @@ paths:
               schema:
                 $ref: "#/components/schemas/ClassSessionResponse"
   /api/admin/batch/inactivity-runs:
+    get:
+      tags:
+      - admin-batch
+      summary: 최근 배치 실행 이력 목록 (시작 시각 내림차순)
+      description: '"어젯밤 배치가 돌았는가"를 실행 이력으로 확인하는 창구다(D-108). 결과가 비어 있거나 가장 최근 실행이
+        어제가 아니면 cron이 멈춘 것이다.'
+      operationId: listInactivityRuns
+      parameters:
+      - name: limit
+        in: query
+        description: 조회 건수. 1..100을 벗어나면 그 범위로 보정된다
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          description: 조회 성공
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BatchExecutionResponse"
+        "401":
+          description: 인증되지 않음 (UNAUTHENTICATED)
+        "403":
+          description: 관리자 권한이 아님 (ACCESS_DENIED)
     post:
       tags:
       - admin-batch
-      summary: 2주 미사용 자동 차감 배치를 즉시 실행한다
-      description: "**순차** 재실행은 안전하다 — 상태 기반 부족분 계산(D-106)이 이미 존재하는 차감을 다시 만들지 않으므\
-        로, 응답을 받은 뒤 다시 호출하면 deductedCount가 0이 된다. 배치가 며칠 중단됐다면 이 호출 한 번이 밀린 주기를 몰아\
-        서 보정한다. **동시 실행은 아직 안전하지 않다** — 이 호출이 끝나기 전에 또 호출하거나 새벽 04:00 cron과 겹치면 같은\
-        \ 주기가 이중 차감될 수 있다(05-REVIEW.md CR-01). 차감 원자성을 보장하는 조건부 UPDATE가 잔여 음수만 막고\
-        \ 주기 중복은 막지 않기 때문이다. 이전 응답을 받기 전에는 다시 호출하지 않는다. **응답이 오지 않아도 재호출하지 않는다** —\
-        \ 이 API는 배치가 끝날 때까지 기다렸다 응답하는 동기 호출이라, 프록시·로드밸런서 타임아웃으로 응답을 못 받아도 서버에서는 배치\
-        가 계속 돌고 있다. 이때 재시도하면 두 실행이 겹쳐 위의 이중 차감이 그대로 재현된다. 실제 실행 여부는 batch_execution\
-        \ 이력으로 확인한다."
+      summary: "2주 미사용 자동 차감 배치 실행을 접수한다 (비동기, 202)"
+      description: "이 호출은 배치를 **시작만** 하고 즉시 202를 반환한다 — 응답 본문의 status는 RUNNING이고 finishedAt은\
+        \ null이다. 진행 상태와 최종 결과는 Location 헤더가 가리키는 단건 조회(GET /api/admin/batch/inactivity-runs/{batchExecutionId})로\
+        \ 폴링한다. **실행 중에 다시 호출하면 409(BATCH_ALREADY_RUNNING)로 거부되므로 재시도가 안전하다** — 동시\
+        에 실행 중일 수 있는 배치는 DB 제약으로 항상 최대 1건이다(D-117). **순차 재실행도 안전하다** — 상태 기반 부족분 계\
+        산(D-106)이 이미 존재하는 차감을 다시 만들지 않으므로 앞 실행이 끝난 뒤 다시 호출하면 그 실행의 deductedCount는\
+        \ 0이 된다. 배치가 며칠 중단됐다면 밀린 주기를 이어받되 **1회 실행당 회원 1명에게서 최대 1회**만 차감한다(D-119) —\
+        \ 나머지는 다음 실행들이 이어받는다."
       operationId: runInactivityBatch
       responses:
-        "200":
-          description: OK
+        "202":
+          description: "실행 접수됨 (status = RUNNING, finishedAt = null)"
+          headers:
+            Location:
+              description: 이 실행의 진행 상태 조회 경로
+              style: simple
+              schema:
+                type: string
           content:
             '*/*':
               schema:
                 $ref: "#/components/schemas/BatchExecutionResponse"
+        "401":
+          description: 인증되지 않음 (UNAUTHENTICATED)
+        "403":
+          description: 관리자 권한이 아님 (ACCESS_DENIED)
+        "409":
+          description: 이미 실행 중인 배치가 있어 거부됨 (BATCH_ALREADY_RUNNING)
   /api/admin/passes/{passId}/period:
     patch:
       tags:
@@ -838,6 +878,35 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/MemberDetailResponse"
+  /api/admin/batch/inactivity-runs/{batchExecutionId}:
+    get:
+      tags:
+      - admin-batch
+      summary: 배치 실행 1건의 진행 상태·결과 조회
+      description: 202 응답의 Location이 가리키는 폴링 대상이다. status가 RUNNING이면 아직 실행 중이며 집계
+        수치는 확정 전 값(0)이고 finishedAt은 null이다. 종료되면 SUCCESS · PARTIAL_FAILURE(일부 회원 실패)
+        · FAILED(실행 전체 실패) 중 하나가 된다.
+      operationId: getInactivityRun
+      parameters:
+      - name: batchExecutionId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: 조회 성공
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/BatchExecutionResponse"
+        "401":
+          description: 인증되지 않음 (UNAUTHENTICATED)
+        "403":
+          description: 관리자 권한이 아님 (ACCESS_DENIED)
+        "404":
+          description: 그 id의 실행 이력이 없음 (BATCH_EXECUTION_NOT_FOUND)
 components:
   schemas:
     ReserveRequest:
