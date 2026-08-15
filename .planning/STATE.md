@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 05-12-PLAN.md
-last_updated: "2026-08-15T16:49:28.963Z"
+last_updated: "2026-08-15T17:07:09.580Z"
 last_activity: 2026-08-15
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 60
-  completed_plans: 56
+  completed_plans: 57
   percent: 67
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 05 (batch) — EXECUTING
-Plan: 5 of 9
+Plan: 6 of 9
 Status: Ready to execute
 Last activity: 2026-08-15
 
-Progress: [█████████░] 93%
+Progress: [██████████] 95%
 
 ## Performance Metrics
 
@@ -82,6 +82,7 @@ Progress: [█████████░] 93%
 | Phase 05-batch P10 | 25min | 2 tasks | 6 files |
 | Phase 05-batch P11 | 30min | 3 tasks | 12 files |
 | Phase 5 P12 | 15min | 3 tasks | 10 files |
+| Phase 5 P13 | 25min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -153,6 +154,8 @@ Recent decisions affecting current work:
 - [Phase 05-11]: BatchExecutionRepositoryTest는 @AfterEach 삭제 대신 클래스 레벨 @Transactional 롤백에 정리를 맡긴다 — 유니크 위반 단언 직후 PostgreSQL 트랜잭션이 abort 상태라 @AfterEach의 DELETE가 그 테스트를 실패시킨다
 - [Phase 5]: D-118: 배치 중복 실행은 409 BATCH_ALREADY_RUNNING으로 거부한다 — D-114의 '새 에러코드는 추가하지 않는다'를 철회 — 근거였던 '거부할 요청이 없다'는 전제가 CR-01(동시 호출 이중 차감)로 깨졌다
 - [Phase 5]: BatchExecutionRecorder는 별도 스프링 빈 + REQUIRES_NEW로 시작·종료를 기록한다 — 러너에 @Transactional을 붙이면 실패 격리(D-112)가 깨지고, 같은 클래스 내부 호출은 프록시를 우회해 트랜잭션 경계가 생기지 않는다. REQUIRED로 두면 RUNNING 행이 호출부 종료까지 커밋되지 않아 직렬화가 성립하지 않는다
+- [Phase 5]: D-108 해소: RUNNING 부분 유니크 인덱스 + 409 거부로 배치 동시 실행이 안전해졌다 — 분산 락 미도입 근거를 '단일 인스턴스'에서 'DB 제약이 인스턴스 수와 무관하게 막는다'로 교체
+- [Phase 5]: D-112 보강: 러너에는 @Transactional을 붙이지 않고 실행 이력의 시작·확정만 BatchExecutionRecorder의 REQUIRES_NEW에서 처리한다
 
 ### Pending Todos
 
@@ -179,6 +182,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-15T16:49:28.956Z
+Last session: 2026-08-15T17:07:05.468Z
 Stopped at: Completed 05-12-PLAN.md
 Resume file: None
