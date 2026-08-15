@@ -209,7 +209,7 @@ Phase 4, `INACTIVITY`는 Phase 5, `EVENING_HALF`는 Phase 6이 쓴다. `PassTran
 - [x] 05-12-PLAN.md — 배치 설정 3종 + BatchAlreadyRunningException(409) + BatchExecutionRecorder (BATCH-04)
 - [x] 05-13-PLAN.md — 러너·스케줄러 통합(FAILED 이력, WR-02) + 동시 run() 총 차감 1회 동시성 테스트 (BATCH-04)
 - [x] 05-14-PLAN.md — CR-02: 정책 시행일 하한 + 1회 실행당 회원 1명 1회 상한 (BATCH-01)
-- [ ] 05-15-PLAN.md — WR-05: 202 접수 + 비동기 실행 + 실행 조회 API 2종 + openapi 재생성 (BATCH-01/04)
+- [x] 05-15-PLAN.md — WR-05: 202 접수 + 비동기 실행 + 실행 조회 API 2종 + openapi 재생성 (BATCH-01/04)
 - [ ] 05-16-PLAN.md — 전체 회귀·문서 정합 점검 + 로컬 실기동 확인 + 표기 갱신 (BATCH-01~04)
 
 **범위 밖(의도적)**: CR-03(출석일 후보 부재) — 아래 Note의 설계 결정이며, 운영 배포 시
