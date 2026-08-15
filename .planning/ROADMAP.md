@@ -208,7 +208,7 @@ Phase 4, `INACTIVITY`는 Phase 5, `EVENING_HALF`는 Phase 6이 쓴다. `PassTran
 - [x] 05-11-PLAN.md — V10(finished_at 완화 + RUNNING 부분 유니크 인덱스) + 실행 이력 모델·스칼라 전환(WR-04) (BATCH-04)
 - [x] 05-12-PLAN.md — 배치 설정 3종 + BatchAlreadyRunningException(409) + BatchExecutionRecorder (BATCH-04)
 - [x] 05-13-PLAN.md — 러너·스케줄러 통합(FAILED 이력, WR-02) + 동시 run() 총 차감 1회 동시성 테스트 (BATCH-04)
-- [ ] 05-14-PLAN.md — CR-02: 정책 시행일 하한 + 1회 실행당 회원 1명 1회 상한 (BATCH-01)
+- [x] 05-14-PLAN.md — CR-02: 정책 시행일 하한 + 1회 실행당 회원 1명 1회 상한 (BATCH-01)
 - [ ] 05-15-PLAN.md — WR-05: 202 접수 + 비동기 실행 + 실행 조회 API 2종 + openapi 재생성 (BATCH-01/04)
 - [ ] 05-16-PLAN.md — 전체 회귀·문서 정합 점검 + 로컬 실기동 확인 + 표기 갱신 (BATCH-01~04)
 
@@ -240,6 +240,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 2. 인증·회원 | 15/15 | Complete   | 2026-08-03 |
 | 3. 이용권 | 11/11 | Complete    | 2026-08-04 |
 | 4. 시간표·예약 | 15/15 | Complete   | 2026-08-08 |
-| 5. 배치 | 13/16 | In Progress|  |
+| 5. 배치 | 14/16 | In Progress|  |
 | 6. 운영 | 0/TBD | Not started | - |
 </content>

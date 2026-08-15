@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Completed 05-12-PLAN.md
-last_updated: "2026-08-15T17:07:09.580Z"
+last_updated: "2026-08-15T17:26:29.227Z"
 last_activity: 2026-08-15
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 60
-  completed_plans: 57
+  completed_plans: 58
   percent: 67
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 05 (batch) — EXECUTING
-Plan: 6 of 9
+Plan: 7 of 9
 Status: Ready to execute
 Last activity: 2026-08-15
 
-Progress: [██████████] 95%
+Progress: [██████████] 97%
 
 ## Performance Metrics
 
@@ -83,6 +83,7 @@ Progress: [██████████] 95%
 | Phase 05-batch P11 | 30min | 3 tasks | 12 files |
 | Phase 5 P12 | 15min | 3 tasks | 10 files |
 | Phase 5 P13 | 25min | 3 tasks | 5 files |
+| Phase 05-batch P14 | 30min | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -156,6 +157,8 @@ Recent decisions affecting current work:
 - [Phase 5]: BatchExecutionRecorder는 별도 스프링 빈 + REQUIRES_NEW로 시작·종료를 기록한다 — 러너에 @Transactional을 붙이면 실패 격리(D-112)가 깨지고, 같은 클래스 내부 호출은 프록시를 우회해 트랜잭션 경계가 생기지 않는다. REQUIRED로 두면 RUNNING 행이 호출부 종료까지 커밋되지 않아 직렬화가 성립하지 않는다
 - [Phase 5]: D-108 해소: RUNNING 부분 유니크 인덱스 + 409 거부로 배치 동시 실행이 안전해졌다 — 분산 락 미도입 근거를 '단일 인스턴스'에서 'DB 제약이 인스턴스 수와 무관하게 막는다'로 교체
 - [Phase 5]: D-112 보강: 러너에는 @Transactional을 붙이지 않고 실행 이력의 시작·확정만 BatchExecutionRecorder의 REQUIRES_NEW에서 처리한다
+- [Phase 5]: D-119: 미사용 차감에 정책 시행일 하한(기본 2026-09-01)과 1회 실행 상한(기본 1)을 둔다 — 둘 다 설정값이라 재배포 없이 되돌릴 수 있다
+- [Phase 5]: 테스트 전역 시행일을 2000-01-01로 고정한다 — 고정하지 않으면 배치 테스트가 '차감 0'을 검증하는 빈 껍데기가 되면서 초록불로 통과한다
 
 ### Pending Todos
 
@@ -182,6 +185,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-15T17:07:05.468Z
+Last session: 2026-08-15T17:26:18.243Z
 Stopped at: Completed 05-12-PLAN.md
 Resume file: None
