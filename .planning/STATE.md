@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-08-PLAN.md
-last_updated: "2026-08-15T06:28:45.171Z"
+stopped_at: Completed 05-10-PLAN.md
+last_updated: "2026-08-15T16:17:15.673Z"
 last_activity: 2026-08-15
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 53
-  completed_plans: 52
+  total_plans: 60
+  completed_plans: 54
   percent: 67
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 05 (batch) — EXECUTING
-Plan: 2 of 9
+Plan: 3 of 9
 Status: Ready to execute
 Last activity: 2026-08-15
 
-Progress: [██████████] 98%
+Progress: [█████████░] 90%
 
 ## Performance Metrics
 
@@ -79,6 +79,7 @@ Progress: [██████████] 98%
 | Phase 05-batch P06 | 35min | 1 tasks | 2 files |
 | Phase 05-batch P07 | ~40min | 2 tasks | 2 files |
 | Phase 05-batch P08 | 45min | 3 tasks | 7 files |
+| Phase 05-batch P10 | 25min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -143,6 +144,8 @@ Recent decisions affecting current work:
 - [Phase 05-07]: 만료 검증 테스트 @AfterEach 정리 순서에 pass_period_change 삭제를 pass 삭제보다 앞에 추가 — AdminPassService.changePeriod가 남기는 이력(D-057)이 FK로 남아 있으면 pass 삭제가 실패한다
 - [Phase 05-batch]: resolveTriggeredBy 두 예외는 HTTP 경로에서 도달 불가 — requireNotNull 분기는 requireAdminId()의 non-null Long 반환으로 컴파일 타임 차단, 관리자 조회 실패 분기는 JwtAuthenticationFilter가 매 요청 관리자 존재를 먼저 검증해 401로 차단(관리자 삭제 기능 자체가 없음). 새 에러코드는 추가하지 않는다(D-114와 일치)
 - [Phase 05-batch]: AdminBatchControllerTest는 클래스 레벨 @Transactional을 쓰지 않는다 — 연속 2회 호출이 서로 다른 물리 트랜잭션으로 커밋돼야 D-106 멱등성을 HTTP 레벨에서 실증할 수 있다. 컨트롤러 테스트 clock 리셋은 Instant.now()를 쓴다 — NimbusJwtDecoder가 시스템 시각으로 exp를 검증해 과거 고정 clock이면 발급 토큰이 즉시 401 처리된다
+- [Phase 05-10]: CR-04: returnedFromLeaveAt 기록 조건을 previousStatus==ON_LEAVE && newStatus!=ON_LEAVE로 확장 — ON_LEAVE→INACTIVE→ACTIVE 우회 복귀 경로의 소급 차감을 막는다
+- [Phase 05-10]: docs/policies.md §4.3·glossary.md·decisions.md D-105/D-111을 CR-04 수정에 맞춰 같은 작업 안에서 정정 — 커밋된 V9 마이그레이션 주석은 그대로 두고 정정 사실은 V10 헤더로 미룬다
 
 ### Pending Todos
 
@@ -169,6 +172,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-15T06:28:45.164Z
-Stopped at: Completed 05-08-PLAN.md
+Last session: 2026-08-15T16:17:15.667Z
+Stopped at: Completed 05-10-PLAN.md
 Resume file: None

@@ -204,7 +204,7 @@ Phase 4, `INACTIVITY`는 Phase 5, `EVENING_HALF`는 Phase 6이 쓴다. `PassTran
 **청크 D — 갭 클로저 (wave 10~16, `feature/phase-05d-gap-closure`)**
 05-VERIFICATION.md가 실패로 판정한 truth 3개(BATCH-01·02·04)를 닫는다. 설계는
 `05-GAP-CONTEXT.md`에서 사용자 확인을 거쳐 확정했다. dev 대상 PR 1개로 납품하며 머지는 사용자가 한다.
-- [ ] 05-10-PLAN.md — CR-04: 휴회에서 벗어나는 모든 전이에 복귀 시각 기록 + 소급 차감 방지 실증 (BATCH-02)
+- [x] 05-10-PLAN.md — CR-04: 휴회에서 벗어나는 모든 전이에 복귀 시각 기록 + 소급 차감 방지 실증 (BATCH-02)
 - [ ] 05-11-PLAN.md — V10(finished_at 완화 + RUNNING 부분 유니크 인덱스) + 실행 이력 모델·스칼라 전환(WR-04) (BATCH-04)
 - [ ] 05-12-PLAN.md — 배치 설정 3종 + BatchAlreadyRunningException(409) + BatchExecutionRecorder (BATCH-04)
 - [ ] 05-13-PLAN.md — 러너·스케줄러 통합(FAILED 이력, WR-02) + 동시 run() 총 차감 1회 동시성 테스트 (BATCH-04)
@@ -240,6 +240,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 2. 인증·회원 | 15/15 | Complete   | 2026-08-03 |
 | 3. 이용권 | 11/11 | Complete    | 2026-08-04 |
 | 4. 시간표·예약 | 15/15 | Complete   | 2026-08-08 |
-| 5. 배치 | 9/9 | Gaps found | - |
+| 5. 배치 | 10/16 | In Progress|  |
 | 6. 운영 | 0/TBD | Not started | - |
 </content>
