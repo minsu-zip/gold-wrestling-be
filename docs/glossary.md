@@ -70,6 +70,8 @@
 | 배치 실행 결과         | `BatchExecutionStatus`   | `RUNNING`(실행 중, 종료 시각 없음) / `SUCCESS`(완주) / `PARTIAL_FAILURE`(일부 회원 처리 실패) / `FAILED`(실행 전체 실패, 루프 미완주). 경쟁 패배·대상 소진 스킵은 정상 경로라 `SUCCESS`이며 스킵 건수만 별도로 센다(D-108 보강·D-117) |
 | 실행 중 배치           | `RUNNING` 행             | `batch_execution`에서 아직 끝나지 않은 행. **동시에 최대 1건만 존재할 수 있고**(V10 `uq_batch_execution_running`) 이 유일성이 배치 실행의 직렬화 장치다(D-117) |
 | 방치된 실행 중 행      | stale `RUNNING`          | 앱이 죽어 확정되지 못한 채 남은 `RUNNING` 행. `started_at`이 임계 시간(기본 30분)을 넘기면 `FAILED`(`errorSummary = "STALE"`)로 정리한다(D-117) |
+| 정체된 실행            | stale run                | 임계 시간(`staleRunTimeout`, 기본 30분)을 넘도록 끝나지 않은 실행. 앱 비정상 종료의 흔적이며, 다음 실행 시작이 `FAILED`(`STALE`)로 정리한 뒤 새 실행을 시작한다(D-117) |
+| 배치 실행 기록자       | `BatchExecutionRecorder` | 실행 시작(`start`)과 종료(`finish`)를 **러너 본문과 분리된 트랜잭션**(`REQUIRES_NEW`)으로 남기는 컴포넌트. 시작 기록이 즉시 커밋돼야 두 번째 실행이 그 행을 보고 409로 거부된다(D-117·D-118) |
 | 미사용 판정 기준일     | `dueDate`                | 5종 후보 중 가장 최근 날짜(D-105). 회원 단위로 계산한다                                                          |
 | 부족분                 | `shortfall`              | `floor(기준일→오늘 경과일 / 14)` − 기준일 이후 `INACTIVITY` 이력 건수(D-106)                                     |
 | 휴회 복귀 시각         | `returnedFromLeaveAt`    | DB `member.returned_from_leave_at` — `ON_LEAVE`에서 벗어난 전이의 시각(대상 상태 무관). 그 외 상태 전이에서는 기록하지 않는다(D-105 기준일 후보 ③ 전용, D-111 CR-04 정정) |
