@@ -81,6 +81,14 @@ goldwrestling:
     # false 로 두면 InactivityBatchScheduler 빈 자체가 등록되지 않는다 —
     # 관리자 수동 실행 API(POST /api/admin/batch/inactivity-runs)는 이 값과 무관하게 계속 동작한다.
     inactivity-scheduler-enabled: ${BATCH_INACTIVITY_SCHEDULER_ENABLED:true}
+    # 위 킬 스위치 키는 @ConditionalOnProperty 가 원시 이름으로 읽으므로 아래 블록으로 옮기지 않는다 (D-116).
+    inactivity:
+      # 정책 시행일 하한 — 이 날짜 이전의 미사용은 차감 부채로 치지 않는다 (D-119, 소급 차감 방지)
+      policy-effective-date: ${BATCH_INACTIVITY_POLICY_EFFECTIVE_DATE:2026-09-01}
+      # 배치 1회 실행에서 회원 1명당 최대 차감 횟수 — 사고 피해 상한 (D-119)
+      max-deductions-per-run: ${BATCH_INACTIVITY_MAX_DEDUCTIONS_PER_RUN:1}
+      # 이 시간을 넘긴 RUNNING 행은 죽은 실행으로 보고 FAILED(STALE)로 정리한다 (D-117·D-118)
+      stale-run-timeout: ${BATCH_INACTIVITY_STALE_RUN_TIMEOUT:30m}
   cors:
     # FE dev 서버는 5180 / preview 5181 고정 (decisions.md D-012)
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5180,http://localhost:5181}
