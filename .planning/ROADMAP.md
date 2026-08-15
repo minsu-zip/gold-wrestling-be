@@ -18,7 +18,7 @@
 - [x] **Phase 2: 인증·회원** - 카카오 로그인, 온보딩, JWT, 관리자 ID/PW 인증, 가입 승인, 회원 관리 (본 작업 완료 2026-08-02 / 검증 갭 클로저 진행 중 — 02-12~02-15) (completed 2026-08-03)
 - [x] **Phase 3: 이용권** - Pass 3종 등록, PassTransaction 이력, 수동 가감·기간 수정, 본인 조회 (completed 2026-08-03)
 - [x] **Phase 4: 시간표·예약** - ClassSchedule/ClassSession, 예약 생성·취소·변경 + 즉시 차감/복구, 동시성 보장, 관리자 예약 관리·휴강, Notification 스키마·알림 레코드 생성 (completed 2026-08-08)
-- [ ] **Phase 5: 배치** - 2주 미사용 차감, 유효기간 만료 처리, 멱등 실행
+- [ ] **Phase 5: 배치** - 2주 미사용 차감, 유효기간 만료 처리, 멱등 실행 (플랜 9/9 실행 완료, 검증 gaps_found — 05-VERIFICATION.md)
 - [ ] **Phase 6: 운영** - 출석 체크, 공지사항, 관리자 알림·활동 피드
 
 ## Phase Details
@@ -158,10 +158,33 @@ Phase 4, `INACTIVITY`는 Phase 5, `EVENING_HALF`는 Phase 6이 쓴다. `PassTran
   2. `ON_LEAVE` 기간, 잔여 0, 유효기간 만료된 이용권은 자동 차감 대상에서 제외된다
   3. 등록일로부터 1년이 지난 이용권은 예약에 쓸 수 없다 — 기존 조회 시점 계산(D-064)과 Phase 4 예약 거부 경로로 충족되며 이 phase는 검증 테스트로 실증한다 (D-107)
   4. 같은 날 배치를 두 번 이상 실행해도 이중 차감이 발생하지 않는다(멱등) — 매일 새벽 실행을 전제로 검증된다
-**Plans**: 9 plans / 9 waves — **2개 청크로 납품한다 (D-084)**.
+
+**충족 근거** (05-09 phase 마감 검증):
+  1. 05-03(기준일·부족분 순수 계산, TDD)·05-05(차감 1회 반영, TDD)·05-06(오케스트레이션) — `InactivityDueDateCalculatorTest`·`InactivityDeductionServiceTest`·`InactivityBatchRunnerTest`가 2주 경과 판정·1회 차감·`INACTIVITY` 이력 생성을 검증
+  2. 05-04(대상 회원 벌크 조회)·05-07(만료 실증) — `InactivityBatchQueryTest`가 휴회·잔여 0·만료 3종 예외를 독립 검증하고, `InactivityBatchExpiryVerificationTest`가 `InactivityBatchRunner.run()` 실행 결과(`processedMemberCount=0`)로 배치 대상 제외를 재확인
+  3. 05-07 — `InactivityBatchExpiryVerificationTest`가 `displayStatus` 종료일 경계 판정·만료 이용권 예약 거부(`InsufficientPassCountException`)·배치 대상 제외·기간 수정 후 되살아남 4축을 실증(D-107, 구현물 없음)
+  4. 05-06(실행 이력은 save만, 조회 없음)·05-07 — `InactivityBatchRunnerTest`가 `batchExecutionRepository.find/existsBy` 미사용을 grep으로 고정하고, `InactivityBatchIdempotencyTest`가 같은 날 2회·5회 실행 시 이력 1건, 6주 캐치업 3건, 매 실행 후 잔여 = 이력 합계를 검증
+
+**검증 결과** (05-VERIFICATION.md, 2026-08-15): **gaps_found — 4개 중 BATCH-03만 통과.**
+위 충족 근거는 *자동 테스트가 무엇을 증명했는지*는 정확하지만, 코드리뷰(05-REVIEW.md) Critical 4건이
+성공 기준 1·2·4를 뒤집었다. 요약: (a) 조건부 UPDATE가 음수만 막아 **동시 실행 이중 차감**이 가능하다
+(순차 멱등은 실증됨), (b) 캐치업에 상한·정책 시행일 하한·kill switch가 없어 **최초 실행이 과거를 소급
+차감**한다, (c) `ON_LEAVE→INACTIVE→ACTIVE` 우회 경로에서 `returned_from_leave_at`이 기록되지 않는다.
+갭 클로저 전까지 dev→main 병합(= cron 활성 배포)을 하지 않는다.
+
+**갭 클로저 범위에 반드시 포함할 것** — (a)(b)(c) 외에 **WR-05**를 함께 담는다: 수동 실행 API가
+배치 종료까지 Tomcat 스레드를 잡는 동기 호출이라, 프록시·LB 타임아웃으로 관리자가 응답을 못 받고
+재시도하면 (a)의 이중 차감이 바로 재현된다. 즉 WR-05는 별개 개선이 아니라 **(a)의 현실적 트리거**다 —
+동시성 가드를 정할 때 이 경로(비동기화 + 실행 상태 조회 API, 혹은 실행 중 중복 요청 거부)를 함께
+설계하지 않으면 가드가 있어도 관리자가 계속 그 경로를 밟는다. 05-08은 API description에 운영
+회피책("응답이 오지 않아도 재호출하지 않는다")만 넣어 둔 상태다.
+
+**Plans**: 9 plans / 9 waves — **3개 청크로 납품했다 (D-084)**. 계획은 2개 청크였으나 청크 B가
+너무 커져 실행 중 wave 7/8 경계에서 한 번 더 갈랐다.
 청크 A `feature/phase-05a-batch-foundation`(wave 1~4, 판정 인프라 — 이 청크만으로는 차감이 일어나지 않는다) ·
-청크 B `feature/phase-05b-inactivity-batch`(wave 5~9, 차감 실행·멱등·스케줄러·API·마감).
-청크 경계 = wave 경계이며 순차 진행한다. 청크 B 마지막 플랜에서 phase를 마감한다.
+청크 B `feature/phase-05b-inactivity-deduction`(wave 5~7, 차감 실행·멱등 실증) ·
+청크 C `feature/phase-05c-batch-trigger`(wave 8~9, 스케줄러·관리자 API·마감).
+청크 경계 = wave 경계이며 순차 진행한다. 청크 C 마지막 플랜에서 phase를 마감한다.
 
 **청크 A — 배치 기반 (wave 1~4)**
 - [x] 05-01-PLAN.md — 용어(glossary)·재량 결정 5건 기록 + BATCH-03 문구 정정 (BATCH-01/03/04)
@@ -169,12 +192,14 @@ Phase 4, `INACTIVITY`는 Phase 5, `EVENING_HALF`는 Phase 6이 쓴다. `PassTran
 - [x] 05-03-PLAN.md — [TDD] 기준일 max·부족분·캐치업 순수 계산 (BATCH-01/04)
 - [x] 05-04-PLAN.md — 배치 대상·기준일 후보·이력 벌크 조회 6종 + 통합테스트 (BATCH-01/02)
 
-**청크 B — 차감 실행·운영 (wave 5~9)**
+**청크 B — 차감 실행 (wave 5~7)**
 - [x] 05-05-PLAN.md — [TDD] 차감 1회 반영(만료 임박 한 장·부분 차감·시스템 주체 이력) (BATCH-01/02)
 - [x] 05-06-PLAN.md — InactivityBatchRunner(조회→계산→차감→실행 이력, 트랜잭션 없는 루프) (BATCH-01/02/04)
 - [x] 05-07-PLAN.md — 멱등·캐치업 실증 + 만료 사용 불가 실증(구현물 없음, D-107) (BATCH-02/03/04)
-- [ ] 05-08-PLAN.md — @Scheduled cron 트리거 + 관리자 수동 실행 API + openapi 재생성 (BATCH-01/04)
-- [ ] 05-09-PLAN.md — phase 마감: 요구사항 대응표·문서 정합 + 로컬 실제 실행 확인 (BATCH-01~04)
+
+**청크 C — 트리거·마감 (wave 8~9)**
+- [x] 05-08-PLAN.md — @Scheduled cron 트리거 + 관리자 수동 실행 API + openapi 재생성 (BATCH-01/04)
+- [x] 05-09-PLAN.md — phase 마감: 요구사항 대응표·문서 정합 + 로컬 실제 실행 확인 (BATCH-01~04)
 
 **Note**: 출석(`Attendance`) 스키마는 이 phase에서 선반영하지 않는다 — 기준일 조회가 출석 테이블을 필요로 하지 않음을 05-CONTEXT에서 확인했고, 기준일 후보 ①(마지막 출석일)은 Phase 6까지 자연히 부재로 동작한다(의도된 동작). 기준일(policies §4.3, D-027·D-105)은 회원 단위로 5종 후보의 가장 최근 날짜를 취하며, 출석 후보가 없는 이 phase 시점에는 나머지 4종(예약 수업일·복귀일·등록일·+가감일)으로 동작한다.
 
@@ -201,6 +226,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 2. 인증·회원 | 15/15 | Complete   | 2026-08-03 |
 | 3. 이용권 | 11/11 | Complete    | 2026-08-04 |
 | 4. 시간표·예약 | 15/15 | Complete   | 2026-08-08 |
-| 5. 배치 | 7/9 | In Progress|  |
+| 5. 배치 | 9/9 | Gaps found | - |
 | 6. 운영 | 0/TBD | Not started | - |
 </content>
