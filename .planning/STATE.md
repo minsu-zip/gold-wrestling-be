@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-04-PLAN.md
-last_updated: "2026-08-15T03:47:22.019Z"
+stopped_at: Completed 05-07-PLAN.md
+last_updated: "2026-08-15T05:06:39.927Z"
 last_activity: 2026-08-15
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 53
-  completed_plans: 48
+  completed_plans: 51
   percent: 67
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 05 (batch) — EXECUTING
-Plan: 5 of 9
+Plan: 7 of 9
 Status: Ready to execute
 Last activity: 2026-08-15
 
-Progress: [█████████░] 91%
+Progress: [██████████] 96%
 
 ## Performance Metrics
 
@@ -75,6 +75,9 @@ Progress: [█████████░] 91%
 | Phase 05-batch P02 | 35min | 3 tasks | 11 files |
 | Phase 05-batch P03 | 25min | 2 tasks | 2 files |
 | Phase 05-batch P04 | 50min | 2 tasks | 9 files |
+| Phase 05-batch P05 | 55min | 1 tasks | 3 files |
+| Phase 05-batch P06 | 35min | 1 tasks | 2 files |
+| Phase 05-batch P07 | ~40min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -130,6 +133,13 @@ Recent decisions affecting current work:
 - [Phase 05-batch]: InactivityDueDateCalculator KDoc의 'Clock' 문자열이 acceptance grep과 충돌해 '시각 주입 빈'으로 표현 변경
 - [Phase 05-batch]: D-115: 배치 벌크 조회는 Array<Any> 캐스팅 대신 인터페이스 스칼라 프로젝션(common/projection)으로 반환 — 타입 안전성을 이 저장소 관례로 고정
 - [Phase 05-batch]: CANCELED Pass 픽스처는 상태를 직접 대입하지 않고 PassRepository.cancelIfNotCanceled 실제 취소 경로로 만든다 — ck_pass_cancellation(V4)이 취소 메타데이터 완전성을 강제
+- [Phase 05-05]: 잔여 0인 SESSION_PASS 테스트 픽스처는 INITIAL_GRANT 이력을 생성하지 않는다 — ck_pass_transaction_amount_nonzero(V4)가 금액 0인 이력을 거부한다
+- [Phase 05-05]: 취소된 SESSION_PASS 픽스처는 cancelIfNotCanceled 대신 취소 메타데이터를 채운 Pass를 직접 saveAndFlush한다 — 커스텀 @Modifying 쿼리는 명시적 @Transactional 없이 호출하면 기본 readOnly 트랜잭션이 붙어 flush가 실패한다
+- [Phase 05-05]: Mockito 5는 Kotlin non-null 인터페이스 파라미터에 any()/anyLong() 매처를 쓰면 NPE를 던진다 — 매처 없이 실제 값을 그대로 인자로 넘겨 우회한다
+- [Phase 05-06]: repeat+return@repeat 대신 for+break로 부족분 루프 구현 — return@repeat은 continue 의미라 대상 소진 후에도 반복이 계속돼 'skippedCount 1건만 증가하고 중단'이라는 명시된 behavior를 만족하지 못한다
+- [Phase 05-06]: InactivityBatchRunner KDoc의 '@Transactional' 리터럴이 acceptance grep(0건 기대)과 충돌해 '트랜잭션 애노테이션'으로 표현 변경 — 05-03·05-04의 동일 유형 충돌과 같은 해결
+- [Phase 05-07]: ADMIN_ADJUST 픽스처는 배치 차감(조건부 UPDATE) 이후 낡은 메모리 참조가 아니라 DB 재조회 값 위에 가감한다 — 재조회 없이 가감하면 이미 반영된 배치 차감분이 되살아난다
+- [Phase 05-07]: 만료 검증 테스트 @AfterEach 정리 순서에 pass_period_change 삭제를 pass 삭제보다 앞에 추가 — AdminPassService.changePeriod가 남기는 이력(D-057)이 FK로 남아 있으면 pass 삭제가 실패한다
 
 ### Pending Todos
 
@@ -138,6 +148,7 @@ None yet.
 ### Blockers/Concerns
 
 - REQUIREMENTS.md 문서 상단의 "v1 requirements: 36 total" 표기가 실제 v1 목록(FOUND~NOTIF, 42건)과 불일치했음. 로드맵 작성 시 실제 목록 42건 전부를 매핑하고 Coverage 섹션을 42로 정정함 — 원 문서(docs/)와의 스펙 차이가 아니라 REQUIREMENTS.md 자체의 집계 오류로 판단.
+- ~~STATE.md의 'Plan: X of 9' 표시값 드리프트~~ **해소(2026-08-15)** — 원인은 청크 실행 시 오케스트레이터가 매번 호출하는 `state.begin-phase`가 Plan 카운터를 1로 리셋하는 것. `advance-plan`은 상대 증분만 하므로 리셋된 값에서 다시 세어 어긋났다. 실제 완료 수(5/9)로 수동 정정했고, 청크 단위 실행(D-084)에서는 wave 시작마다 `begin-phase`가 재호출되므로 다음 청크에서도 같은 드리프트가 재발할 수 있다 — 표시 전용 필드이며 SUMMARY 존재 여부가 실제 진행의 근거다
 
 ### Quick Tasks Completed
 
@@ -155,6 +166,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-15T03:47:22.013Z
-Stopped at: Completed 05-04-PLAN.md
+Last session: 2026-08-15T05:06:39.921Z
+Stopped at: Completed 05-07-PLAN.md
 Resume file: None
