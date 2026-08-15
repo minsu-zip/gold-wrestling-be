@@ -308,7 +308,7 @@ class InactivityBatchRunnerTest {
     // ── 대상 회원 0명·트리거 ──────────────────────────────────────────────
 
     @Test
-    fun `대상 회원이 0명이면 0집계 SUCCESS 이력이 남고 트리거가 SCHEDULED면 triggeredBy가 null이다`() {
+    fun `대상 회원이 0명이면 0집계 SUCCESS 이력이 남고 트리거가 SCHEDULED면 triggeredByAdminId가 null이다`() {
         val result = inactivityBatchRunner.run(BatchTrigger.SCHEDULED, null)
         createdBatchExecutionIds += result.id!!
 
@@ -317,18 +317,18 @@ class InactivityBatchRunnerTest {
         assertThat(result.skippedCount).isZero()
         assertThat(result.status).isEqualTo(BatchExecutionStatus.SUCCESS)
         assertThat(result.trigger).isEqualTo(BatchTrigger.SCHEDULED)
-        assertThat(result.triggeredBy).isNull()
+        assertThat(result.triggeredByAdminId).isNull()
     }
 
     @Test
-    fun `트리거가 MANUAL이면 triggeredBy에 관리자가 채워진다`() {
+    fun `트리거가 MANUAL이면 triggeredByAdminId에 관리자 id가 채워진다`() {
         val admin = persistAdmin()
 
         val result = inactivityBatchRunner.run(BatchTrigger.MANUAL, admin.id)
         createdBatchExecutionIds += result.id!!
 
         assertThat(result.trigger).isEqualTo(BatchTrigger.MANUAL)
-        assertThat(result.triggeredBy?.id).isEqualTo(admin.id)
+        assertThat(result.triggeredByAdminId).isEqualTo(admin.id)
     }
 
     @Test

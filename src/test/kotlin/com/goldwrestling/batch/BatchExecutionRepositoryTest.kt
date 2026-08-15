@@ -54,7 +54,7 @@ class BatchExecutionRepositoryTest {
             batchExecutionRepository.save(
                 BatchExecution(
                     trigger = BatchTrigger.SCHEDULED,
-                    triggeredBy = null,
+                    triggeredByAdminId = null,
                     startedAt = started,
                     finishedAt = finished,
                     processedMemberCount = 10,
@@ -81,7 +81,7 @@ class BatchExecutionRepositoryTest {
             batchExecutionRepository.saveAndFlush(
                 BatchExecution(
                     trigger = BatchTrigger.MANUAL,
-                    triggeredBy = null,
+                    triggeredByAdminId = null,
                     startedAt = OffsetDateTime.now(clock),
                     finishedAt = OffsetDateTime.now(clock),
                     processedMemberCount = 0,
@@ -102,7 +102,7 @@ class BatchExecutionRepositoryTest {
             batchExecutionRepository.saveAndFlush(
                 BatchExecution(
                     trigger = BatchTrigger.SCHEDULED,
-                    triggeredBy = admin,
+                    triggeredByAdminId = admin.id,
                     startedAt = OffsetDateTime.now(clock),
                     finishedAt = OffsetDateTime.now(clock),
                     processedMemberCount = 0,
@@ -121,7 +121,7 @@ class BatchExecutionRepositoryTest {
             batchExecutionRepository.saveAndFlush(
                 BatchExecution(
                     trigger = BatchTrigger.SCHEDULED,
-                    triggeredBy = null,
+                    triggeredByAdminId = null,
                     startedAt = OffsetDateTime.now(clock),
                     finishedAt = OffsetDateTime.now(clock),
                     processedMemberCount = 5,
@@ -141,7 +141,7 @@ class BatchExecutionRepositoryTest {
             batchExecutionRepository.saveAndFlush(
                 BatchExecution(
                     trigger = BatchTrigger.SCHEDULED,
-                    triggeredBy = null,
+                    triggeredByAdminId = null,
                     startedAt = OffsetDateTime.now(clock),
                     finishedAt = OffsetDateTime.now(clock),
                     processedMemberCount = 0,

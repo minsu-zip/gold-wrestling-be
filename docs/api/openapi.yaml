@@ -1496,9 +1496,11 @@ components:
           format: date-time
           description: 실행 시작 시각
         finishedAt:
-          type: string
+          type:
+          - string
+          - "null"
           format: date-time
-          description: 실행 종료 시각
+          description: 실행 종료 시각 — 아직 실행 중(RUNNING)이면 null
         processedMemberCount:
           type: integer
           format: int32
@@ -1513,10 +1515,12 @@ components:
           description: 대상 소진 등으로 스킵된 건수 — 다음 실행이 상태 기반으로 이어받는다
         status:
           type: string
-          description: 실행 결과
+          description: 실행 결과 — RUNNING이면 아직 실행 중이며 집계는 확정 전 값(0)이다
           enum:
+          - RUNNING
           - SUCCESS
           - PARTIAL_FAILURE
+          - FAILED
         errorSummary:
           type:
           - string

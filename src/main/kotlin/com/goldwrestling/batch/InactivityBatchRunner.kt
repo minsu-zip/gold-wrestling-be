@@ -1,7 +1,6 @@
 package com.goldwrestling.batch
 
 import com.goldwrestling.SEOUL_ZONE_ID
-import com.goldwrestling.admin.Admin
 import com.goldwrestling.admin.AdminRepository
 import com.goldwrestling.member.MemberRepository
 import com.goldwrestling.pass.PassRepository
@@ -58,7 +57,7 @@ class InactivityBatchRunner(
     ): BatchExecution {
         val startedAt = OffsetDateTime.now(clock)
         val today = LocalDate.now(clock)
-        val triggeredBy = resolveTriggeredBy(trigger, triggeredByAdminId)
+        val resolvedAdminId = resolveTriggeredByAdminId(trigger, triggeredByAdminId)
 
         val memberIds = passRepository.findMemberIdsWithDeductibleSessionPass(today)
 
@@ -139,7 +138,7 @@ class InactivityBatchRunner(
         return batchExecutionRepository.save(
             BatchExecution(
                 trigger = trigger,
-                triggeredBy = triggeredBy,
+                triggeredByAdminId = resolvedAdminId,
                 startedAt = startedAt,
                 finishedAt = finishedAt,
                 processedMemberCount = memberIds.size,
@@ -152,7 +151,13 @@ class InactivityBatchRunner(
     }
 
     /**
-     * `trigger = MANUAL`이면 관리자를 조회해 채우고, `SCHEDULED`면 항상 null이다(`ck_batch_execution_trigger`).
+     * `trigger = MANUAL`이면 **관리자 존재를 확인한 뒤 그 id를 반환**하고, `SCHEDULED`면 항상
+     * null이다(`ck_batch_execution_trigger`).
+     *
+     * **존재 검증을 없애고 FK(`fk_batch_execution_admin`) 위반에 맡기지 않는다**(D-117) — 그러면
+     * "관리자 없음"과 "이미 실행 중(`uq_batch_execution_running`)"이 둘 다
+     * `DataIntegrityViolationException`이 되어, 실행 시작 경로가 두 원인을 구분해 409로 변환할 수
+     * 없게 된다.
      *
      * **두 예외 모두 `AdminBatchController`의 HTTP 경로에서는 도달 불가하다**(05-08, PR #14 리뷰
      * Info 이월 확인):
@@ -171,10 +176,10 @@ class InactivityBatchRunner(
      * (`InactivityBatchFailureIsolationTest`)의 계약 검증용으로 남는다 — 프로그래밍 오류(잘못된
      * 인자로 러너를 직접 호출)를 조기에 드러내는 방어 코드다.
      */
-    private fun resolveTriggeredBy(
+    private fun resolveTriggeredByAdminId(
         trigger: BatchTrigger,
         triggeredByAdminId: Long?,
-    ): Admin? =
+    ): Long? =
         when (trigger) {
             BatchTrigger.MANUAL -> {
                 val adminId =
@@ -182,6 +187,7 @@ class InactivityBatchRunner(
                 adminRepository.findById(adminId).orElseThrow {
                     IllegalStateException("배치를 수동 실행한 관리자(id=$adminId)를 찾을 수 없습니다.")
                 }
+                adminId
             }
 
             BatchTrigger.SCHEDULED -> {
