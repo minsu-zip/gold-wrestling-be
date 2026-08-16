@@ -132,16 +132,19 @@ class InactivityBatchIdempotencyTest {
         assertLedgerInvariant(pass.id!!)
     }
 
+    /**
+     * D-119의 1회 실행 상한이 캐치업의 **속도**만 바꾸고 **총량**은 그대로 둔다는 것을 고정한다 —
+     * 상한 도입 전에는 첫 실행이 3회를 몰아서 깎았다. 밀린 주기가 사라지지 않고 실행마다 1회씩
+     * 이어받는 것이 D-106 상태 기반 캐치업이 여전히 작동한다는 증거다.
+     */
     @Test
-    fun `배치가 6주 밀리면 다음 실행이 밀린 3회를 몰아서 차감한다`() {
+    fun `배치가 6주 밀리면 실행마다 1회씩 이어받아 밀린 3회를 결국 다 차감한다`() {
         val member = persistMember()
         val pass = persistSessionPass(member, remaining = "3.0", endDate = today.plusDays(30), createdAt = today.minusDays(42).atTime9am())
 
-        val first = runOnce(BatchTrigger.SCHEDULED, null)
-        val second = runOnce(BatchTrigger.SCHEDULED, null)
+        val results = (1..4).map { runOnce(BatchTrigger.SCHEDULED, null) }
 
-        assertThat(first.deductedCount).isEqualTo(3)
-        assertThat(second.deductedCount).isZero()
+        assertThat(results.map { it.deductedCount }).containsExactly(1, 1, 1, 0)
         assertThat(remainingOf(pass.id!!)).isEqualByComparingTo(BigDecimal.ZERO)
         assertThat(inactivityCountOf(pass.id!!)).isEqualTo(3)
         assertLedgerInvariant(pass.id!!)
@@ -161,16 +164,27 @@ class InactivityBatchIdempotencyTest {
         assertLedgerInvariant(pass.id!!)
     }
 
+    /**
+     * 잔여가 차감량(1.0)보다 적으면 잔여만큼만 차감한다(policies §4.3). 상한 `1` 아래에서는 이
+     * 부분 차감이 실행 두 번에 걸쳐 일어나고, 소진된 회원은 **다음 실행의 대상 목록에서 아예
+     * 빠진다**(`remainingCount > 0` 필터) — 그래서 세 번째 실행은 스킵이 아니라 처리 인원 0이다.
+     * (상한 도입 전에는 한 실행 안에서 2회 차감 + 대상 소진 스킵 1건이었다 — 그 스킵 계약은
+     * `InactivityBatchDeductionLimitOverrideTest`가 이어받았다.)
+     */
     @Test
-    fun `캐치업 중 잔여가 부분 소진되면 스킵 1건으로 멈추고 결과는 SUCCESS다`() {
+    fun `캐치업 중 잔여가 부분 소진되면 잔여만큼만 차감되고 소진 후에는 대상에서 빠진다`() {
         val member = persistMember()
         val pass = persistSessionPass(member, remaining = "1.5", endDate = today.plusDays(30), createdAt = today.minusDays(42).atTime9am())
 
-        val result = runOnce(BatchTrigger.SCHEDULED, null)
+        val first = runOnce(BatchTrigger.SCHEDULED, null)
+        val second = runOnce(BatchTrigger.SCHEDULED, null)
+        val third = runOnce(BatchTrigger.SCHEDULED, null)
 
-        assertThat(result.deductedCount).isEqualTo(2)
-        assertThat(result.skippedCount).isGreaterThanOrEqualTo(1)
-        assertThat(result.status).isEqualTo(BatchExecutionStatus.SUCCESS)
+        assertThat(first.deductedCount).isEqualTo(1)
+        assertThat(second.deductedCount).isEqualTo(1)
+        assertThat(third.processedMemberCount).isZero()
+        assertThat(third.deductedCount).isZero()
+        assertThat(third.status).isEqualTo(BatchExecutionStatus.SUCCESS)
         assertThat(remainingOf(pass.id!!)).isEqualByComparingTo(BigDecimal.ZERO)
         assertThat(inactivityCountOf(pass.id!!)).isEqualTo(2)
         assertLedgerInvariant(pass.id!!)
@@ -180,7 +194,8 @@ class InactivityBatchIdempotencyTest {
     fun `차감 후 관리자가 양의 가감을 하면 가감일부터 유예가 다시 시작돼 추가 차감이 없다`() {
         val member = persistMember()
         val pass = persistSessionPass(member, remaining = "3.0", endDate = today.plusDays(30), createdAt = today.minusDays(42).atTime9am())
-        runOnce(BatchTrigger.SCHEDULED, null)
+        // 1회 실행 상한(D-119) 때문에 밀린 3주기를 따라잡으려면 실행이 3번 필요하다.
+        repeat(3) { runOnce(BatchTrigger.SCHEDULED, null) }
         val remainingAfterCatchUp = remainingOf(pass.id!!)
         assertThat(remainingAfterCatchUp).isEqualByComparingTo(BigDecimal.ZERO)
 

@@ -63,6 +63,13 @@
 | `ADMIN_BRANCH_NOT_ASSIGNED` | 403 | 요청한 `branchId`에 관리자가 소속되지 않음 (T-04-53) | `AdminScheduleService` |
 | `INVALID_RESERVATION_SEARCH_RANGE` | 400 | 관리자 예약 검색 조건의 `from`이 `to`보다 뒤임 (RESV-07) | `AdminReservationService` |
 
+## 배치 코드 (Phase 5)
+
+| 코드 | HTTP 상태 | 의미 | 발생 지점 |
+|---|---|---|---|
+| `BATCH_ALREADY_RUNNING` | 409 | 이미 실행 중인 배치가 있어 새 실행을 거부 (CR-01, D-118). 관리자 더블클릭·재시도·cron 겹침은 예상된 상황이고 거부가 안전한 결과다 — 오류가 아니라 상태 충돌이다 | `BatchExecutionRecorder` |
+| `BATCH_EXECUTION_NOT_FOUND` | 404 | 요청한 배치 실행 이력이 없음 (WR-05). 진행 상태 조회(`GET /api/admin/batch/inactivity-runs/{id}`)를 잘못된 id로 호출한 경우 — 응답 문구에 id를 담지 않는다(존재 여부 탐색 방지, conventions §8) | `AdminBatchService` |
+
 **폴백 규칙** — 위 표에 매핑되지 않은 예외는 상태값으로 코드를 추측하지 않고 다음으로 고정된다:
 4xx → `MALFORMED_REQUEST`, 그 외 → `INTERNAL_ERROR`. (이때 HTTP 상태는 예외가 정한 값이 그대로 나가므로,
 FE가 특정 코드로 구분해야 하는 에러가 생기면 이 표와 핸들러에 명시 매핑을 추가한다.)

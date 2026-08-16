@@ -149,11 +149,13 @@ class InactivityBatchRunnerTest {
     }
 
     @Test
-    fun `기준일 42일 전인 회원은 3회 차감된다(캐치업)`() {
+    fun `기준일 42일 전인 회원은 실행 3번에 걸쳐 3회 차감된다(캐치업 + 1회 실행 상한)`() {
         val member = persistMember()
         val pass = persistSessionPass(member, remaining = "5.0", endDate = today.plusDays(60), createdAt = today.minusDays(42).atTime9am())
 
-        inactivityBatchRunner.run(BatchTrigger.SCHEDULED, null).let { createdBatchExecutionIds += it.id!! }
+        // 1회 실행 상한(D-119)이 한 실행의 차감을 1회로 자른다 — 밀린 3주기는 사라지지 않고
+        // 다음 실행들이 상태 기반으로 이어받는다(D-106). 총량은 상한 도입 전과 같다.
+        repeat(3) { inactivityBatchRunner.run(BatchTrigger.SCHEDULED, null).let { createdBatchExecutionIds += it.id!! } }
 
         assertThat(remainingOf(pass.id!!)).isEqualByComparingTo(BigDecimal("2.0"))
         assertThat(inactivityCountOf(pass.id!!)).isEqualTo(3)
@@ -290,8 +292,15 @@ class InactivityBatchRunnerTest {
         assertThat(remainingOf(untouchedPass.id!!)).isEqualByComparingTo(BigDecimal("2.0"))
     }
 
+    /**
+     * 상한 도입(D-119) 전에는 이 시나리오가 "부족분 2 → 1회 차감 + 대상 소진 스킵 1건"이었다.
+     * 상한 `1`이 부족분을 먼저 자르므로 `deductOnce`가 한 번만 호출되고, 그 호출은 대상 회원
+     * 벌크 조회와 필터가 같아 단일 스레드에서는 항상 성공한다 — **스킵은 더 이상 발생하지
+     * 않는다.** 대상 소진 스킵의 계약은 상한을 올린 전용 컨텍스트
+     * (`InactivityBatchDeductionLimitOverrideTest`)로 옮겼다.
+     */
     @Test
-    fun `부족분이 2인데 잔여 1dot0인 장 한 장뿐이면 1회만 차감되고 스킵 1건으로 루프가 멈춘다`() {
+    fun `부족분이 2여도 한 실행에서는 1회만 차감하고 상한으로 잘린 주기는 스킵으로 세지 않는다`() {
         val member = persistMember()
         val pass = persistSessionPass(member, remaining = "1.0", endDate = today.plusDays(30), createdAt = today.minusDays(28).atTime9am())
 
@@ -299,7 +308,7 @@ class InactivityBatchRunnerTest {
         createdBatchExecutionIds += result.id!!
 
         assertThat(result.deductedCount).isEqualTo(1)
-        assertThat(result.skippedCount).isEqualTo(1)
+        assertThat(result.skippedCount).isZero()
         assertThat(result.status).isEqualTo(BatchExecutionStatus.SUCCESS)
         assertThat(remainingOf(pass.id!!)).isEqualByComparingTo(BigDecimal.ZERO)
         assertThat(inactivityCountOf(pass.id!!)).isEqualTo(1)
@@ -308,7 +317,7 @@ class InactivityBatchRunnerTest {
     // ── 대상 회원 0명·트리거 ──────────────────────────────────────────────
 
     @Test
-    fun `대상 회원이 0명이면 0집계 SUCCESS 이력이 남고 트리거가 SCHEDULED면 triggeredBy가 null이다`() {
+    fun `대상 회원이 0명이면 0집계 SUCCESS 이력이 남고 트리거가 SCHEDULED면 triggeredByAdminId가 null이다`() {
         val result = inactivityBatchRunner.run(BatchTrigger.SCHEDULED, null)
         createdBatchExecutionIds += result.id!!
 
@@ -317,18 +326,18 @@ class InactivityBatchRunnerTest {
         assertThat(result.skippedCount).isZero()
         assertThat(result.status).isEqualTo(BatchExecutionStatus.SUCCESS)
         assertThat(result.trigger).isEqualTo(BatchTrigger.SCHEDULED)
-        assertThat(result.triggeredBy).isNull()
+        assertThat(result.triggeredByAdminId).isNull()
     }
 
     @Test
-    fun `트리거가 MANUAL이면 triggeredBy에 관리자가 채워진다`() {
+    fun `트리거가 MANUAL이면 triggeredByAdminId에 관리자 id가 채워진다`() {
         val admin = persistAdmin()
 
         val result = inactivityBatchRunner.run(BatchTrigger.MANUAL, admin.id)
         createdBatchExecutionIds += result.id!!
 
         assertThat(result.trigger).isEqualTo(BatchTrigger.MANUAL)
-        assertThat(result.triggeredBy?.id).isEqualTo(admin.id)
+        assertThat(result.triggeredByAdminId).isEqualTo(admin.id)
     }
 
     @Test

@@ -121,9 +121,13 @@ class AdminMemberService(
      * PENDING으로 되돌리는 것)가 이 메서드로만 가능하다. `UpdateMemberStatusRequest`가 요구사항
      * 문구(ACTIVE/ON_LEAVE/INACTIVE 3종)를 넘어 PENDING까지 허용하는 이유이기도 하다.
      *
-     * **휴회 복귀 시각은 여기서만 기록된다.** 이 값은 2주 미사용 차감의 기준일 후보 ③이며
-     * (D-105), 복귀하면 유예 2주가 새로 시작한다 — 기록이 누락되면 복귀 직후 회원이 밀린 주기만큼
-     * 소급 차감된다(D-111).
+     * **휴회 복귀 시각은 "`ON_LEAVE`에서 벗어났을 때" 기록된다** — `ACTIVE`로 돌아왔을 때만이
+     * 아니다. 이 값은 2주 미사용 차감의 기준일 후보 ③이며(D-105), 휴회가 끝난 시각이 곧 2주 유예가
+     * 다시 시작되는 시점이다. `ON_LEAVE → INACTIVE → ACTIVE`처럼 `ACTIVE`를 거치지 않고 우회하는
+     * 실제 운영 경로가 있어, 조건을 "`ACTIVE`로 전이할 때"가 아니라 "`ON_LEAVE`를 벗어날 때"로 잡아야
+     * `ON_LEAVE→INACTIVE` 시점에 값이 채워지고 그 뒤의 `INACTIVE→ACTIVE`에서도 기준일이 살아
+     * 있는다. 이 조건으로 좁혀 두지 않으면(예: `ON_LEAVE→ACTIVE` 직행에서만 기록) 우회 경로에서
+     * 기준일이 휴회 시작 이전으로 되돌아가 휴회 기간 전체가 소급 차감된다(CR-04, D-111 정정).
      */
     @Transactional
     fun changeStatus(
@@ -136,7 +140,7 @@ class AdminMemberService(
         }
         val previousStatus = member.status
         member.status = newStatus
-        if (previousStatus == MemberStatus.ON_LEAVE && newStatus == MemberStatus.ACTIVE) {
+        if (previousStatus == MemberStatus.ON_LEAVE && newStatus != MemberStatus.ON_LEAVE) {
             member.returnedFromLeaveAt = OffsetDateTime.now(clock)
         }
         if (newStatus == MemberStatus.PENDING) {

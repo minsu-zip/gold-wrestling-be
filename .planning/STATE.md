@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-08-PLAN.md
-last_updated: "2026-08-15T06:28:45.171Z"
-last_activity: 2026-08-15
+stopped_at: 05-16-PLAN.md Task 1·3 완료 — Task 2(로컬 실기동 확인) 사용자 승인 대기
+last_updated: "2026-08-16T00:00:00.000Z"
+last_activity: 2026-08-16
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 53
-  completed_plans: 52
+  total_plans: 60
+  completed_plans: 59
   percent: 67
 ---
 
@@ -26,11 +26,12 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 05 (batch) — EXECUTING
-Plan: 2 of 9
-Status: Ready to execute
-Last activity: 2026-08-15
+Plan: 16 of 16 (본 작업 9 + 갭 클로저 7, 청크 D)
+Status: 05-16(마감 검증) Task 1(전체 회귀·문서 정합)·Task 3(ROADMAP/REQUIREMENTS/VALIDATION/PATTERNS 갱신) 완료.
+  Task 2(로컬 실기동 202 접수·조회·잔여 변화 확인)는 **사용자 승인 대기** — 아직 아무도 확인하지 않았다.
+Last activity: 2026-08-16
 
-Progress: [██████████] 98%
+Progress: [█████████░] 98% (05-16 Task 2 승인 시 100%)
 
 ## Performance Metrics
 
@@ -78,7 +79,13 @@ Progress: [██████████] 98%
 | Phase 05-batch P05 | 55min | 1 tasks | 3 files |
 | Phase 05-batch P06 | 35min | 1 tasks | 2 files |
 | Phase 05-batch P07 | ~40min | 2 tasks | 2 files |
+| Phase 05-batch P15 | 75min | 3 tasks | 12 files |
 | Phase 05-batch P08 | 45min | 3 tasks | 7 files |
+| Phase 05-batch P10 | 25min | 2 tasks | 6 files |
+| Phase 05-batch P11 | 30min | 3 tasks | 12 files |
+| Phase 5 P12 | 15min | 3 tasks | 10 files |
+| Phase 5 P13 | 25min | 3 tasks | 5 files |
+| Phase 05-batch P14 | 30min | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -143,6 +150,19 @@ Recent decisions affecting current work:
 - [Phase 05-07]: 만료 검증 테스트 @AfterEach 정리 순서에 pass_period_change 삭제를 pass 삭제보다 앞에 추가 — AdminPassService.changePeriod가 남기는 이력(D-057)이 FK로 남아 있으면 pass 삭제가 실패한다
 - [Phase 05-batch]: resolveTriggeredBy 두 예외는 HTTP 경로에서 도달 불가 — requireNotNull 분기는 requireAdminId()의 non-null Long 반환으로 컴파일 타임 차단, 관리자 조회 실패 분기는 JwtAuthenticationFilter가 매 요청 관리자 존재를 먼저 검증해 401로 차단(관리자 삭제 기능 자체가 없음). 새 에러코드는 추가하지 않는다(D-114와 일치)
 - [Phase 05-batch]: AdminBatchControllerTest는 클래스 레벨 @Transactional을 쓰지 않는다 — 연속 2회 호출이 서로 다른 물리 트랜잭션으로 커밋돼야 D-106 멱등성을 HTTP 레벨에서 실증할 수 있다. 컨트롤러 테스트 clock 리셋은 Instant.now()를 쓴다 — NimbusJwtDecoder가 시스템 시각으로 exp를 검증해 과거 고정 clock이면 발급 토큰이 즉시 401 처리된다
+- [Phase 05-10]: CR-04: returnedFromLeaveAt 기록 조건을 previousStatus==ON_LEAVE && newStatus!=ON_LEAVE로 확장 — ON_LEAVE→INACTIVE→ACTIVE 우회 복귀 경로의 소급 차감을 막는다
+- [Phase 05-10]: docs/policies.md §4.3·glossary.md·decisions.md D-105/D-111을 CR-04 수정에 맞춰 같은 작업 안에서 정정 — 커밋된 V9 마이그레이션 주석은 그대로 두고 정정 사실은 V10 헤더로 미룬다
+- [Phase 05-11]: D-117: 배치 실행 직렬화는 batch_execution RUNNING 행 + status='RUNNING' 부분 유니크 인덱스(V10)로 한다 — advisory lock·원장 주기 유니크 인덱스·회원 행 비관적 락 기각
+- [Phase 05-11]: BatchExecution의 triggeredBy(@ManyToOne LAZY)를 triggeredByAdminId 스칼라로 교체 — 엔티티에 LAZY 연관이 0개가 되어 트랜잭션 밖 응답 변환이 조건 없이 안전해진다(WR-04)
+- [Phase 05-11]: BatchExecutionRepositoryTest는 @AfterEach 삭제 대신 클래스 레벨 @Transactional 롤백에 정리를 맡긴다 — 유니크 위반 단언 직후 PostgreSQL 트랜잭션이 abort 상태라 @AfterEach의 DELETE가 그 테스트를 실패시킨다
+- [Phase 5]: D-118: 배치 중복 실행은 409 BATCH_ALREADY_RUNNING으로 거부한다 — D-114의 '새 에러코드는 추가하지 않는다'를 철회 — 근거였던 '거부할 요청이 없다'는 전제가 CR-01(동시 호출 이중 차감)로 깨졌다
+- [Phase 5]: BatchExecutionRecorder는 별도 스프링 빈 + REQUIRES_NEW로 시작·종료를 기록한다 — 러너에 @Transactional을 붙이면 실패 격리(D-112)가 깨지고, 같은 클래스 내부 호출은 프록시를 우회해 트랜잭션 경계가 생기지 않는다. REQUIRED로 두면 RUNNING 행이 호출부 종료까지 커밋되지 않아 직렬화가 성립하지 않는다
+- [Phase 5]: D-108 해소: RUNNING 부분 유니크 인덱스 + 409 거부로 배치 동시 실행이 안전해졌다 — 분산 락 미도입 근거를 '단일 인스턴스'에서 'DB 제약이 인스턴스 수와 무관하게 막는다'로 교체
+- [Phase 5]: D-112 보강: 러너에는 @Transactional을 붙이지 않고 실행 이력의 시작·확정만 BatchExecutionRecorder의 REQUIRES_NEW에서 처리한다
+- [Phase 5]: D-119: 미사용 차감에 정책 시행일 하한(기본 2026-09-01)과 1회 실행 상한(기본 1)을 둔다 — 둘 다 설정값이라 재배포 없이 되돌릴 수 있다
+- [Phase 5]: 테스트 전역 시행일을 2000-01-01로 고정한다 — 고정하지 않으면 배치 테스트가 '차감 0'을 검증하는 빈 껍데기가 되면서 초록불로 통과한다
+- [Phase 05-16]: 전체 회귀(./gradlew cleanTest test 763건, 0 failures) + ./gradlew build 모두 캐시 없이 그린. "동시 실행은 아직 안전하지 않다"·"응답이 오지 않아도 재호출하지 않는다"·"차감 원자성 보장은 갭 클로저에서 정한다"·"ON_LEAVE→ACTIVE 복귀일" 서술이 src/·docs/ 전체에서 0건임을 grep으로 확인
+- [Phase 05-16]: REQUIREMENTS.md BATCH-01·02·04를 Complete로 전환 — BATCH-01은 CR-03(출석일 후보 부재, Phase 6 범위)이 열려 있는 동안 운영 배포는 cron을 꺼 둔 채 한다는 조건을 함께 명시. 사용자 로컬 실기동 확인(Task 2)은 아직 미완료이므로 05-16 플랜 자체는 완료 처리하지 않음
 
 ### Pending Todos
 
@@ -152,6 +172,7 @@ None yet.
 
 - REQUIREMENTS.md 문서 상단의 "v1 requirements: 36 total" 표기가 실제 v1 목록(FOUND~NOTIF, 42건)과 불일치했음. 로드맵 작성 시 실제 목록 42건 전부를 매핑하고 Coverage 섹션을 42로 정정함 — 원 문서(docs/)와의 스펙 차이가 아니라 REQUIREMENTS.md 자체의 집계 오류로 판단.
 - ~~STATE.md의 'Plan: X of 9' 표시값 드리프트~~ **해소(2026-08-15)** — 원인은 청크 실행 시 오케스트레이터가 매번 호출하는 `state.begin-phase`가 Plan 카운터를 1로 리셋하는 것. `advance-plan`은 상대 증분만 하므로 리셋된 값에서 다시 세어 어긋났다. 실제 완료 수(5/9)로 수동 정정했고, 청크 단위 실행(D-084)에서는 wave 시작마다 `begin-phase`가 재호출되므로 다음 청크에서도 같은 드리프트가 재발할 수 있다 — 표시 전용 필드이며 SUMMARY 존재 여부가 실제 진행의 근거다
+- **05-16-PLAN.md Task 2(로컬 실기동 확인)는 사용자 승인 대기 중** — 관리자 토큰으로 `POST /api/admin/batch/inactivity-runs` 호출 → 202/조회/목록/409/psql `RUNNING` 잔존 0건을 사용자가 직접 관찰하고 "승인"으로 응답해야 05-16이 완료된다. 그 전까지 `requirements-completed`·ROADMAP 05-16 체크박스는 미완료로 남는다. Phase 5 dev→main 병합(cron 활성 배포)은 이 승인과 무관하게 CR-03이 열려 있는 한 보류된다(D-116·D-119)
 
 ### Quick Tasks Completed
 
@@ -169,6 +190,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-15T06:28:45.164Z
-Stopped at: Completed 05-08-PLAN.md
-Resume file: None
+Last session: 2026-08-16T00:00:00.000Z
+Stopped at: 05-16-PLAN.md Task 1·3 완료, Task 2(로컬 실기동 확인) 사용자 승인 대기
+Resume file: .planning/phases/05-batch/05-16-PLAN.md

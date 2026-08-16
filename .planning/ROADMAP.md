@@ -18,7 +18,7 @@
 - [x] **Phase 2: 인증·회원** - 카카오 로그인, 온보딩, JWT, 관리자 ID/PW 인증, 가입 승인, 회원 관리 (본 작업 완료 2026-08-02 / 검증 갭 클로저 진행 중 — 02-12~02-15) (completed 2026-08-03)
 - [x] **Phase 3: 이용권** - Pass 3종 등록, PassTransaction 이력, 수동 가감·기간 수정, 본인 조회 (completed 2026-08-03)
 - [x] **Phase 4: 시간표·예약** - ClassSchedule/ClassSession, 예약 생성·취소·변경 + 즉시 차감/복구, 동시성 보장, 관리자 예약 관리·휴강, Notification 스키마·알림 레코드 생성 (completed 2026-08-08)
-- [ ] **Phase 5: 배치** - 2주 미사용 차감, 유효기간 만료 처리, 멱등 실행 (플랜 9/9 실행 완료, 검증 gaps_found — 05-VERIFICATION.md)
+- [ ] **Phase 5: 배치** - 2주 미사용 차감, 유효기간 만료 처리, 멱등 실행 (본 작업 9/9 + 갭 클로저 05-10~05-15 완료, 05-16 마감 검증 진행 중 — 사용자 로컬 실기동 확인 대기, 청크 D)
 - [ ] **Phase 6: 운영** - 출석 체크, 공지사항, 관리자 알림·활동 피드
 
 ## Phase Details
@@ -172,6 +172,22 @@ Phase 4, `INACTIVITY`는 Phase 5, `EVENING_HALF`는 Phase 6이 쓴다. `PassTran
 차감**한다, (c) `ON_LEAVE→INACTIVE→ACTIVE` 우회 경로에서 `returned_from_leave_at`이 기록되지 않는다.
 갭 클로저 전까지 dev→main 병합(= cron 활성 배포)을 하지 않는다.
 
+**갭 클로저**(2026-08-16, 청크 D): (a)(b)(c)와 WR-05를 아래 플랜에서 닫았다.
+- **(a) CR-01(동시 실행 이중 차감)** — 05-11(V10 `RUNNING` 부분 유니크 인덱스)·05-12(`BatchExecutionRecorder`
+  + 409 `BATCH_ALREADY_RUNNING`)·05-13(러너 배선 + `InactivityBatchRunConcurrencyTest`)에서 닫혔다.
+- **(b) CR-02(소급 차감 무방비)** — 05-14(정책 시행일 하한 `2026-09-01` + 1회 실행 상한 1)에서 닫혔다.
+- **(c) CR-04(휴회 이탈 시각 기록 누락)** — 05-10(`previousStatus==ON_LEAVE && newStatus!=ON_LEAVE`로
+  기록 조건 확장)에서 닫혔다.
+- **WR-05(동기 호출 → 타임아웃 → 재시도 → CR-01 재현)** — 05-15(202 접수 + 비동기 실행 +
+  `AdminBatchRunConcurrencyTest`)에서 닫혔다.
+- **WR-02(전체 실패 무기록)·WR-04(LAZY 프록시 계약 모순)** — CR-01 설계(05-11·05-13)의 부산물로 함께 닫혔다.
+- **CR-03(출석일 후보 부재)은 이번 청크의 범위 밖이다.** Phase 6이 `Attendance`를 도입하기 전까지
+  기준일 후보 ①(마지막 출석일)이 항상 null이라 저녁반 전용 회원이 부당 차감될 수 있는 문제는 남아
+  있다 — **운영 배포는 `BATCH_INACTIVITY_SCHEDULER_ENABLED=false`로 cron을 꺼 둔 채** 올리고 Phase 6에서
+  켠다(D-116·D-119). 이 청크가 dev에 머지된 뒤에도 **CR-03 때문에 cron 활성 배포(= dev→main 병합)는
+  여전히 보류한다** — 위 "갭 클로저 전까지 dev→main 병합을 하지 않는다"는 "청크 D가 dev에 머지된
+  뒤에도 CR-03이 열려 있는 한 cron 활성 배포는 하지 않는다"로 정확히 고쳐 읽는다.
+
 **갭 클로저 범위에 반드시 포함할 것** — (a)(b)(c) 외에 **WR-05**를 함께 담는다: 수동 실행 API가
 배치 종료까지 Tomcat 스레드를 잡는 동기 호출이라, 프록시·LB 타임아웃으로 관리자가 응답을 못 받고
 재시도하면 (a)의 이중 차감이 바로 재현된다. 즉 WR-05는 별개 개선이 아니라 **(a)의 현실적 트리거**다 —
@@ -179,7 +195,7 @@ Phase 4, `INACTIVITY`는 Phase 5, `EVENING_HALF`는 Phase 6이 쓴다. `PassTran
 설계하지 않으면 가드가 있어도 관리자가 계속 그 경로를 밟는다. 05-08은 API description에 운영
 회피책("응답이 오지 않아도 재호출하지 않는다")만 넣어 둔 상태다.
 
-**Plans**: 9 plans / 9 waves — **3개 청크로 납품했다 (D-084)**. 계획은 2개 청크였으나 청크 B가
+**Plans**: 16 plans / 16 waves — **4개 청크로 납품한다 (D-084)**. 본 작업 9 + 갭 클로저 7. 계획은 2개 청크였으나 청크 B가
 너무 커져 실행 중 wave 7/8 경계에서 한 번 더 갈랐다.
 청크 A `feature/phase-05a-batch-foundation`(wave 1~4, 판정 인프라 — 이 청크만으로는 차감이 일어나지 않는다) ·
 청크 B `feature/phase-05b-inactivity-deduction`(wave 5~7, 차감 실행·멱등 실증) ·
@@ -200,6 +216,22 @@ Phase 4, `INACTIVITY`는 Phase 5, `EVENING_HALF`는 Phase 6이 쓴다. `PassTran
 **청크 C — 트리거·마감 (wave 8~9)**
 - [x] 05-08-PLAN.md — @Scheduled cron 트리거 + 관리자 수동 실행 API + openapi 재생성 (BATCH-01/04)
 - [x] 05-09-PLAN.md — phase 마감: 요구사항 대응표·문서 정합 + 로컬 실제 실행 확인 (BATCH-01~04)
+
+**청크 D — 갭 클로저 (wave 10~16, `feature/phase-05d-gap-closure`)**
+05-VERIFICATION.md가 실패로 판정한 truth 3개(BATCH-01·02·04)를 닫는다. 설계는
+`05-GAP-CONTEXT.md`에서 사용자 확인을 거쳐 확정했다. dev 대상 PR 1개로 납품하며 머지는 사용자가 한다.
+- [x] 05-10-PLAN.md — CR-04: 휴회에서 벗어나는 모든 전이에 복귀 시각 기록 + 소급 차감 방지 실증 (BATCH-02)
+- [x] 05-11-PLAN.md — V10(finished_at 완화 + RUNNING 부분 유니크 인덱스) + 실행 이력 모델·스칼라 전환(WR-04) (BATCH-04)
+- [x] 05-12-PLAN.md — 배치 설정 3종 + BatchAlreadyRunningException(409) + BatchExecutionRecorder (BATCH-04)
+- [x] 05-13-PLAN.md — 러너·스케줄러 통합(FAILED 이력, WR-02) + 동시 run() 총 차감 1회 동시성 테스트 (BATCH-04)
+- [x] 05-14-PLAN.md — CR-02: 정책 시행일 하한 + 1회 실행당 회원 1명 1회 상한 (BATCH-01)
+- [x] 05-15-PLAN.md — WR-05: 202 접수 + 비동기 실행 + 실행 조회 API 2종 + openapi 재생성 (BATCH-01/04)
+- [ ] 05-16-PLAN.md — 전체 회귀·문서 정합 점검(완료: `./gradlew cleanTest test` 763건 BUILD SUCCESSFUL,
+  `./gradlew build` BUILD SUCCESSFUL) + 로컬 실기동 확인(**사용자 확인 대기 — 아직 승인되지 않았다**) +
+  표기 갱신 (BATCH-01~04)
+
+**범위 밖(의도적)**: CR-03(출석일 후보 부재) — 아래 Note의 설계 결정이며, 운영 배포 시
+`BATCH_INACTIVITY_SCHEDULER_ENABLED=false`로 cron을 꺼 둔 채 올리는 것으로 대응한다(D-116).
 
 **Note**: 출석(`Attendance`) 스키마는 이 phase에서 선반영하지 않는다 — 기준일 조회가 출석 테이블을 필요로 하지 않음을 05-CONTEXT에서 확인했고, 기준일 후보 ①(마지막 출석일)은 Phase 6까지 자연히 부재로 동작한다(의도된 동작). 기준일(policies §4.3, D-027·D-105)은 회원 단위로 5종 후보의 가장 최근 날짜를 취하며, 출석 후보가 없는 이 phase 시점에는 나머지 4종(예약 수업일·복귀일·등록일·+가감일)으로 동작한다.
 
@@ -226,6 +258,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 2. 인증·회원 | 15/15 | Complete   | 2026-08-03 |
 | 3. 이용권 | 11/11 | Complete    | 2026-08-04 |
 | 4. 시간표·예약 | 15/15 | Complete   | 2026-08-08 |
-| 5. 배치 | 9/9 | Gaps found | - |
+| 5. 배치 | 15/16 | In Progress (05-16 사용자 확인 대기) |  |
 | 6. 운영 | 0/TBD | Not started | - |
 </content>

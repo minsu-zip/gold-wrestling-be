@@ -18,7 +18,9 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.ArgumentMatchers.anyCollection
 import org.mockito.BDDMockito.willThrow
+import org.mockito.Mockito.reset
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
@@ -30,8 +32,9 @@ import java.time.LocalDate
 import java.time.OffsetDateTime
 
 /**
- * `InactivityBatchRunner`의 **회원 단위 예외 격리**(D-112)와 `PARTIAL_FAILURE` 집계, 그리고
- * 수동 실행 관리자 해석(D-113 `ck_batch_execution_trigger`)의 거부 경로를 실제 PostgreSQL로 검증한다.
+ * `InactivityBatchRunner`의 **회원 단위 예외 격리**(D-112)와 `PARTIAL_FAILURE` 집계, 수동 실행
+ * 관리자 해석(D-113 `ck_batch_execution_trigger`)의 거부 경로, 그리고 **실행 전체 실패의 이력
+ * 확정**(05-REVIEW.md WR-02)을 실제 PostgreSQL로 검증한다.
  *
  * 별도 클래스인 이유: 예외 주입에 [MockitoSpyBean]이 필요해 `InactivityBatchRunnerTest`와 스프링
  * 컨텍스트가 갈린다. 그 클래스는 예외 격리를 "05-07에서 다룬다"고 미뤘으나 05-07(멱등·만료 실증)이
@@ -39,6 +42,11 @@ import java.time.OffsetDateTime
  *
  * **클래스에 트랜잭션 애노테이션을 붙이지 않는다** — [InactivityDeductionService.deductOnce]가 회원별로
  * 독립 커밋해야 그 결과를 관측할 수 있다(`InactivityBatchRunnerTest` 선례). 대신 `@AfterEach`에서 직접 지운다.
+ *
+ * 실행 이력 정리는 [baselineExecutionId] 이후에 생긴 행으로 한정한다(`BatchExecutionRecorderTest`
+ * 관례) — 전체 실패 경로는 `run`이 예외를 던져 호출부가 id를 받지 못하므로 반환값만으로는 정리할
+ * 수 없고, **`RUNNING` 행을 하나라도 남기면 같은 컨테이너를 쓰는 다른 테스트 클래스의 배치 실행이
+ * 전부 409로 막힌다**(T-05D-11-01).
  */
 @SpringBootTest
 @Import(TestcontainersConfiguration::class, TestClockConfiguration::class)
@@ -60,7 +68,12 @@ class InactivityBatchFailureIsolationTest {
     @Autowired
     private lateinit var passTransactionRepository: PassTransactionRepository
 
-    @Autowired
+    /**
+     * 스파이인 이유는 **실행 전체 실패**(WR-02) 검증 하나뿐이다 — 벌크 조회 단계가 터지는 상황은
+     * DB 픽스처로 만들 수 없다(쿼리가 실패할 데이터가 존재하지 않는다). 기본 위임이라 픽스처 저장
+     * (`saveAndFlush`)에는 영향이 없고, 예외를 주입한 테스트만 그 메서드에서 실패한다.
+     */
+    @MockitoSpyBean
     private lateinit var memberRepository: MemberRepository
 
     @Autowired
@@ -81,10 +94,16 @@ class InactivityBatchFailureIsolationTest {
     private var fixtureCounter = 0L
     private val today: LocalDate = BatchFixtures.FIXED_TODAY
     private val createdBatchExecutionIds = mutableListOf<Long>()
+    private var baselineExecutionId: Long = 0
 
     @BeforeEach
-    fun resetClock() {
+    fun resetClockAndBaseline() {
         (clock as MutableTestClock).setTo(BatchFixtures.FIXED_TIME.toInstant())
+        baselineExecutionId =
+            jdbcClient
+                .sql("select coalesce(max(id), 0) from batch_execution")
+                .query(Long::class.java)
+                .single()
     }
 
     @AfterEach
@@ -93,6 +112,10 @@ class InactivityBatchFailureIsolationTest {
             batchExecutionRepository.deleteAllById(createdBatchExecutionIds)
             createdBatchExecutionIds.clear()
         }
+        jdbcClient
+            .sql("delete from batch_execution where id > :baseline")
+            .param("baseline", baselineExecutionId)
+            .update()
         jdbcClient
             .sql(
                 "delete from pass_transaction where pass_id in " +
@@ -200,7 +223,62 @@ class InactivityBatchFailureIsolationTest {
         assertThat(batchExecutionRepository.count()).isEqualTo(before)
     }
 
+    // ── WR-02: 실행 전체 실패도 이력에 확정된다 ────────────────────────────────
+
+    /**
+     * 05-12까지의 러너는 **종료 시점에** 이력 1건을 저장했다 — 벌크 조회가 터지면 저장 지점에
+     * 도달하지 못해 이력이 한 줄도 남지 않았고, 운영자는 "배치가 안 돌았다"와 "배치가 돌다가
+     * 터졌다"를 구분할 수 없었다(WR-02). 시작 시점 삽입 + 종료 확정으로 바뀐 지금은 실패해도
+     * `FAILED` 이력이 남아야 한다.
+     */
+    @Test
+    fun `벌크 조회가 실패하면 FAILED 이력 1건이 남고 예외가 호출부로 전파된다`() {
+        val member = persistMember()
+        persistDeductiblePass(member)
+        willThrow(IllegalStateException(LEAKY_MESSAGE))
+            .given(memberRepository)
+            .findReturnedFromLeaveTimestamps(anyCollection())
+
+        assertThatThrownBy { inactivityBatchRunner.run(BatchTrigger.SCHEDULED, null) }
+            .isInstanceOf(IllegalStateException::class.java)
+
+        val executions = executionsSinceBaseline()
+        assertThat(executions).hasSize(1)
+        assertThat(executions.single().status).isEqualTo(BatchExecutionStatus.FAILED)
+        assertThat(executions.single().finishedAt).isNotNull()
+        // errorSummary는 관리자 API 응답으로 그대로 나간다 — 예외 종류만 남는다(conventions §8, D-017)
+        assertThat(executions.single().errorSummary).isEqualTo("IllegalStateException")
+        assertThat(executions.single().errorSummary).doesNotContain(LEAKY_MESSAGE)
+    }
+
+    @Test
+    fun `전체 실패 뒤에도 RUNNING 행이 남지 않아 다음 실행이 시작된다`() {
+        val member = persistMember()
+        val pass = persistDeductiblePass(member)
+        willThrow(IllegalStateException(LEAKY_MESSAGE))
+            .given(memberRepository)
+            .findReturnedFromLeaveTimestamps(anyCollection())
+
+        assertThatThrownBy { inactivityBatchRunner.run(BatchTrigger.SCHEDULED, null) }
+            .isInstanceOf(IllegalStateException::class.java)
+        assertThat(batchExecutionRepository.findFirstByStatus(BatchExecutionStatus.RUNNING)).isNull()
+
+        // 주입한 예외를 걷어내고 같은 러너를 다시 부른다 — `RUNNING` 행이 방치돼 있었다면 여기서
+        // `uq_batch_execution_running` 때문에 409(BatchAlreadyRunningException)로 막힌다.
+        reset(memberRepository)
+        val retried = inactivityBatchRunner.run(BatchTrigger.SCHEDULED, null)
+
+        assertThat(retried.status).isEqualTo(BatchExecutionStatus.SUCCESS)
+        assertThat(retried.deductedCount).isEqualTo(1)
+        assertThat(remainingOf(pass.id!!)).isEqualByComparingTo(BigDecimal("2.0"))
+        assertThat(batchExecutionRepository.findFirstByStatus(BatchExecutionStatus.RUNNING)).isNull()
+    }
+
     // ── fixtures ──────────────────────────────────────────────────────────
+
+    /** 이 테스트 메서드가 만든 실행 이력만 고른다 — 다른 테스트 클래스가 남긴 이력과 섞이지 않게 한다. */
+    private fun executionsSinceBaseline(): List<BatchExecution> =
+        batchExecutionRepository.findAll().filter { it.id!! > baselineExecutionId }
 
     private fun songpaBranch(): Branch = branchRepository.findByName("송파점")!!
 

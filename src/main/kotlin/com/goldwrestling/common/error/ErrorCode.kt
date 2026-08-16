@@ -136,4 +136,10 @@ enum class ErrorCode(
 
     /** 관리자 예약 검색 조건의 from이 to보다 뒤임 (RESV-07) */
     INVALID_RESERVATION_SEARCH_RANGE(HttpStatus.BAD_REQUEST),
+
+    /** 배치가 이미 실행 중이어서 새 실행을 거부 (CR-01, D-118) */
+    BATCH_ALREADY_RUNNING(HttpStatus.CONFLICT),
+
+    /** 요청한 배치 실행 이력 없음 (WR-05, 실행 상태 조회) */
+    BATCH_EXECUTION_NOT_FOUND(HttpStatus.NOT_FOUND),
 }

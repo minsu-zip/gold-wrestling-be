@@ -380,6 +380,64 @@ class MemberStatusChangeTest {
         assertThat(reloaded.returnedFromLeaveAt).isNull()
     }
 
+    // ---------- 휴회 이탈 전이 전체 기록 (CR-04, D-111 정정) ----------
+
+    @Test
+    fun `ON_LEAVE에서 INACTIVE로 바꾸면 returnedFromLeaveAt이 채워진다`() {
+        val member = persistMember(kakaoId = 9224L, status = MemberStatus.ON_LEAVE)
+        val adminToken = adminAccessToken(loginId = "admin-status-return-fill-inactive")
+        val fixedInstant = Instant.parse("2026-08-20T01:00:00Z")
+        (clock as MutableTestClock).setTo(fixedInstant)
+
+        mockMvc.perform(statusRequest(member.id!!, adminToken, "INACTIVE")).andExpect(status().isOk)
+
+        val reloaded = memberRepository.findById(member.id!!).orElseThrow()
+        assertThat(reloaded.returnedFromLeaveAt).isEqualTo(OffsetDateTime.now(clock))
+    }
+
+    @Test
+    fun `ON_LEAVE에서 PENDING으로 바꾸면 returnedFromLeaveAt이 채워진다`() {
+        val member = persistMember(kakaoId = 9225L, status = MemberStatus.ON_LEAVE)
+        val adminToken = adminAccessToken(loginId = "admin-status-return-fill-pending")
+        val fixedInstant = Instant.parse("2026-08-20T01:00:00Z")
+        (clock as MutableTestClock).setTo(fixedInstant)
+
+        mockMvc.perform(statusRequest(member.id!!, adminToken, "PENDING")).andExpect(status().isOk)
+
+        val reloaded = memberRepository.findById(member.id!!).orElseThrow()
+        assertThat(reloaded.returnedFromLeaveAt).isEqualTo(OffsetDateTime.now(clock))
+    }
+
+    @Test
+    fun `ON_LEAVE에서 다시 ON_LEAVE로 바꾸면 returnedFromLeaveAt은 갱신되지 않는다`() {
+        val member = persistMember(kakaoId = 9226L, status = MemberStatus.ON_LEAVE)
+        val adminToken = adminAccessToken(loginId = "admin-status-return-noop-onleave")
+
+        mockMvc.perform(statusRequest(member.id!!, adminToken, "ON_LEAVE")).andExpect(status().isOk)
+
+        val reloaded = memberRepository.findById(member.id!!).orElseThrow()
+        assertThat(reloaded.returnedFromLeaveAt).isNull()
+    }
+
+    @Test
+    fun `ON_LEAVE에서 INACTIVE를 거쳐 ACTIVE로 돌아와도 최초 이탈 시각이 유지된다`() {
+        val member = persistMember(kakaoId = 9227L, status = MemberStatus.ON_LEAVE)
+        val adminToken = adminAccessToken(loginId = "admin-status-return-bypass")
+        val leaveExitInstant = Instant.parse("2026-08-20T01:00:00Z")
+        (clock as MutableTestClock).setTo(leaveExitInstant)
+
+        mockMvc.perform(statusRequest(member.id!!, adminToken, "INACTIVE")).andExpect(status().isOk)
+        val afterLeaveExit = memberRepository.findById(member.id!!).orElseThrow().returnedFromLeaveAt
+        assertThat(afterLeaveExit).isEqualTo(OffsetDateTime.ofInstant(leaveExitInstant, clock.zone))
+
+        val laterInstant = Instant.parse("2026-09-05T03:30:00Z")
+        (clock as MutableTestClock).setTo(laterInstant)
+        mockMvc.perform(statusRequest(member.id!!, adminToken, "ACTIVE")).andExpect(status().isOk)
+
+        val reloaded = memberRepository.findById(member.id!!).orElseThrow()
+        assertThat(reloaded.returnedFromLeaveAt).isEqualTo(afterLeaveExit)
+    }
+
     private fun statusRequest(
         memberId: Long,
         token: String,

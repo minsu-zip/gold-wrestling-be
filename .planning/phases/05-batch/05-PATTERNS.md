@@ -570,6 +570,31 @@ object PassFixtures {
 `memberWithReturnedFromLeave`)를 추가한다 — Testcontainers 통합테스트(`InactivityBatchRunnerTest` 등)가
 공유한다.
 
+## 갭 클로저 신규 파일 (2026-08-16 추가, 청크 D 05-10~05-15)
+
+본 작업(wave 1~9) 매핑 이후 갭 클로저가 새로 만든 파일이 File Classification 표에 없었다.
+analog는 새로 찾지 않고 각 플랜의 `<interfaces>` 기존 관례 인용을 그대로 옮긴다.
+
+| New File | Role | Data Flow | Closest Analog | Match Quality |
+|---|---|---|---|---|
+| `db/migration/V10__allow_running_batch_execution.sql` | migration | batch | `db/migration/V9__*.sql`(CHECK 완화 관례, 위 표) | exact |
+| `batch/BatchExecutionRecorder.kt` | service(`REQUIRES_NEW` 별도 빈) | CRUD(실행 이력 시작·확정) | `batch/InactivityDeductionService.kt`(self-invocation 회피를 위해 별도 빈으로 분리한 선례, 05-01) | role-match |
+| `config/InactivityBatchProperties.kt` | config(`@ConfigurationProperties` 데이터 클래스) | — | `config/JwtProperties.kt`, `config/AdminSeedProperties.kt` (05-12 `<interfaces>` 인용) | exact |
+| `batch/BatchAlreadyRunningException.kt` → `batch/BatchExceptions.kt`(05-15에서 통합) | utility(도메인 예외) | — | `pass/PassExceptions.kt` (`DomainException` 서브클래스 패턴, 05-12 `<interfaces>` 인용) | exact |
+| `config/BatchExecutorConfig.kt` | config(전용 `TaskExecutor` 빈) | — | `config/ClockConfig.kt`(단일 책임 `@Configuration` 관례, 위 표) | role-match |
+| `batch/AdminBatchService.kt` | service(접수 동기 + 본문 비동기 위임, 조회 2종) | request-response | `reservation/ReservationLedgerSupport.kt`(여러 스텝을 조합하지만 트랜잭션 경계는 위임하는 구조 원칙, 위 표) | role-match |
+| `test/batch/InactivityLeaveReturnTest.kt` | test(integration) | batch | `test/pass/PassLedgerInvariantTest.kt` (위 표) | exact |
+| `test/batch/BatchExecutionTest.kt` | test(unit, 스프링 없음) | — | `test/reservation/ReservationPassPolicyTest.kt` (위 표) | exact |
+| `test/batch/BatchExecutionRecorderTest.kt` | test(integration, `@Transactional` 미사용) | batch | `test/pass/PassLedgerInvariantTest.kt` | exact |
+| `test/batch/InactivityBatchRunConcurrencyTest.kt` | test(concurrency, Testcontainers) | batch | `test/reservation/ReservationCapacityConcurrencyTest.kt`(이 저장소의 동시성 테스트 관례 — `CountDownLatch` + 실제 PostgreSQL + `@Transactional` 미사용) | role-match |
+| `test/batch/InactivityBatchPolicyLimitTest.kt` / `InactivityBatchDeductionLimitOverrideTest.kt` | test(integration, `@SpringBootTest(properties=...)`) | batch | `test/batch/InactivityBatchIdempotencyTest.kt`(같은 phase 선례) | exact |
+| `test/batch/AdminBatchServiceTest.kt` | test(unit, Mockito) | — | `test/reservation/ReservationPassPolicyTest.kt`류의 스프링 없는 단위테스트 관례 | role-match |
+| `test/batch/AdminBatchRunConcurrencyTest.kt` | test(concurrency, MockMvc + `@MockitoBean`) | batch | `test/reservation/ReservationCapacityConcurrencyTest.kt` | role-match |
+
+**`InactivityBatchProperties`/`BatchExecutorConfig`는 conventions §10.0 면제 목록**(설정 클래스)이라
+전용 단위테스트가 없다 — 값 바인딩·부작용은 그 값을 소비하는 통합테스트(`BatchExecutionRecorderTest`,
+`InactivityBatchPolicyLimitTest`, `AdminBatchControllerTest`)가 간접 실증한다(각 SUMMARY 참조).
+
 ## Shared Patterns
 
 ### 조건부 UPDATE(D-021) + 재조회 + 이력 저장
