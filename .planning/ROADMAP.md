@@ -18,7 +18,7 @@
 - [x] **Phase 2: 인증·회원** - 카카오 로그인, 온보딩, JWT, 관리자 ID/PW 인증, 가입 승인, 회원 관리 (본 작업 완료 2026-08-02 / 검증 갭 클로저 진행 중 — 02-12~02-15) (completed 2026-08-03)
 - [x] **Phase 3: 이용권** - Pass 3종 등록, PassTransaction 이력, 수동 가감·기간 수정, 본인 조회 (completed 2026-08-03)
 - [x] **Phase 4: 시간표·예약** - ClassSchedule/ClassSession, 예약 생성·취소·변경 + 즉시 차감/복구, 동시성 보장, 관리자 예약 관리·휴강, Notification 스키마·알림 레코드 생성 (completed 2026-08-08)
-- [ ] **Phase 5: 배치** - 2주 미사용 차감, 유효기간 만료 처리, 멱등 실행 (본 작업 9/9 + 갭 클로저 05-10~05-15 완료, 05-16 마감 검증 진행 중 — 사용자 로컬 실기동 확인 대기, 청크 D)
+- [x] **Phase 5: 배치** - 2주 미사용 차감, 유효기간 만료 처리, 멱등 실행 (본 작업 9/9 + 갭 클로저 05-10~05-16 완료, 재검증 `passed` 4/4 — CR-03은 Phase 6으로 이월, 그동안 cron은 꺼 둔 채 배포) (completed 2026-08-16)
 - [ ] **Phase 6: 운영** - 출석 체크, 공지사항, 관리자 알림·활동 피드
 
 ## Phase Details
@@ -180,6 +180,17 @@ Phase 4, `INACTIVITY`는 Phase 5, `EVENING_HALF`는 Phase 6이 쓴다. `PassTran
   기록 조건 확장)에서 닫혔다.
 - **WR-05(동기 호출 → 타임아웃 → 재시도 → CR-01 재현)** — 05-15(202 접수 + 비동기 실행 +
   `AdminBatchRunConcurrencyTest`)에서 닫혔다.
+
+**재검증 결과** (05-VERIFICATION.md, 2026-08-16): **passed — 4/4.** 이전 판정(1/4)에서 실패했던
+BATCH-01·02·04가 모두 뒤집혔고 회귀는 없다. 검증자가 SUMMARY 주장이 아니라 코드를 직접 읽고
+`./gradlew cleanTest test`(배치·회원 299건 0 failures)를 자체 실행해 판정했으며, 로컬 실기동
+관찰(동시 POST 10건 × 2회 → 매번 202 1건/409 9건, 총 20건 요청 후에도 `INACTIVITY` 이력 1건 불변,
+종료 후 `RUNNING` 0건)이 근거로 포함됐다.
+
+> ⚠️ **배포 조건**: CR-03(기준일 후보 ① 부재)이 Phase 6까지 열려 있으므로, dev→main 배포 시
+> `BATCH_INACTIVITY_SCHEDULER_ENABLED=false`로 **cron을 꺼 둔 채** 올린다(D-116·D-119). 켜 두면
+> 저녁반에만 나오는 `SESSION_PASS` 회원이 2주마다 1.0회씩 부당 차감된다. 이 전제가 산문에만
+> 있어 잊히기 쉬웠으므로 `.env.example` 기본값을 `false`로 바꿔 두었다 — Phase 6에서 되돌린다.
 - **WR-02(전체 실패 무기록)·WR-04(LAZY 프록시 계약 모순)** — CR-01 설계(05-11·05-13)의 부산물로 함께 닫혔다.
 - **CR-03(출석일 후보 부재)은 이번 청크의 범위 밖이다.** Phase 6이 `Attendance`를 도입하기 전까지
   기준일 후보 ①(마지막 출석일)이 항상 null이라 저녁반 전용 회원이 부당 차감될 수 있는 문제는 남아
@@ -226,9 +237,8 @@ Phase 4, `INACTIVITY`는 Phase 5, `EVENING_HALF`는 Phase 6이 쓴다. `PassTran
 - [x] 05-13-PLAN.md — 러너·스케줄러 통합(FAILED 이력, WR-02) + 동시 run() 총 차감 1회 동시성 테스트 (BATCH-04)
 - [x] 05-14-PLAN.md — CR-02: 정책 시행일 하한 + 1회 실행당 회원 1명 1회 상한 (BATCH-01)
 - [x] 05-15-PLAN.md — WR-05: 202 접수 + 비동기 실행 + 실행 조회 API 2종 + openapi 재생성 (BATCH-01/04)
-- [ ] 05-16-PLAN.md — 전체 회귀·문서 정합 점검(완료: `./gradlew cleanTest test` 763건 BUILD SUCCESSFUL,
-  `./gradlew build` BUILD SUCCESSFUL) + 로컬 실기동 확인(**사용자 확인 대기 — 아직 승인되지 않았다**) +
-  표기 갱신 (BATCH-01~04)
+- [x] 05-16-PLAN.md — 전체 회귀·문서 정합 점검(`./gradlew cleanTest test` 763건 → PR #16 리뷰 반영 후
+  767건, `./gradlew build` 모두 BUILD SUCCESSFUL) + 로컬 실기동 확인 + 표기 갱신 (BATCH-01~04)
 
 **범위 밖(의도적)**: CR-03(출석일 후보 부재) — 아래 Note의 설계 결정이며, 운영 배포 시
 `BATCH_INACTIVITY_SCHEDULER_ENABLED=false`로 cron을 꺼 둔 채 올리는 것으로 대응한다(D-116).

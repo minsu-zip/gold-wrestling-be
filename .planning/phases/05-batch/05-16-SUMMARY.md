@@ -250,3 +250,24 @@ docker compose exec -T postgres psql -U gold -d gold_wrestling -c \
 - FOUND: commit `030cfcc` (Task 3)
 - FOUND: commit `61e4e51` (STATE 갱신)
 - CONFIRMED: 로컬 앱이 `http://localhost:8080`에서 응답 중, V10 적용 확인, 보존 데이터(member 4·pass 7·pass_transaction 35·batch_execution 3·RUNNING 0) 무손실
+
+## 실기동 확인 결과 (2026-08-16, 체크포인트 해소)
+
+오케스트레이터가 실제 앱(`./gradlew bootRun`)과 실제 로컬 DB로 실행하고 결과를 사용자에게 제시했다.
+자동 테스트가 다루지 못하는 두 가지 — V10이 실제 DB에 적용된 상태에서의 동작, 그리고 실 원장의
+이중 차감 부재 — 를 확인하는 것이 이 체크포인트의 목적이었다.
+
+| # | 확인 | 관찰 결과 |
+|---|---|---|
+| ① | `POST /api/admin/batch/inactivity-runs` | **202**, `Location: /api/admin/batch/inactivity-runs/5`, `status=RUNNING`, `finishedAt=null`, 회원 개인정보·id 목록 없음 |
+| ② | `Location` 폴링 | **SUCCESS**, `finishedAt` 채워짐, `processedMemberCount=3`, `deductedCount=0`(부족분 0 — D-106 상태 기반 멱등) |
+| ③ | 동시 POST 10건 × 2회 | 매번 **202 정확히 1건 / 409 9건**. 409 본문 = RFC 9457 `ProblemDetail`, `code: BATCH_ALREADY_RUNNING` |
+| ④ | 종료 후 `batch_execution` | `SUCCESS` 7건, **`status='RUNNING'` 0건**, `finished_at IS NULL` 0건 |
+| ⑤ | 실 원장 | 총 20건의 동시 실행 요청 이후에도 `pass_transaction` **35건 불변**, `reason='INACTIVITY'` **1건 불변** — 실제 DB에서 이중 차감 0건 |
+| ⑥ | `GET .../?limit=` | 0·-1·101 → **400 `VALIDATION_FAILED`**, 1·100 → 200 (PR #16 리뷰 Info 1 수정분) |
+
+기동 로그에서 `Successfully validated 10 migrations` / `Schema "public" is up to date`로 V10이
+실제 적용된 상태임을 확인했다. 보존 데이터(member 4 / pass 7 / pass_transaction 35) 무손실.
+
+**기록의 정확성을 위해:** 이 관찰은 오케스트레이터가 수행하고 사용자에게 결과를 제시한 것이다
+(사용자 요청: "직접해서 확인해줘"). 앞선 SUMMARY 본문의 "사용자 승인 대기" 서술은 이 섹션으로 해소된다.
