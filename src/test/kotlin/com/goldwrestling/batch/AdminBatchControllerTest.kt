@@ -18,6 +18,8 @@ import org.assertj.core.api.Assertions.fail
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -286,6 +288,40 @@ class AdminBatchControllerTest {
 
         // limit이 실제로 건수를 자른다
         assertThat(listRuns(token, limit = 1).map { it.get("batchExecutionId").asLong() }).containsExactly(second)
+    }
+
+    /**
+     * 범위를 벗어난 `limit`은 조용히 보정하지 않고 400으로 거부한다(PR #16 리뷰 Info 1).
+     *
+     * 잘못된 입력을 서비스에서 `coerceIn`으로 고쳐 200을 돌려주면 호출자는 **자기 요청이 무시된 줄
+     * 모른다** — `limit=0`을 보내고 20건을 받아도 그게 보정 결과인지 실제 결과인지 구분할 수 없다.
+     * 페이징 파라미터 검증은 컨트롤러가 한다는 이 저장소 관례(`MemberSearchCondition`·
+     * `PassTransactionSearchCondition`)를 따른다.
+     */
+    @ParameterizedTest(name = "limit={0}")
+    @ValueSource(ints = [0, -1, 101])
+    fun `limit이 1부터 100 범위를 벗어나면 400과 VALIDATION_FAILED를 반환한다`(limit: Int) {
+        val admin = persistAdmin()
+        val token = tokenService.issueTokenPair(PrincipalType.ADMIN, admin.id!!).accessToken
+
+        mockMvc
+            .perform(
+                get(RUNS_PATH)
+                    .param("limit", limit.toString())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token"),
+            ).andExpect(status().isBadRequest)
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+    }
+
+    @Test
+    fun `limit 경계값 1과 100은 정상 조회된다`() {
+        val admin = persistAdmin()
+        val token = tokenService.issueTokenPair(PrincipalType.ADMIN, admin.id!!).accessToken
+        runAndAwait(token)
+
+        assertThat(listRuns(token, limit = 1)).hasSize(1)
+        assertThat(listRuns(token, limit = AdminBatchService.MAX_LIMIT)).isNotEmpty()
     }
 
     @Test

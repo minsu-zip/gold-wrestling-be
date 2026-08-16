@@ -93,9 +93,15 @@ class AdminBatchService(
      * 실행 이력 1건을 조회한다 — 관리자가 202 응답의 `Location`으로 진행 상태를 폴링하는 경로다.
      *
      * 없으면 [BatchExecutionNotFoundException](404)이다.
+     *
+     * **찾지 못한 id는 응답이 아니라 로그에만 남긴다.** 예외 메시지에 id를 보간하면 응답 문구로
+     * "그 id의 실행이 존재하는가"를 훑을 수 있게 되므로 담지 않는다(conventions §8). 그렇다고
+     * 아무 데도 남기지 않으면 운영 중 "어떤 id가 404였나"를 코드로 되짚을 수 없어, 여기서 한 줄
+     * 남긴다 — 배치 실행 id는 회원 개인정보가 아니므로 로그에 남아도 안전하다.
      */
     fun getExecution(batchExecutionId: Long): BatchExecution =
         batchExecutionRepository.findById(batchExecutionId).orElseThrow {
+            logger.info("배치 실행 이력 조회 실패 — 존재하지 않는 id (batchExecutionId={})", batchExecutionId)
             BatchExecutionNotFoundException(batchExecutionId)
         }
 
@@ -103,10 +109,15 @@ class AdminBatchService(
      * 최근 실행 이력을 시작 시각 내림차순으로 최대 [limit]건 반환한다 — D-108의 "배치가 안 돌았는지는
      * 실행 이력으로 확인한다"를 실제로 가능하게 만드는 조회다(WR-02의 운영자 질문).
      *
-     * **[limit]은 1..[MAX_LIMIT]로 조용히 보정한다.** 0·음수는 `PageRequest.of`가
-     * `IllegalArgumentException`(500)을 던지므로 잘못된 쿼리 파라미터 하나가 서버 오류가 되고,
-     * 상한이 없으면 이력이 몇 년치 쌓인 뒤 한 번의 호출이 전부를 메모리에 올린다. 보정 사실은
-     * `AdminBatchController`의 파라미터 설명에도 적혀 있다.
+     * **HTTP 경로의 범위 검증은 여기가 아니라 컨트롤러가 한다** — `AdminBatchController`의
+     * `limit` 파라미터에 `@Min(1)`·`@Max`가 붙어 있어 범위를 벗어난 요청은 이 메서드에 닿기 전에
+     * `HandlerMethodValidationException` → **400 `VALIDATION_FAILED`**(`ProblemDetail`)로 거부된다
+     * (`MemberSearchCondition`·`PassTransactionSearchCondition`의 페이징 파라미터와 같은 관례).
+     * 잘못된 입력을 조용히 고쳐 200을 돌려주면 호출자는 자기 요청이 무시된 줄 모른다.
+     *
+     * 아래 `coerceIn`은 그 검증을 대신하는 것이 아니라 **HTTP를 거치지 않는 직접 호출**(테스트·
+     * 내부 코드)에 대한 최후 방어다 — 0·음수는 `PageRequest.of`가 `IllegalArgumentException`(500)을
+     * 던지고, 상한이 없으면 이력이 몇 년치 쌓인 뒤 한 번의 호출이 전부를 메모리에 올린다.
      */
     fun listRecentExecutions(limit: Int): List<BatchExecution> =
         batchExecutionRepository.findAllByOrderByStartedAtDesc(PageRequest.of(0, limit.coerceIn(1, MAX_LIMIT)))

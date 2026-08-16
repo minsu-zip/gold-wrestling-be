@@ -10,6 +10,8 @@ import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
@@ -129,11 +131,15 @@ class AdminBatchController(
     )
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "조회 성공"),
+        ApiResponse(responseCode = "400", description = "limit이 1..100 범위를 벗어남 (VALIDATION_FAILED)", content = [Content()]),
         ApiResponse(responseCode = "401", description = "인증되지 않음 (UNAUTHENTICATED)", content = [Content()]),
         ApiResponse(responseCode = "403", description = "관리자 권한이 아님 (ACCESS_DENIED)", content = [Content()]),
     )
     fun listInactivityRuns(
-        @Parameter(description = "조회 건수. 1..100을 벗어나면 그 범위로 보정된다")
-        @RequestParam(defaultValue = "20") limit: Int,
+        @Parameter(description = "조회 건수(1..100). 범위를 벗어나면 400이다")
+        @RequestParam(defaultValue = "20")
+        @Min(1)
+        @Max(AdminBatchService.MAX_LIMIT.toLong())
+        limit: Int,
     ): List<BatchExecutionResponse> = adminBatchService.listRecentExecutions(limit).map(BatchExecutionResponse::from)
 }

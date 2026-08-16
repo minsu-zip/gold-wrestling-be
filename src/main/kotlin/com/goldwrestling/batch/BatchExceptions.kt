@@ -30,7 +30,12 @@ class BatchAlreadyRunningException :
  *
  * **[batchExecutionId]를 메시지에 보간하지 않는다** — 응답 문구로 "그 id의 실행이 존재하는가"를
  * 탐색할 수 있게 되는 것을 막기 위해서다(conventions §8, `PassNotFoundException`·
- * `MemberNotFoundException`과 동일한 선례).
+ * `MemberNotFoundException`과 동일한 선례). 파라미터를 받기만 하고 쓰지 않는 것도 그 선례와 같다 —
+ * 호출부가 "무엇을 못 찾았는지"를 명시하게 두되 응답에는 싣지 않는다.
+ *
+ * **추적은 로그가 담당한다** — `AdminBatchService.getExecution`이 던지기 직전에 id를 남긴다.
+ * 응답에 담지 않는 것과 아무 데도 남기지 않는 것은 다르다: 후자면 운영 중 "어떤 id가 404였나"를
+ * 되짚을 수단이 없다(PR #16 리뷰 Info 2).
  */
 @Suppress("UNUSED_PARAMETER")
 class BatchExecutionNotFoundException(

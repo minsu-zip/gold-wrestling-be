@@ -483,12 +483,14 @@ paths:
       parameters:
       - name: limit
         in: query
-        description: 조회 건수. 1..100을 벗어나면 그 범위로 보정된다
+        description: 조회 건수(1..100). 범위를 벗어나면 400이다
         required: false
         schema:
           type: integer
           format: int32
           default: 20
+          maximum: 100
+          minimum: 1
       responses:
         "200":
           description: 조회 성공
@@ -498,6 +500,8 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/BatchExecutionResponse"
+        "400":
+          description: limit이 1..100 범위를 벗어남 (VALIDATION_FAILED)
         "401":
           description: 인증되지 않음 (UNAUTHENTICATED)
         "403":
