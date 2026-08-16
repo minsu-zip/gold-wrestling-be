@@ -213,7 +213,7 @@ R-05-08(수용)로 닫았다. 아래 분석은 그 판단 근거로 남긴다.
 | R-05-06 | T-05D-12-03 / T-05D-14-02 | `BATCH_INACTIVITY_POLICY_EFFECTIVE_DATE`를 과거로 바꾸면 소급 차감 범위가 늘어난다. 배포 환경변수는 서버 운영자만 바꿀 수 있고, 1회 실행 상한(기본 1)이 피해 **속도**를 하루 1회로 묶는다. `.env.example:56`에는 키 이름만 두고 실값은 커밋하지 않는다 | 05-12/05-14-PLAN 승인 | 2026-08-16 |
 | R-05-07 | T-05D-14-03 | 1회 실행 상한으로 잘린 부족분을 이력이 아니라 로그로만 남긴다 — `skippedCount`(대상 소진·경쟁 패배 전용, D-113)를 오염시키지 않기 위해서다. 원장과 기준일로 언제든 재계산 가능해 정보가 사라지지 않는다 | 05-14-PLAN 승인 | 2026-08-16 |
 | R-05-08 | T-05-31 / T-05D-15-02 | `errorSummary`에 실패 회원 id가 담겨 관리자 응답으로 나간다. 관리자는 이미 전 회원 목록을 열람할 수 있어 **신규 권한 경계 통과가 없고**, 이 값 없이는 `PARTIAL_FAILURE` 이력으로 복구 대상을 특정할 수 없다. 예외 메시지·SQL은 계속 차단된다. 등록부의 T-05-23을 정본으로 삼고 T-05-31/T-05D-15-02 문구를 오기로 정정한다 | **사용자 확정** | 2026-08-16 |
-| R-05-09 | 등록부 밖 (기록 목적) | cron 킬 스위치의 **기본값이 켜짐(fail-open)**이다 — `application.yml:83` `${BATCH_INACTIVITY_SCHEDULER_ENABLED:true}` + `InactivityBatchScheduler.kt:37` `matchIfMissing = true`. 배포자가 환경변수를 잊으면 CR-03(출석일 후보 부재)이 열린 채 cron이 돈다. 완충 장치 2중: ① `.env.example:54`가 `false`로 고정됨 ② `policy-effective-date` 기본값 `2026-09-01`이 현재(2026-08-16) 미래라 그때까지 차감 0. `05-VERIFICATION.md` human_verification 2번의 후속 | 05-VERIFICATION 이월 | 2026-08-16 |
+| R-05-09 | 등록부 밖 (기록 목적) | ~~cron 킬 스위치가 **fail-open**이다~~ **해소(2026-08-17, D-121)** — `application.yml` 기본값을 `false`로, `@ConditionalOnProperty`의 `matchIfMissing`을 `false`로 뒤집어 **설정을 빠뜨리면 꺼지는 쪽으로 실패**하게 했다(fail-safe). 이제 자동 실행은 `BATCH_INACTIVITY_SCHEDULER_ENABLED=true`를 명시해야만 켜진다. 감사 시점(2026-08-16)에는 `.env.example`만 `false`였고 기본값 2곳이 `true`였다 | 사용자 확정 | 2026-08-17 |
 
 ---
 
@@ -274,11 +274,9 @@ R-05-08(수용)로 닫았다. 아래 분석은 그 판단 근거로 남긴다.
 `threats_open: 0`.
 
 **Next (Phase 5 밖):**
-1. **dev→main 배포 시 `BATCH_INACTIVITY_SCHEDULER_ENABLED=false`를 서버 환경변수에 반드시 넣는다**
-   — R-05-09가 지적한 fail-open 때문이다. `.env.example`은 `false`지만 `application.yml` 기본값과
-   `@ConditionalOnProperty(matchIfMissing = true)`는 여전히 켜짐이라, 환경변수를 잊으면 RES-05-02
-   (CR-03, 저녁반 전용 회원 부당 차감)가 열린 채 cron이 돈다. 현재는 `policy-effective-date`
-   기본값 `2026-09-01`이 미래라 그때까지만 완충된다.
+1. ~~dev→main 배포 시 환경변수를 반드시 넣는다~~ **해소(2026-08-17, D-121)** — 기본값을 뒤집어
+   fail-safe로 만들었다. 이제 환경변수를 넣지 **않으면** cron이 돌지 않는다. Phase 6에서 켤 때
+   `BATCH_INACTIVITY_SCHEDULER_ENABLED=true`를 명시한다.
 2. **RES-05-03(WR-06)** — `INACTIVE`(탈퇴) 회원의 `SESSION_PASS`가 계속 차감 대상인지 사용자 결정 필요.
 3. **Phase 6** — RES-05-02(출석일 후보) 해소 후 cron을 켠다. 그때 `Member.kt`·`application.yml`
    기본값도 함께 재검토한다.
