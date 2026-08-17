@@ -7,7 +7,9 @@ import org.mockito.BDDMockito.given
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoMoreInteractions
+import org.springframework.boot.env.YamlPropertySourceLoader
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
+import org.springframework.core.io.ClassPathResource
 import org.springframework.scheduling.annotation.Scheduled
 import java.util.function.Supplier
 
@@ -144,15 +146,25 @@ class InactivityBatchSchedulerTest {
      * 지키므로, `application.yml`이 `:true`로 되돌아가면 프로퍼티가 **항상 존재**하게 되어
      * `matchIfMissing`이 발동할 기회 자체가 사라진다 — 두 곳이 같은 방향을 가리켜야 fail-safe가
      * 성립한다(D-121).
+     *
+     * **파일을 텍스트로 읽어 문자열을 찾지 않는다**(PR #17 2차 리뷰 Info). 그 방식은 들여쓰기·
+     * 따옴표 같은 서식 변경만으로 깨지고(거짓 실패), 반대로 같은 문자열이 **주석**에 남아 있으면
+     * 값이 바뀌어도 통과한다(거짓 성공). `YamlPropertySourceLoader`로 실제 키를 읽으면 주석이
+     * 제거된 뒤의 **값 자체**를 보게 되어 두 위험이 함께 사라진다.
+     *
+     * 플레이스홀더가 해석되지 않은 원문(`${'$'}{...:false}`)으로 남는 것은 의도다 — 이 테스트가
+     * 확인하려는 것은 "환경변수가 없을 때 무엇으로 떨어지는가"이고, 그 답은 해석 전 기본값에 있다.
      */
     @Test
     fun `application_yml의 킬 스위치 기본값이 false다 (D-121)`() {
-        val yml =
-            requireNotNull(javaClass.classLoader.getResourceAsStream("application.yml")) {
-                "application.yml을 클래스패스에서 찾을 수 없습니다."
-            }.bufferedReader().use { it.readText() }
+        val sources =
+            YamlPropertySourceLoader().load("application.yml", ClassPathResource("application.yml"))
 
-        assertThat(yml).contains("\${BATCH_INACTIVITY_SCHEDULER_ENABLED:false}")
+        val declared = sources.firstNotNullOfOrNull { it.getProperty(SCHEDULER_ENABLED_KEY) }
+
+        assertThat(declared)
+            .describedAs("application.yml에 %s 키가 선언돼 있어야 한다", SCHEDULER_ENABLED_KEY)
+            .isEqualTo("\${BATCH_INACTIVITY_SCHEDULER_ENABLED:false}")
     }
 
     /** 스케줄러와 그 유일한 협력자만 담은 최소 컨텍스트 — 조건 평가만 보면 되므로 전체 앱을 띄우지 않는다. */
