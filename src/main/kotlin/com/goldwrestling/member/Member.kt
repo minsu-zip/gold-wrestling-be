@@ -27,9 +27,15 @@ import java.time.OffsetDateTime
  * [kakaoNickname]·[kakaoProfileImageUrl]은 카카오가 준 **표시용 보조 정보**이지 운영 기준 신원이
  * 아니다(D-083). 매 로그인마다 [applyKakaoProfile]로 갱신되며, 동의가 없으면 값이 없는 것이 정상이다.
  *
- * [returnedFromLeaveAt]은 `ON_LEAVE` → `ACTIVE` 전이에서만 갱신한다 — 다른 상태 전이는 이 값을
- * 건드리지 않는다(D-105 기준일 후보 ③, D-111). `Reservation.canceledAt`과 같은 단일 목적 시각
- * 컬럼이다.
+ * [returnedFromLeaveAt]은 **`ON_LEAVE`에서 벗어나는 모든 전이**에서 갱신한다 — `→ACTIVE`뿐 아니라
+ * `→INACTIVE`·`→PENDING`도 포함한다(D-105 기준일 후보 ③, D-111 정정). `ON_LEAVE`가 아닌 상태에서
+ * 출발하는 전이는 이 값을 건드리지 않는다. `Reservation.canceledAt`과 같은 단일 목적 시각 컬럼이다.
+ *
+ * **`→ACTIVE`로 좁히지 말 것**(05-REVIEW.md CR-04). 관리자가 장기 휴회자를 `INACTIVE`로 내렸다가
+ * 되살리는 `ON_LEAVE→INACTIVE→ACTIVE` 경로에서 값이 비면, 미사용 차감의 기준일이 휴회 전 등록일로
+ * 되돌아가 **휴회 기간 전체가 소급 차감된다**(6개월 휴회 복귀 시 최대 12회). 휴회가 끝난 시각이 곧
+ * 유예가 다시 시작되는 시점이므로 "벗어날 때 기록"이 의미상으로도 정확하다.
+ * 판정은 `AdminMemberService.changeStatus`가 하고, `InactivityLeaveReturnTest`가 우회 경로를 고정한다.
  */
 @Entity
 @Table(name = "member")

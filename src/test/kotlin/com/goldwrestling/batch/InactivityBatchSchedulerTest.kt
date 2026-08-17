@@ -7,7 +7,11 @@ import org.mockito.BDDMockito.given
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoMoreInteractions
+import org.springframework.boot.env.YamlPropertySourceLoader
+import org.springframework.boot.test.context.runner.ApplicationContextRunner
+import org.springframework.core.io.ClassPathResource
 import org.springframework.scheduling.annotation.Scheduled
+import java.util.function.Supplier
 
 /**
  * [InactivityBatchScheduler]의 **위임 계약**을 고정한다 — cron 발화 자체는 스프링의 기능이라
@@ -92,5 +96,95 @@ class InactivityBatchSchedulerTest {
         // 트리거가 늘면 그만큼 러너 진입점이 늘어난다 — CR-01(동시 이중 차감)이 열리는 지점이라
         // 새 트리거를 추가할 때는 반드시 동시 실행 가드를 함께 본다
         assertThat(scheduledMethods).hasSize(1)
+    }
+
+    /**
+     * D-121의 fail-safe 기본값을 **실제 스프링 조건 평가로** 고정한다 (PR #17 리뷰 Info).
+     *
+     * 다른 배치 테스트는 전부 `build.gradle.kts:107`이 주입하는 시스템 프로퍼티
+     * (`goldwrestling.batch.inactivity-scheduler-enabled=false`) 위에서 돈다 — 즉 **"값이 주어진
+     * 상태"만** 검증하고 이번 PR이 실제로 바꾼 `matchIfMissing`(= 값이 **없을 때**의 동작) 경로는
+     * 아무도 밟지 않는다. 그 상태로는 누군가 `matchIfMissing`을 `true`로 되돌려도(D-121 이전으로 회귀)
+     * 스위트가 초록불을 유지한다 — 이 PR의 핵심 안전장치가 무방비로 남는다.
+     *
+     * 그래서 이 테스트만 시스템 프로퍼티를 **일시적으로 비우고** 조건을 평가한다. 테스트는 단일 JVM
+     * 순차 실행이므로(`build.gradle.kts`에 `maxParallelForks`·JUnit 병렬 설정 없음) 전역 상태를
+     * 건드려도 다른 테스트와 겹치지 않으며, `finally`에서 원래 값을 반드시 되돌린다.
+     *
+     * 왜 fail-safe여야 하는가: CR-03(기준일 후보 ① 부재)이 Phase 6까지 열려 있어, 배포자가 설정을
+     * 빠뜨렸을 때 cron이 도는 쪽으로 실패하면 저녁반 전용 `SESSION_PASS` 회원의 잔여가 2주마다
+     * 부당하게 깎인다. 잊어서 안 도는 것은 아무 일도 일어나지 않는다 — 두 실패의 비용이 비대칭이다.
+     */
+    @Test
+    fun `킬 스위치 설정이 아예 없으면 스케줄러 빈이 등록되지 않는다 (D-121 fail-safe)`() {
+        withoutSchedulerSystemProperty {
+            schedulerContextRunner().run { context ->
+                assertThat(context).doesNotHaveBean(InactivityBatchScheduler::class.java)
+            }
+        }
+    }
+
+    @Test
+    fun `킬 스위치를 true로 명시해야만 스케줄러 빈이 등록된다`() {
+        withoutSchedulerSystemProperty {
+            schedulerContextRunner()
+                .withPropertyValues("$SCHEDULER_ENABLED_KEY=true")
+                .run { context ->
+                    assertThat(context).hasSingleBean(InactivityBatchScheduler::class.java)
+                }
+
+            schedulerContextRunner()
+                .withPropertyValues("$SCHEDULER_ENABLED_KEY=false")
+                .run { context ->
+                    assertThat(context).doesNotHaveBean(InactivityBatchScheduler::class.java)
+                }
+        }
+    }
+
+    /**
+     * `application.yml`의 기본값도 `false`인지 고정한다. 위 조건 평가 테스트는 `matchIfMissing`만
+     * 지키므로, `application.yml`이 `:true`로 되돌아가면 프로퍼티가 **항상 존재**하게 되어
+     * `matchIfMissing`이 발동할 기회 자체가 사라진다 — 두 곳이 같은 방향을 가리켜야 fail-safe가
+     * 성립한다(D-121).
+     *
+     * **파일을 텍스트로 읽어 문자열을 찾지 않는다**(PR #17 2차 리뷰 Info). 그 방식은 들여쓰기·
+     * 따옴표 같은 서식 변경만으로 깨지고(거짓 실패), 반대로 같은 문자열이 **주석**에 남아 있으면
+     * 값이 바뀌어도 통과한다(거짓 성공). `YamlPropertySourceLoader`로 실제 키를 읽으면 주석이
+     * 제거된 뒤의 **값 자체**를 보게 되어 두 위험이 함께 사라진다.
+     *
+     * 플레이스홀더가 해석되지 않은 원문(`${'$'}{...:false}`)으로 남는 것은 의도다 — 이 테스트가
+     * 확인하려는 것은 "환경변수가 없을 때 무엇으로 떨어지는가"이고, 그 답은 해석 전 기본값에 있다.
+     */
+    @Test
+    fun `application_yml의 킬 스위치 기본값이 false다 (D-121)`() {
+        val sources =
+            YamlPropertySourceLoader().load("application.yml", ClassPathResource("application.yml"))
+
+        val declared = sources.firstNotNullOfOrNull { it.getProperty(SCHEDULER_ENABLED_KEY) }
+
+        assertThat(declared)
+            .describedAs("application.yml에 %s 키가 선언돼 있어야 한다", SCHEDULER_ENABLED_KEY)
+            .isEqualTo("\${BATCH_INACTIVITY_SCHEDULER_ENABLED:false}")
+    }
+
+    /** 스케줄러와 그 유일한 협력자만 담은 최소 컨텍스트 — 조건 평가만 보면 되므로 전체 앱을 띄우지 않는다. */
+    private fun schedulerContextRunner(): ApplicationContextRunner =
+        ApplicationContextRunner()
+            .withBean(InactivityBatchRunner::class.java, Supplier { mock(InactivityBatchRunner::class.java) })
+            .withUserConfiguration(InactivityBatchScheduler::class.java)
+
+    /** [block] 실행 동안만 킬 스위치 시스템 프로퍼티를 비운다 — 원래 값은 반드시 복원한다. */
+    private fun withoutSchedulerSystemProperty(block: () -> Unit) {
+        val saved = System.getProperty(SCHEDULER_ENABLED_KEY)
+        System.clearProperty(SCHEDULER_ENABLED_KEY)
+        try {
+            block()
+        } finally {
+            saved?.let { System.setProperty(SCHEDULER_ENABLED_KEY, it) }
+        }
+    }
+
+    private companion object {
+        const val SCHEDULER_ENABLED_KEY = "goldwrestling.batch.inactivity-scheduler-enabled"
     }
 }

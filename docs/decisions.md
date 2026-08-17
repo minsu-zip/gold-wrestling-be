@@ -1005,8 +1005,10 @@
 
 ## D-116. 미사용 차감 cron은 프로퍼티로 끌 수 있다 (`goldwrestling.batch.inactivity-scheduler-enabled`)
 
-- 2026-08-15 / `InactivityBatchScheduler`에 `@ConditionalOnProperty(matchIfMissing = true)`를 붙여
-  기본은 켜 두되 `BATCH_INACTIVITY_SCHEDULER_ENABLED=false`로 빈 등록 자체를 막을 수 있게 한다.
+- 2026-08-15 / `InactivityBatchScheduler`에 `@ConditionalOnProperty`를 붙여
+  `BATCH_INACTIVITY_SCHEDULER_ENABLED`로 빈 등록 자체를 막을 수 있게 한다.
+  **[2026-08-17 정정 — D-121] 최초 결정의 "기본은 켜 둔다"(`matchIfMissing = true`)를 철회한다.**
+  기본값을 `false`로 뒤집어 설정을 빠뜨리면 꺼지는 쪽으로 실패하게 했다(fail-safe). 근거는 D-121.
   **관리자 수동 실행 API는 이 값과 무관하게 계속 동작한다** — 끄는 것은 "자동 실행"뿐이다.
 - 이유 ①(운영): 이 배치는 사람 개입 없이 회원 잔여를 깎는 유일한 경로다. 잘못 돌 때 코드 배포
   없이 즉시 멈출 수단이 없으면 매일 04:00마다 피해가 누적된다. 특히 최초 배포는 소급 차감
@@ -1124,3 +1126,38 @@
   없애지 않는다** — 시행일 이후 2주가 지나면 같은 문제가 다시 생긴다. 그래서 운영 배포는
   **`BATCH_INACTIVITY_SCHEDULER_ENABLED=false`로 cron을 꺼 둔 채** 올리고, 출석 후보가 생기는
   Phase 6에서 켠다(D-116). 수동 실행 API는 이 값과 무관하게 동작하므로 그때까지 실행하지 않는다.
+
+## D-120. 배치 `errorSummary`에 실패 회원 id를 남긴다 — 예외 메시지는 계속 차단한다
+
+- 2026-08-16 / 부분 실패(`PARTIAL_FAILURE`) 이력의 `error_summary`에 `memberId={id}: {예외종류}`
+  형태로 실패 회원 id를 남긴다. 이 값은 관리자 배치 API 3종 응답으로 그대로 나간다.
+  예외 **메시지**·SQL·제약조건명은 여전히 담지 않는다(conventions §8, D-017).
+- 이유: 이 값이 없으면 `PARTIAL_FAILURE` 이력만으로 **어느 회원의 잔여를 복구해야 하는지 특정할 수
+  없다** — Core Value("회원이 보는 잔여 = 실제 사용 가능 횟수")를 되돌리는 작업 자체가 불가능해진다.
+  노출 대상은 `hasRole("ADMIN")` 통과자뿐이고 관리자는 이미 `GET /api/admin/members`로 전 회원을
+  열람하므로 **새로 넘는 권한 경계가 없다**(Phase 4의 R-04-02·R-04-03과 같은 성격).
+- 배경: 05-SECURITY.md 감사에서 위협 등록부가 서로 모순됨이 드러났다 — T-05-23은 "회원 id + 예외
+  메시지만 기록"을, T-05-31·T-05D-15-02는 "회원 id 미포함"을 요구했다. **T-05-23을 정본**으로 삼고
+  나머지 둘의 문구를 오기로 정정했다(R-05-08 수용, 2026-08-16 사용자 확정).
+- 기각 대안: 회원 id를 로그에만 남기기 — 신뢰 경계가 동일(둘 다 관리자·운영자)해 보안 이득이
+  거의 없으면서 복구 시 서버 로그 접근을 강요한다.
+- 계약 고정: `InactivityBatchFailureIsolationTest`가 회원 id 포함(`:159`)·예외 종류만 포함·
+  SQL 제약조건 메시지 배제(`:188`, `:251`)를 함께 단언한다.
+
+## D-121. cron 킬 스위치의 기본값을 꺼짐으로 뒤집는다 (fail-safe) — D-116 정정
+
+- 2026-08-17 / `application.yml`의 `inactivity-scheduler-enabled` 기본값을 `true` → **`false`**로,
+  `@ConditionalOnProperty`의 `matchIfMissing`을 `true` → **`false`**로 바꾼다. 이제 자동 실행은
+  `BATCH_INACTIVITY_SCHEDULER_ENABLED=true`를 **명시해야만** 켜진다.
+- 이유: D-116은 "잘못 돌 때 끌 수 있다"는 **사후 수단**을 만들었지만, 켜고 끄는 판단이 배포자의
+  기억에 달려 있었다 — 환경변수를 빠뜨리면 켜진 채로 뜬다(fail-open). 05-SECURITY.md R-05-09가
+  이 상태를 지적했다. CR-03(기준일 후보 ① 부재)이 Phase 6까지 열려 있는 동안 cron이 돌면
+  저녁반 전용 `SESSION_PASS` 회원의 잔여가 2주마다 부당하게 깎인다. **잊어서 안 도는 것은 아무 일도
+  일어나지 않지만, 잊어서 도는 것은 회원 횟수가 사라진다** — 두 실패의 비용이 비대칭이므로
+  기본값은 싼 쪽으로 둔다.
+- 대가: Phase 6에서 켤 때 서버 환경변수를 명시해야 한다. 그 시점에 "이제 켜도 되는가"(출석 기록이
+  실제로 쌓이는가)를 확인하고 켜는 것이 옳은 순서이므로 대가라기보다 절차의 일부다.
+- 테스트 영향 없음: `build.gradle.kts`가 이미 테스트 전역에서 이 값을 `false`로 고정하고 있고,
+  스케줄러 빈이 **등록되지 않음**을 단언하는 테스트만 존재한다(`AdminBatchControllerTest`).
+- 되돌리기: Phase 6에서 출석 기록이 채워지면 기본값을 재검토한다. 그때도 "기본은 꺼짐, 명시해야 켜짐"을
+  유지할지(운영 안전) 되돌릴지(편의)를 함께 판단한다.

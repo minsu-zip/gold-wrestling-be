@@ -76,11 +76,16 @@ logging:
 
 goldwrestling:
   batch:
-    # 2주 미사용 차감 cron(매일 04:00 Asia/Seoul)의 킬 스위치 (decisions.md D-116).
+    # 2주 미사용 차감 cron(매일 04:00 Asia/Seoul)의 킬 스위치 (decisions.md D-116, D-121).
     # 이 배치는 사람 개입 없이 회원 잔여를 깎는 유일한 경로라 즉시 멈출 수단이 필요하다.
     # false 로 두면 InactivityBatchScheduler 빈 자체가 등록되지 않는다 —
     # 관리자 수동 실행 API(POST /api/admin/batch/inactivity-runs)는 이 값과 무관하게 계속 동작한다.
-    inactivity-scheduler-enabled: ${BATCH_INACTIVITY_SCHEDULER_ENABLED:true}
+    #
+    # 기본값이 false 인 것은 의도다(fail-safe, D-121). 환경변수를 빠뜨리면 배치가 "돌지 않는" 쪽으로
+    # 안전하게 실패한다 — 켜진 채로 실패하면 CR-03(출석일 후보 부재)이 열려 있는 동안 저녁반 전용
+    # 회원의 잔여가 2주마다 부당하게 깎인다. Phase 6에서 출석 기록이 채워지면 그때
+    # BATCH_INACTIVITY_SCHEDULER_ENABLED=true 로 켠다.
+    inactivity-scheduler-enabled: ${BATCH_INACTIVITY_SCHEDULER_ENABLED:false}
     # 위 킬 스위치 키는 @ConditionalOnProperty 가 원시 이름으로 읽으므로 아래 블록으로 옮기지 않는다 (D-116).
     inactivity:
       # 정책 시행일 하한 — 이 날짜 이전의 미사용은 차감 부채로 치지 않는다 (D-119, 소급 차감 방지)

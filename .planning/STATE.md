@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: 05-16-PLAN.md Task 1·3 완료 — Task 2(로컬 실기동 확인) 사용자 승인 대기
+stopped_at: Phase 5 완료 — 재검증 passed 4/4 (2026-08-16). 다음: /gsd-secure-phase 5
 last_updated: "2026-08-16T00:00:00.000Z"
 last_activity: 2026-08-16
 progress:
@@ -27,11 +27,11 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 
 Phase: 05 (batch) — EXECUTING
 Plan: 16 of 16 (본 작업 9 + 갭 클로저 7, 청크 D)
-Status: 05-16(마감 검증) Task 1(전체 회귀·문서 정합)·Task 3(ROADMAP/REQUIREMENTS/VALIDATION/PATTERNS 갱신) 완료.
+Status: Phase 5 완료 — 05-16 마감 검증 전 태스크 완료(전체 회귀 767건 0 failures, 로컬 실기동 확인 수행). 재검증 05-VERIFICATION.md = passed 4/4.
   Task 2(로컬 실기동 202 접수·조회·잔여 변화 확인)는 **사용자 승인 대기** — 아직 아무도 확인하지 않았다.
 Last activity: 2026-08-16
 
-Progress: [█████████░] 98% (05-16 Task 2 승인 시 100%)
+Progress: [██████████] 100% (재검증 passed 4/4, 2026-08-16)
 
 ## Performance Metrics
 
@@ -172,7 +172,7 @@ None yet.
 
 - REQUIREMENTS.md 문서 상단의 "v1 requirements: 36 total" 표기가 실제 v1 목록(FOUND~NOTIF, 42건)과 불일치했음. 로드맵 작성 시 실제 목록 42건 전부를 매핑하고 Coverage 섹션을 42로 정정함 — 원 문서(docs/)와의 스펙 차이가 아니라 REQUIREMENTS.md 자체의 집계 오류로 판단.
 - ~~STATE.md의 'Plan: X of 9' 표시값 드리프트~~ **해소(2026-08-15)** — 원인은 청크 실행 시 오케스트레이터가 매번 호출하는 `state.begin-phase`가 Plan 카운터를 1로 리셋하는 것. `advance-plan`은 상대 증분만 하므로 리셋된 값에서 다시 세어 어긋났다. 실제 완료 수(5/9)로 수동 정정했고, 청크 단위 실행(D-084)에서는 wave 시작마다 `begin-phase`가 재호출되므로 다음 청크에서도 같은 드리프트가 재발할 수 있다 — 표시 전용 필드이며 SUMMARY 존재 여부가 실제 진행의 근거다
-- **05-16-PLAN.md Task 2(로컬 실기동 확인)는 사용자 승인 대기 중** — 관리자 토큰으로 `POST /api/admin/batch/inactivity-runs` 호출 → 202/조회/목록/409/psql `RUNNING` 잔존 0건을 사용자가 직접 관찰하고 "승인"으로 응답해야 05-16이 완료된다. 그 전까지 `requirements-completed`·ROADMAP 05-16 체크박스는 미완료로 남는다. Phase 5 dev→main 병합(cron 활성 배포)은 이 승인과 무관하게 CR-03이 열려 있는 한 보류된다(D-116·D-119)
+- ~~05-16-PLAN.md Task 2(로컬 실기동 확인) 사용자 승인 대기~~ **해소(2026-08-16)** — 오케스트레이터가 실제 앱·실제 DB로 실행해 결과를 사용자에게 제시했다: 202+Location, Location 폴링 SUCCESS, 동시 POST 10건×2회 → 매번 202 1건/409 9건(ProblemDetail `BATCH_ALREADY_RUNNING`), 종료 후 `RUNNING` 0건, 총 20건 요청 후에도 `pass_transaction` 35건·`INACTIVITY` 1건 불변(실 DB 이중 차감 0건), `limit` 0/-1/101 → 400. 보존 데이터 무손실
 
 ### Quick Tasks Completed
 
@@ -191,5 +191,5 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-08-16T00:00:00.000Z
-Stopped at: 05-16-PLAN.md Task 1·3 완료, Task 2(로컬 실기동 확인) 사용자 승인 대기
+Stopped at: Phase 5 완료 (재검증 passed 4/4). 다음 스텝은 /gsd-secure-phase 5 → dev→main PR
 Resume file: .planning/phases/05-batch/05-16-PLAN.md
