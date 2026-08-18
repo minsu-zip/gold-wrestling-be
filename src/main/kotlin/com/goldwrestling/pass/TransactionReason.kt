@@ -32,4 +32,7 @@ enum class TransactionReason {
 
     /** 등록 취소(오등록 정정) 시 잔여를 0으로 상쇄 (D-059, 이번 phase 사용) */
     REGISTRATION_CANCELED,
+
+    /** 저녁반 출석 삭제로 인한 0.5회 복구 (D-128, EVENING_HALF의 반대) */
+    EVENING_HALF_REFUND,
 }
