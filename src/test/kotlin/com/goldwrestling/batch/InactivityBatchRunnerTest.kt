@@ -3,6 +3,10 @@ package com.goldwrestling.batch
 import com.goldwrestling.TestcontainersConfiguration
 import com.goldwrestling.admin.Admin
 import com.goldwrestling.admin.AdminRepository
+import com.goldwrestling.attendance.Attendance
+import com.goldwrestling.attendance.AttendanceFixtures
+import com.goldwrestling.attendance.AttendanceRepository
+import com.goldwrestling.attendance.AttendanceStatus
 import com.goldwrestling.branch.Branch
 import com.goldwrestling.branch.BranchRepository
 import com.goldwrestling.member.Member
@@ -80,6 +84,9 @@ class InactivityBatchRunnerTest {
     private lateinit var adminRepository: AdminRepository
 
     @Autowired
+    private lateinit var attendanceRepository: AttendanceRepository
+
+    @Autowired
     private lateinit var batchExecutionRepository: BatchExecutionRepository
 
     @Autowired
@@ -104,6 +111,12 @@ class InactivityBatchRunnerTest {
             batchExecutionRepository.deleteAllById(createdBatchExecutionIds)
             createdBatchExecutionIds.clear()
         }
+        // attendance가 class_session·pass_transaction을 FK로 참조하므로 그 둘보다 먼저 지운다
+        // (05-07의 pass_period_change 선례와 같은 유형).
+        jdbcClient
+            .sql("delete from attendance where member_id in (select id from member where kakao_id >= :base)")
+            .param("base", KAKAO_ID_BASE)
+            .update()
         jdbcClient
             .sql(
                 "delete from pass_transaction where pass_id in " +
@@ -267,6 +280,79 @@ class InactivityBatchRunnerTest {
         assertThat(remainingOf(pass.id!!)).isEqualByComparingTo(BigDecimal("2.0"))
     }
 
+    // ── CR-03: 출석 기반 기준일 후보 ① (06-03) ────────────────────────────
+
+    @Test
+    fun `마지막 출석일은 출석(ATTENDED) 기록만 기준으로 한다`() {
+        // 저녁반에만 나오는 SESSION_PASS 회원 — 등록은 30일 전, 저녁반 출석은 14일 전이라
+        // 기준일이 등록일(30일 전)이 아니라 출석일(14일 전)로 갱신돼야 한다(D-105 후보 ①).
+        val attendedMember = persistMember()
+        val attendedPass =
+            persistSessionPass(attendedMember, remaining = "5.0", endDate = today.plusDays(60), createdAt = today.minusDays(30).atTime9am())
+        persistAttendance(attendedMember, classDate = today.minusDays(14), status = AttendanceStatus.ATTENDED)
+
+        val noAttendanceMember = persistMember()
+        val noAttendancePass =
+            persistSessionPass(
+                noAttendanceMember,
+                remaining = "5.0",
+                endDate = today.plusDays(60),
+                createdAt = today.minusDays(30).atTime9am(),
+            )
+
+        repeat(3) { inactivityBatchRunner.run(BatchTrigger.SCHEDULED, null).let { createdBatchExecutionIds += it.id!! } }
+
+        // 출석 있는 회원: 기준일 14일 전 → floor(14/14) = 1회. 출석 없는 회원: 기준일 30일 전(등록일)
+        // → floor(30/14) = 2회. 같은 조건에서 출석 반영 여부만 다르므로 차감 횟수가 줄어든다.
+        assertThat(inactivityCountOf(attendedPass.id!!)).isEqualTo(1)
+        assertThat(inactivityCountOf(noAttendancePass.id!!)).isEqualTo(2)
+        assertThat(inactivityCountOf(attendedPass.id!!)).isLessThan(inactivityCountOf(noAttendancePass.id!!))
+    }
+
+    @Test
+    fun `불참(ABSENT) 기록은 기준일을 갱신하지 않는다`() {
+        val absentMember = persistMember()
+        val absentPass =
+            persistSessionPass(absentMember, remaining = "5.0", endDate = today.plusDays(60), createdAt = today.minusDays(30).atTime9am())
+        persistAttendance(absentMember, classDate = today.minusDays(14), status = AttendanceStatus.ABSENT, classType = ClassType.SESSION)
+
+        val noAttendanceMember = persistMember()
+        val noAttendancePass =
+            persistSessionPass(
+                noAttendanceMember,
+                remaining = "5.0",
+                endDate = today.plusDays(60),
+                createdAt = today.minusDays(30).atTime9am(),
+            )
+
+        repeat(3) { inactivityBatchRunner.run(BatchTrigger.SCHEDULED, null).let { createdBatchExecutionIds += it.id!! } }
+
+        // ABSENT는 후보 ①에서 제외되므로(policies §6) 등록일(30일 전) 기준으로만 계산돼 출석이
+        // 아예 없는 회원과 동일한 결과가 나온다.
+        assertThat(inactivityCountOf(absentPass.id!!)).isEqualTo(2)
+        assertThat(inactivityCountOf(absentPass.id!!)).isEqualTo(inactivityCountOf(noAttendancePass.id!!))
+    }
+
+    @Test
+    fun `소급 출석은 이미 실행된 INACTIVITY 차감을 되돌리지 않는다`() {
+        val member = persistMember()
+        val pass = persistSessionPass(member, remaining = "2.0", endDate = today.plusDays(30), createdAt = today.minusDays(20).atTime9am())
+
+        inactivityBatchRunner.run(BatchTrigger.SCHEDULED, null).let { createdBatchExecutionIds += it.id!! }
+        assertThat(remainingOf(pass.id!!)).isEqualByComparingTo(BigDecimal("1.0"))
+        assertThat(inactivityCountOf(pass.id!!)).isEqualTo(1)
+
+        // 이미 INACTIVITY 1건이 확정된 뒤, 그보다 최근 날짜(5일 전)의 ATTENDED 출석을 소급 입력한다.
+        persistAttendance(member, classDate = today.minusDays(5), status = AttendanceStatus.ATTENDED)
+
+        inactivityBatchRunner.run(BatchTrigger.SCHEDULED, null).let { createdBatchExecutionIds += it.id!! }
+
+        // 기준일 반영은 다음 배치 실행부터일 뿐(D-127), 이미 확정된 차감을 되돌리지 않는다 —
+        // 잔여도 늘지 않고 INACTIVITY 건수도 줄지 않는다.
+        assertThat(remainingOf(pass.id!!)).isEqualByComparingTo(BigDecimal("1.0"))
+        assertThat(inactivityCountOf(pass.id!!)).isEqualTo(1)
+    }
+
     // ── 집계·회당 재선택·소진 ──────────────────────────────────────────────
 
     @Test
@@ -399,6 +485,29 @@ class InactivityBatchRunnerTest {
             BatchFixtures.passTransaction(pass = pass, amount = BigDecimal(amount), reason = reason, occurredAt = occurredAt),
         )
 
+    /**
+     * CR-03 회귀 테스트 전용 — [classType]의 세션을 [classDate]에 만들어 [member]의 출석을 남긴다.
+     * 기본값 `EVENING`은 "저녁반에만 나오는 SESSION_PASS 회원" 시나리오(D-105 후보 ①)를 반영한다.
+     * `ABSENT`는 저녁반에 존재하지 않는 상태(D-127)이므로 그 경우 호출부가 `SESSION`을 넘긴다.
+     */
+    private fun persistAttendance(
+        member: Member,
+        classDate: LocalDate,
+        status: AttendanceStatus,
+        classType: ClassType = ClassType.EVENING,
+    ): Attendance {
+        val session = persistClassSession(classDate, classType)
+        return attendanceRepository.saveAndFlush(
+            AttendanceFixtures.attendance(
+                classSession = session,
+                member = member,
+                status = status,
+                checkedBy = persistAdmin(),
+                checkedAt = OffsetDateTime.now(clock),
+            ),
+        )
+    }
+
     /** [today]와 무관하게 스케줄만 다른 세션 하나를 매번 새 [classDate]로 만든다(`uq_class_session`). */
     private fun persistActiveReservation(
         member: Member,
@@ -421,14 +530,17 @@ class InactivityBatchRunnerTest {
         )
     }
 
-    private fun persistClassSession(classDate: LocalDate): ClassSession {
-        val schedule = songpaSchedule(ClassType.SESSION)
+    private fun persistClassSession(
+        classDate: LocalDate,
+        classType: ClassType = ClassType.SESSION,
+    ): ClassSession {
+        val schedule = songpaSchedule(classType)
         val session =
             classSessionRepository.saveAndFlush(
                 ClassSession(
                     classSchedule = schedule,
                     classDate = classDate,
-                    classType = ClassType.SESSION,
+                    classType = classType,
                     startTime = schedule.startTime,
                     endTime = schedule.endTime,
                     capacity = schedule.capacity,
