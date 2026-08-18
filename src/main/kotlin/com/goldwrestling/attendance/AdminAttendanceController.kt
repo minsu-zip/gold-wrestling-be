@@ -69,7 +69,8 @@ class AdminAttendanceController(
                 "0.5회를 차감한다. 둘 다 불가하면 409 EVENING_ATTENDANCE_DEDUCTION_UNAVAILABLE로 " +
                 "거부한다(관리자가 수동 가감으로 충전 후 재시도). 대상 회원은 " +
                 "`GET /api/admin/members?keyword=`로 검색해 얻은 memberId를 넘긴다 — 이 API는 " +
-                "별도 회원 검색 기능을 갖지 않는다.",
+                "별도 회원 검색 기능을 갖지 않는다. 회원의 소속 지점과 시간표의 지점이 다르면 " +
+                "404 CLASS_SCHEDULE_NOT_FOUND로 거부한다(예약과 동일한 불변식).",
     )
     fun addEvening(
         @AuthenticationPrincipal principal: AuthenticatedPrincipal,

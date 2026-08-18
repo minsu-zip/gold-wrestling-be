@@ -15,6 +15,7 @@ import com.goldwrestling.pass.PassTransactionRepository
 import com.goldwrestling.pass.PassType
 import com.goldwrestling.pass.TransactionReason
 import com.goldwrestling.schedule.ClassSchedule
+import com.goldwrestling.schedule.ClassScheduleNotFoundException
 import com.goldwrestling.schedule.ClassScheduleRepository
 import com.goldwrestling.schedule.ClassSessionRepository
 import com.goldwrestling.schedule.ClassType
@@ -106,6 +107,11 @@ class AttendanceEveningHalfTest {
         jdbcClient
             .sql("delete from admin where login_id like :prefix")
             .param("prefix", "$ADMIN_LOGIN_PREFIX%")
+            .update()
+        // 회원을 지운 뒤에 지운다 — member.branch_id가 NOT NULL FK다.
+        jdbcClient
+            .sql("delete from branch where name = :name")
+            .param("name", OTHER_BRANCH_NAME)
             .update()
     }
 
@@ -263,6 +269,29 @@ class AttendanceEveningHalfTest {
         assertThat(passRepository.findById(pass.id!!).get().remainingCount).isEqualByComparingTo(BigDecimal("1.5"))
     }
 
+    /**
+     * PR #19 리뷰 Info — 저녁반 경로는 예약을 거치지 않아 지점 검증이 여기 말고는 없다. 이 검사가
+     * 빠지면 관리자가 타 지점 회원을 이 지점 저녁반에 출석시켜 **그 회원의 이용권에서 0.5회를
+     * 차감**할 수 있다(`MemberReservationService.reserve`는 같은 상황을 이미 거부한다).
+     */
+    @Test
+    fun `타 지점 회원은 저녁반 출석으로 차감할 수 없다`() {
+        val schedule = songpaEveningSchedule()
+        val classDate = nextClassDate()
+        val member = persistOtherBranchMember()
+        val admin = persistAdmin()
+        val pass = persistSessionPass(member, remaining = "2.0", endDate = classDate.plusYears(1))
+
+        assertThatThrownBy {
+            attendanceService.addEveningAttendance(admin.id!!, AddEveningAttendanceRequest(schedule.id!!, classDate, member.id!!))
+        }.isInstanceOf(ClassScheduleNotFoundException::class.java)
+
+        assertThat(passRepository.findById(pass.id!!).get().remainingCount).isEqualByComparingTo(BigDecimal("2.0"))
+        assertThat(attendanceRepository.findAll().none { it.member.id == member.id }).isTrue()
+        // 지점 검증이 getOrCreate보다 앞서므로 빈 세션도 만들어지지 않는다(T-06-18과 같은 이유).
+        assertThat(classSessionRepository.findByClassScheduleIdAndClassDate(schedule.id!!, classDate)).isNull()
+    }
+
     // ── fixtures ──────────────────────────────────────────────────────────
 
     private fun songpaBranch(): Branch = branchRepository.findByName("송파점")!!
@@ -273,6 +302,15 @@ class AttendanceEveningHalfTest {
     private fun persistMember(): Member {
         fixtureCounter++
         return memberRepository.saveAndFlush(AttendanceFixtures.member(songpaBranch(), kakaoId = KAKAO_ID_BASE + fixtureCounter))
+    }
+
+    /** 지점 검증 테스트 전용 — 시드된 송파점이 아닌 별도 지점에 속한 회원. 지점 행은 `@AfterEach`가 지운다. */
+    private fun persistOtherBranchMember(): Member {
+        fixtureCounter++
+        val otherBranch =
+            branchRepository.findByName(OTHER_BRANCH_NAME)
+                ?: branchRepository.saveAndFlush(Branch(name = OTHER_BRANCH_NAME))
+        return memberRepository.saveAndFlush(AttendanceFixtures.member(otherBranch, kakaoId = KAKAO_ID_BASE + fixtureCounter))
     }
 
     private fun persistAdmin(): Admin {
@@ -329,6 +367,7 @@ class AttendanceEveningHalfTest {
     companion object {
         const val KAKAO_ID_BASE = 9_830_000_000L
         const val ADMIN_LOGIN_PREFIX = "admin-evening-half-"
+        const val OTHER_BRANCH_NAME = "출석지점검증-테스트지점"
         val BASE_SESSION_DATE: LocalDate = LocalDate.of(2033, 1, 1)
     }
 }

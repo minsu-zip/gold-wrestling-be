@@ -207,6 +207,10 @@ class AttendanceService(
      *
      * **회비·차감 후보 조회는 항상 [ClassSession.classDate](수업날) 기준이다** — clock으로 구한 오늘
      * 날짜를 넘기면 소급 입력 시 오늘 기준으로 잘못 판정한다(D-128 Pitfall 1).
+     *
+     * 회원과 시간표의 지점이 다르면 [ClassScheduleNotFoundException]으로 거부한다 —
+     * `MemberReservationService.reserve`가 예약에 적용하는 것과 같은 불변식이다. 관리자 계정이
+     * 어느 지점을 다룰 수 있는지(`AdminBranch` 스코프)는 여전히 v1 범위 밖이다(D-101).
      */
     @Transactional
     fun addEveningAttendance(
@@ -217,6 +221,17 @@ class AttendanceService(
             classScheduleRepository.findById(request.classScheduleId).orElseThrow {
                 ClassScheduleNotFoundException(request.classScheduleId)
             }
+
+        // 타 지점 회원을 이 지점 수업에 출석시키면 그 회원의 이용권에서 0.5회가 빠진다 — 원장이 걸린
+        // 경로이므로 `MemberReservationService.reserve`가 쓰는 것과 같은 불변식·같은 예외로 막는다
+        // (존재 여부를 흘리지 않으려고 403이 아니라 ClassScheduleNotFoundException을 쓴다).
+        // check()는 이 검사가 없어도 안전하다 — 활성 예약자만 통과시키는데, 예약 생성 시점에 이미
+        // 같은 검사를 통과했기 때문이다. 저녁반은 예약을 거치지 않아 여기가 유일한 방어선이다.
+        val member = memberRepository.findById(request.memberId).orElseThrow { MemberNotFoundException(request.memberId) }
+        if (schedule.branch.id != member.branch.id) {
+            throw ClassScheduleNotFoundException(request.classScheduleId)
+        }
+
         val session = classSessionService.getOrCreate(schedule, request.classDate)
         EveningHalfDeductionPolicy.requireEveningSession(session.classType)
         val sessionId = requireNotNull(session.id) { "getOrCreate가 반환한 세션은 항상 저장돼 있어야 합니다." }
