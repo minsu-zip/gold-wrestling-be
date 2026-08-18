@@ -65,7 +65,7 @@
 - [x] **ATTEND-01**: 관리자가 모든 수업(저녁반/예약제/1:1)의 타임별 출석을 체크할 수 있다 — 차감과 무관한 참고 데이터 (policies §6)
 - [x] **ATTEND-02**: 관리자가 횟수권 회원의 저녁반 참여를 0.5회 수동 차감할 수 있다 (`EVENING_HALF`) — 잔여 0.5 이상일 때만
 - [x] **NOTICE-01**: 관리자가 공지사항을 등록/수정/삭제할 수 있다
-- [ ] **NOTICE-02**: 회원이 공지 목록·상세를 열람할 수 있다
+- [x] **NOTICE-02**: 회원이 공지 목록·상세를 열람할 수 있다
 - [x] **NOTIF-01**: 예약 생성/변경/취소·휴강 시 관리자 알림이 생성된다 — Notification 스키마·레코드 생성은 Phase 4에서 구현 (조회·확인·폴링·피드는 Phase 6)
 - [ ] **NOTIF-02**: 관리자가 알림 목록을 폴링(30초)으로 조회하고 확인 처리할 수 있다 — 미확인 카운트 제공
 - [x] **NOTIF-03**: 관리자가 최근 활동 피드(예약 이벤트 타임라인)를 조회할 수 있다 — 알림과 동일 데이터의 다른 뷰
@@ -144,7 +144,7 @@
 | ATTEND-01 | Phase 6 | Complete |
 | ATTEND-02 | Phase 6 | Complete |
 | NOTICE-01 | Phase 6 | Complete |
-| NOTICE-02 | Phase 6 | Pending |
+| NOTICE-02 | Phase 6 | Complete |
 | NOTIF-02 | Phase 6 | Pending |
 | NOTIF-03 | Phase 6 | Complete |
 

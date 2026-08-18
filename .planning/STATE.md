@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-08-18T09:07:11.940Z"
+stopped_at: Completed 06-02-PLAN.md
+last_updated: "2026-08-18T09:17:43.197Z"
 last_activity: 2026-08-18
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 71
-  completed_plans: 61
+  completed_plans: 62
   percent: 83
 ---
 
@@ -26,12 +26,12 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 06 (operations) — EXECUTING
-Plan: 2 of 11
+Plan: 3 of 11
 Status: Ready to execute
   Task 2(로컬 실기동 202 접수·조회·잔여 변화 확인)는 **사용자 승인 대기** — 아직 아무도 확인하지 않았다.
 Last activity: 2026-08-18
 
-Progress: [█████████░] 86%
+Progress: [█████████░] 87%
 
 ## Performance Metrics
 
@@ -87,6 +87,7 @@ Progress: [█████████░] 86%
 | Phase 5 P13 | 25min | 3 tasks | 5 files |
 | Phase 05-batch P14 | 30min | 2 tasks | 11 files |
 | Phase 06-operations P01 | 15min | 2 tasks | 6 files |
+| Phase 06-operations P02 | 35min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -165,6 +166,8 @@ Recent decisions affecting current work:
 - [Phase 05-16]: 전체 회귀(./gradlew cleanTest test 763건, 0 failures) + ./gradlew build 모두 캐시 없이 그린. "동시 실행은 아직 안전하지 않다"·"응답이 오지 않아도 재호출하지 않는다"·"차감 원자성 보장은 갭 클로저에서 정한다"·"ON_LEAVE→ACTIVE 복귀일" 서술이 src/·docs/ 전체에서 0건임을 grep으로 확인
 - [Phase 05-16]: REQUIREMENTS.md BATCH-01·02·04를 Complete로 전환 — BATCH-01은 CR-03(출석일 후보 부재, Phase 6 범위)이 열려 있는 동안 운영 배포는 cron을 꺼 둔 채 한다는 조건을 함께 명시. 사용자 로컬 실기동 확인(Task 2)은 아직 미완료이므로 05-16 플랜 자체는 완료 처리하지 않음
 - [Phase 06-01]: D-132~D-135: 출석 건별 upsert, EVENING_ATTENDANCE_DEDUCTION_UNAVAILABLE(409) 신설, 공지 열람 게이트 미적용(D-071 연장), 활동 피드 인덱스 V11 예고 — Phase 6 계약(용어·정책·에러코드)을 코드보다 먼저 docs/에 확정
+- [Phase 06-02]: AttendanceRepositoryTest·NoticeRepositoryTest는 InactivityBatchRunnerTest와 동일한 애노테이션 조합(@Transactional 미사용 + @AfterEach 직접 정리)을 쓴다 — 06-06~06-08이 재사용할 컨텍스트를 통일하고, 유니크 위반 단언 직후 abort된 트랜잭션에서 @AfterEach DELETE가 실패하는 문제를 피한다
+- [Phase 06-02]: AttendanceFixtures.branch()는 통합테스트에서 쓰지 않는다 — uq_branch_name UNIQUE + V2의 '송파점' 시드와 충돌하므로 순수 단위테스트 전용으로 남기고, 통합테스트는 BranchRepository.findByName으로 시드된 지점을 재사용한다
 
 ### Pending Todos
 
@@ -192,6 +195,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-18T09:07:11.933Z
-Stopped at: Completed 06-01-PLAN.md
+Last session: 2026-08-18T09:17:43.190Z
+Stopped at: Completed 06-02-PLAN.md
 Resume file: None
