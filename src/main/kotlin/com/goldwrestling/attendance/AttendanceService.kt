@@ -1,18 +1,26 @@
 package com.goldwrestling.attendance
 
 import com.goldwrestling.admin.AdminRepository
+import com.goldwrestling.attendance.dto.AddEveningAttendanceRequest
 import com.goldwrestling.attendance.dto.AttendanceResponse
 import com.goldwrestling.attendance.dto.AttendanceRosterEntryResponse
 import com.goldwrestling.attendance.dto.CheckAttendanceRequest
 import com.goldwrestling.attendance.dto.ClassSessionAttendanceRosterResponse
 import com.goldwrestling.member.MemberNotFoundException
 import com.goldwrestling.member.MemberRepository
+import com.goldwrestling.pass.PassNotFoundException
+import com.goldwrestling.pass.PassRepository
+import com.goldwrestling.pass.PassTransaction
+import com.goldwrestling.pass.PassTransactionRepository
+import com.goldwrestling.pass.PassType
+import com.goldwrestling.pass.TransactionReason
 import com.goldwrestling.reservation.ReservationRepository
 import com.goldwrestling.reservation.ReservationStatus
 import com.goldwrestling.schedule.ClassScheduleNotFoundException
 import com.goldwrestling.schedule.ClassScheduleRepository
 import com.goldwrestling.schedule.ClassSessionService
 import com.goldwrestling.schedule.ClassType
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -20,15 +28,19 @@ import java.time.LocalDate
 import java.time.OffsetDateTime
 
 /**
- * 출석 체크의 **예약제/1:1 경로**(D-132, policies §6) — 예약자 명단 프리로드([getRoster])와 회원
- * 건별 출석/불참 upsert([check])만 담당한다. 저녁반 0.5회 차감 경로(§4.2)는 06-07이 이 클래스에
- * `addEveningAttendance`로 추가한다.
+ * 출석 체크의 **예약제/1:1 경로**(D-132, policies §6)와 **저녁반 0.5회 차감 경로**(§4.2, D-128,
+ * ATTEND-02)를 함께 담당한다 — 예약자 명단 프리로드([getRoster]), 회원 건별 출석/불참 upsert
+ * ([check]), 저녁반 출석 추가·차감([addEveningAttendance]), 출석 삭제·복구([delete]).
  *
- * **이 클래스는 이용권 원장을 조회하지도 수정하지도 않는다** — 출석은 차감과 무관한 참고용
- * 데이터이기 때문이다(policies §6 "차감은 예약 시점에 이미 확정"). 소급 출석 정정이 이미 실행된
- * 배치성 차감 이력(2주 미사용 자동 차감, §4.3)을 되돌리는 코드는 이 파일 어디에도 없다(D-127) —
- * 정정이 필요하면 관리자가 수동 가감(§4.2a)으로 처리한다. 이 금지가 이 클래스의 설계 경계이므로,
- * 이용권 원장 리포지토리를 생성자에 주입하지 않는다.
+ * **예약제/1:1 경로는 이용권 원장을 건드리지 않는다** — 출석은 차감과 무관한 참고용 데이터이기
+ * 때문이다(policies §6 "차감은 예약 시점에 이미 확정"). 소급 출석 정정이 이미 실행된 배치성 차감
+ * 이력(2주 미사용 자동 차감, §4.3)을 되돌리는 코드는 이 파일 어디에도 없다(D-127) — 정정이
+ * 필요하면 관리자가 수동 가감(§4.2a)으로 처리한다.
+ *
+ * **저녁반 경로만 예외적으로 [passRepository]·[passTransactionRepository]를 쓴다** — 이 phase에서
+ * 잔여 횟수를 바꾸는 유일한 경로다. 그 실행 구조는 `ReservationLedgerSupport.createReservation`이
+ * 확립한 "판정 → 조건부 UPDATE(0행이면 예외) → 재조회 → INSERT → 원장 기록"을 그대로 이식한다
+ * (06-07). `ReservationLedgerSupport`를 직접 재사용하지 않는 이유는 [delete]의 KDoc에 있다.
  */
 @Service
 @Transactional(readOnly = true)
@@ -40,6 +52,8 @@ class AttendanceService(
     private val memberRepository: MemberRepository,
     private val adminRepository: AdminRepository,
     private val clock: Clock,
+    private val passRepository: PassRepository,
+    private val passTransactionRepository: PassTransactionRepository,
 ) {
     /**
      * 특정 시간표·날짜의 출석 명단을 조회한다(D-132) — 관리자가 타임별 참여자 명단을 출석 상태와
@@ -176,6 +190,107 @@ class AttendanceService(
                         createdAt = now,
                     ),
                 )
+            }
+
+        return AttendanceResponse.from(saved)
+    }
+
+    /**
+     * 저녁반 출석 추가 실행부(ATTEND-02, policies §4.2, D-128) — 회비 우선 판정 → (필요 시)
+     * `SESSION_PASS` 0.5회 조건부 차감 → 출석 INSERT → `EVENING_HALF` 원장 기록을 한 트랜잭션으로
+     * 묶는다. `ReservationLedgerSupport.createReservation`이 확립한 "판정 → 조건부 UPDATE(0행이면
+     * 예외) → 재조회 → INSERT → 원장 기록" 구조를 그대로 이식한다.
+     *
+     * `EVENING` 세션은 `capacity`가 null이라(저녁반은 예약 대상이 아니다)
+     * `incrementReservedCountIfCapacityAvailable`을 호출하지 않는다 — `reservedCount`는 예약제/1:1
+     * 정원 관리 전용이다.
+     *
+     * **회비·차감 후보 조회는 항상 [ClassSession.classDate](수업날) 기준이다** — clock으로 구한 오늘
+     * 날짜를 넘기면 소급 입력 시 오늘 기준으로 잘못 판정한다(D-128 Pitfall 1).
+     */
+    @Transactional
+    fun addEveningAttendance(
+        adminId: Long,
+        request: AddEveningAttendanceRequest,
+    ): AttendanceResponse {
+        val schedule =
+            classScheduleRepository.findById(request.classScheduleId).orElseThrow {
+                ClassScheduleNotFoundException(request.classScheduleId)
+            }
+        val session = classSessionService.getOrCreate(schedule, request.classDate)
+        EveningHalfDeductionPolicy.requireEveningSession(session.classType)
+        val sessionId = requireNotNull(session.id) { "getOrCreate가 반환한 세션은 항상 저장돼 있어야 합니다." }
+        val sessionClassDate = session.classDate
+
+        if (attendanceRepository.existsByClassSessionIdAndMemberId(sessionId, request.memberId)) {
+            throw DuplicateAttendanceException()
+        }
+
+        // 회비 우선 판정 — 반드시 수업날(sessionClassDate) 기준. 오늘 기준으로 판정하지 않는다.
+        val hasValidMembership = passRepository.existsActiveEveningMembership(request.memberId, sessionClassDate)
+
+        val deductedPassId: Long? =
+            if (hasValidMembership) {
+                null
+            } else {
+                val candidates =
+                    passRepository.findDeductionCandidates(
+                        request.memberId,
+                        PassType.SESSION_PASS,
+                        sessionClassDate,
+                        EveningHalfDeductionPolicy.HALF_SESSION,
+                    )
+                val candidate = EveningHalfDeductionPolicy.selectCandidate(candidates)
+                val candidatePassId = requireNotNull(candidate.id) { "차감 후보 조회는 항상 저장된 Pass만 반환합니다." }
+                if (passRepository.adjustRemainingCount(candidatePassId, EveningHalfDeductionPolicy.HALF_SESSION.negate()) == 0) {
+                    throw EveningAttendanceDeductionUnavailableException()
+                }
+                candidatePassId
+            }
+
+        // 조건부 UPDATE가 실행됐다면(deductedPassId != null) 영속성 컨텍스트가 clear됐으므로
+        // INSERT에 쓸 엔티티를 모두 재조회한다(ReservationLedgerSupport 관례).
+        val refreshedMember = memberRepository.findById(request.memberId).orElseThrow { MemberNotFoundException(request.memberId) }
+        val refreshedSession =
+            classSessionService.findExisting(request.classScheduleId, request.classDate)
+                ?: throw IllegalStateException("방금 확보한 ClassSession(id=$sessionId)을 찾을 수 없습니다.")
+        val refreshedAdmin =
+            adminRepository.findById(adminId).orElseThrow {
+                IllegalStateException("저녁반 출석을 추가하려는 관리자(id=$adminId)를 찾을 수 없습니다.")
+            }
+        val now = OffsetDateTime.now(clock)
+
+        val passTransaction =
+            deductedPassId?.let { passId ->
+                val refreshedPass = passRepository.findById(passId).orElseThrow { PassNotFoundException(passId) }
+                passTransactionRepository.save(
+                    PassTransaction(
+                        pass = refreshedPass,
+                        amount = EveningHalfDeductionPolicy.HALF_SESSION.negate(),
+                        reason = TransactionReason.EVENING_HALF,
+                        note = null,
+                        admin = refreshedAdmin,
+                        member = null,
+                        occurredAt = now,
+                    ),
+                )
+            }
+
+        val saved =
+            try {
+                attendanceRepository.saveAndFlush(
+                    Attendance(
+                        member = refreshedMember,
+                        classSession = refreshedSession,
+                        status = AttendanceStatus.ATTENDED,
+                        passTransaction = passTransaction,
+                        checkedBy = refreshedAdmin,
+                        checkedAt = now,
+                        createdAt = now,
+                    ),
+                )
+            } catch (e: DataIntegrityViolationException) {
+                throw DuplicateAttendanceException()
             }
 
         return AttendanceResponse.from(saved)
