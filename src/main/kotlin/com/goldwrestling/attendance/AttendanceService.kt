@@ -327,6 +327,12 @@ class AttendanceService(
             requireNotNull(linkedTransaction.pass.id) { "저장되지 않은 Pass를 참조하는 PassTransaction은 복구할 수 없습니다." }
 
         // attendance.pass_transaction_id FK가 남아 있으면 이력 해석이 모호해지므로 삭제를 선행한다.
+        //
+        // "먼저 지우고 나중에 복구 성공을 확인"하는 순서라 위험해 보이지만 안전하다 — 아래 복구가
+        // 0행이면 던지는 IllegalStateException은 unchecked 예외이고, 이 메서드 전체가 하나의
+        // @Transactional이므로 스프링이 **방금 실행한 삭제까지 함께 롤백**한다. 따라서 "출석은
+        // 지워졌는데 잔여는 복구되지 않은" 중간 상태로는 커밋될 수 없다.
+        // 이 순서를 바꾸거나 여기서 예외를 잡아먹으면(try-catch) 그 보장이 깨진다.
         attendanceRepository.delete(attendance)
         attendanceRepository.flush()
 
