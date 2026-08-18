@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 6 context gathered
-last_updated: "2026-08-18T06:17:23.426Z"
-last_activity: 2026-08-18 -- Phase 6 planning complete
+stopped_at: Completed 06-01-PLAN.md
+last_updated: "2026-08-18T09:07:11.940Z"
+last_activity: 2026-08-18
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 71
-  completed_plans: 60
+  completed_plans: 61
   percent: 83
 ---
 
@@ -21,17 +21,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-30)
 
 **Core value:** 회원이 보는 잔여 횟수는 항상 실제 사용 가능 횟수와 일치한다 (즉시 차감/복구 + 전 이력 + 초과 예약 0건)
-**Current focus:** Phase 05 — batch
+**Current focus:** Phase 06 — operations
 
 ## Current Position
 
-Phase: 05 (batch) — EXECUTING
-Plan: 16 of 16 (본 작업 9 + 갭 클로저 7, 청크 D)
+Phase: 06 (operations) — EXECUTING
+Plan: 2 of 11
 Status: Ready to execute
   Task 2(로컬 실기동 202 접수·조회·잔여 변화 확인)는 **사용자 승인 대기** — 아직 아무도 확인하지 않았다.
-Last activity: 2026-08-18 -- Phase 6 planning complete
+Last activity: 2026-08-18
 
-Progress: [██████████] 100% (재검증 passed 4/4, 2026-08-16)
+Progress: [█████████░] 86%
 
 ## Performance Metrics
 
@@ -86,6 +86,7 @@ Progress: [██████████] 100% (재검증 passed 4/4, 2026-08-1
 | Phase 5 P12 | 15min | 3 tasks | 10 files |
 | Phase 5 P13 | 25min | 3 tasks | 5 files |
 | Phase 05-batch P14 | 30min | 2 tasks | 11 files |
+| Phase 06-operations P01 | 15min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -163,6 +164,7 @@ Recent decisions affecting current work:
 - [Phase 5]: 테스트 전역 시행일을 2000-01-01로 고정한다 — 고정하지 않으면 배치 테스트가 '차감 0'을 검증하는 빈 껍데기가 되면서 초록불로 통과한다
 - [Phase 05-16]: 전체 회귀(./gradlew cleanTest test 763건, 0 failures) + ./gradlew build 모두 캐시 없이 그린. "동시 실행은 아직 안전하지 않다"·"응답이 오지 않아도 재호출하지 않는다"·"차감 원자성 보장은 갭 클로저에서 정한다"·"ON_LEAVE→ACTIVE 복귀일" 서술이 src/·docs/ 전체에서 0건임을 grep으로 확인
 - [Phase 05-16]: REQUIREMENTS.md BATCH-01·02·04를 Complete로 전환 — BATCH-01은 CR-03(출석일 후보 부재, Phase 6 범위)이 열려 있는 동안 운영 배포는 cron을 꺼 둔 채 한다는 조건을 함께 명시. 사용자 로컬 실기동 확인(Task 2)은 아직 미완료이므로 05-16 플랜 자체는 완료 처리하지 않음
+- [Phase 06-01]: D-132~D-135: 출석 건별 upsert, EVENING_ATTENDANCE_DEDUCTION_UNAVAILABLE(409) 신설, 공지 열람 게이트 미적용(D-071 연장), 활동 피드 인덱스 V11 예고 — Phase 6 계약(용어·정책·에러코드)을 코드보다 먼저 docs/에 확정
 
 ### Pending Todos
 
@@ -190,6 +192,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-18T04:58:22.311Z
-Stopped at: Phase 6 context gathered
-Resume file: .planning/phases/06-operations/06-CONTEXT.md
+Last session: 2026-08-18T09:07:11.933Z
+Stopped at: Completed 06-01-PLAN.md
+Resume file: None
