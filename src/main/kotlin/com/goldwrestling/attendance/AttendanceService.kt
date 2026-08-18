@@ -296,6 +296,65 @@ class AttendanceService(
         return AttendanceResponse.from(saved)
     }
 
+    /**
+     * 저녁반 출석 삭제 — `passTransaction`이 연결돼 있으면 0.5회를 복구하고
+     * `EVENING_HALF_REFUND` 이력을 남긴다(policies §4.2, D-128). `passTransaction`이 null인 출석
+     * (예약제/1:1, 또는 회비로 커버돼 차감이 없었던 저녁반 출석)은 행만 삭제한다.
+     *
+     * **원래 차감 이력(`EVENING_HALF`)은 삭제하지 않는다** — 원장은 append-only이고 상쇄 이력으로
+     * 표현한다(CLAUDE.md 규칙 6).
+     *
+     * `ReservationLedgerSupport.restorePassAfterCancellation`을 재사용하지 않는다 — 그 컴포넌트의
+     * 복구 금액은 `ReservationPassPolicy.DEDUCTION_AMOUNT`(1.0) 상수로 고정돼 있어 0.5 복구에 쓸 수
+     * 없다(06-PATTERNS 분석). 대신 그 컴포넌트가 확립한 "먼저 삭제 → 조건부 UPDATE(0행이면 예외) →
+     * 재조회 → 원장 기록" 흐름만 이 메서드에 이식한다.
+     */
+    @Transactional
+    fun delete(
+        adminId: Long,
+        attendanceId: Long,
+    ) {
+        val attendance =
+            attendanceRepository.findById(attendanceId).orElseThrow { AttendanceNotFoundException(attendanceId) }
+        val linkedTransaction = attendance.passTransaction
+
+        if (linkedTransaction == null) {
+            attendanceRepository.delete(attendance)
+            return
+        }
+
+        val passId =
+            requireNotNull(linkedTransaction.pass.id) { "저장되지 않은 Pass를 참조하는 PassTransaction은 복구할 수 없습니다." }
+
+        // attendance.pass_transaction_id FK가 남아 있으면 이력 해석이 모호해지므로 삭제를 선행한다.
+        attendanceRepository.delete(attendance)
+        attendanceRepository.flush()
+
+        if (passRepository.adjustRemainingCount(passId, EveningHalfDeductionPolicy.HALF_SESSION) == 0) {
+            throw IllegalStateException(
+                "복구 대상 이용권(id=$passId)이 판정 이후 상태가 바뀌어 복구를 반영하지 못했습니다.",
+            )
+        }
+
+        val refreshedPass = passRepository.findById(passId).orElseThrow { PassNotFoundException(passId) }
+        val refreshedAdmin =
+            adminRepository.findById(adminId).orElseThrow {
+                IllegalStateException("저녁반 출석 삭제를 수행하려는 관리자(id=$adminId)를 찾을 수 없습니다.")
+            }
+
+        passTransactionRepository.save(
+            PassTransaction(
+                pass = refreshedPass,
+                amount = EveningHalfDeductionPolicy.HALF_SESSION,
+                reason = TransactionReason.EVENING_HALF_REFUND,
+                note = null,
+                admin = refreshedAdmin,
+                member = null,
+                occurredAt = OffsetDateTime.now(clock),
+            ),
+        )
+    }
+
     private fun requireMemberId(attendance: Attendance): Long =
         requireNotNull(attendance.member.id) { "저장되지 않은 Member를 참조하는 Attendance는 명단에 담을 수 없습니다." }
 
