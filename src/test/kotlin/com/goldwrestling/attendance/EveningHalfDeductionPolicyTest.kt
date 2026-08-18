@@ -7,9 +7,13 @@ import com.goldwrestling.member.MemberStatus
 import com.goldwrestling.pass.Pass
 import com.goldwrestling.pass.PassStatus
 import com.goldwrestling.pass.PassType
+import com.goldwrestling.schedule.ClassType
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatCode
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.EnumSource
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.OffsetDateTime
@@ -71,6 +75,19 @@ class EveningHalfDeductionPolicyTest {
             )
 
         assertThat(result).isSameAs(exactlyHalf)
+    }
+
+    @Test
+    fun `저녁반 세션이면 저녁반 전용 차감 처리를 통과한다`() {
+        assertThatCode { EveningHalfDeductionPolicy.requireEveningSession(ClassType.EVENING) }
+            .doesNotThrowAnyException()
+    }
+
+    @ParameterizedTest(name = "classType={0}")
+    @EnumSource(value = ClassType::class, names = ["SESSION", "LESSON"])
+    fun `저녁반이 아닌 수업 종류에는 저녁반 전용 차감 처리를 쓸 수 없다`(classType: ClassType) {
+        assertThatThrownBy { EveningHalfDeductionPolicy.requireEveningSession(classType) }
+            .isInstanceOf(AttendanceClassTypeMismatchException::class.java)
     }
 
     private fun sessionPass(
