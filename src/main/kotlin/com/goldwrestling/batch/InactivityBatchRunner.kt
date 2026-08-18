@@ -2,6 +2,7 @@ package com.goldwrestling.batch
 
 import com.goldwrestling.SEOUL_ZONE_ID
 import com.goldwrestling.admin.AdminRepository
+import com.goldwrestling.attendance.AttendanceRepository
 import com.goldwrestling.config.InactivityBatchProperties
 import com.goldwrestling.member.MemberRepository
 import com.goldwrestling.pass.PassRepository
@@ -64,6 +65,7 @@ class InactivityBatchRunner(
     private val passTransactionRepository: PassTransactionRepository,
     private val memberRepository: MemberRepository,
     private val adminRepository: AdminRepository,
+    private val attendanceRepository: AttendanceRepository,
     private val inactivityDeductionService: InactivityDeductionService,
     private val recorder: BatchExecutionRecorder,
     private val properties: InactivityBatchProperties,
@@ -129,6 +131,8 @@ class InactivityBatchRunner(
             processedMemberCount = memberIds.size
 
             if (memberIds.isNotEmpty()) {
+                val lastAttendedClassDates =
+                    attendanceRepository.findLastAttendedClassDates(memberIds).associate { it.getMemberId() to it.getDate() }
                 val lastActiveReservationClassDates =
                     reservationRepository.findLastActiveReservationClassDates(memberIds).associate { it.getMemberId() to it.getDate() }
                 val returnedFromLeaveDates =
@@ -153,8 +157,8 @@ class InactivityBatchRunner(
                     try {
                         val candidates =
                             InactivityDueDateCandidates(
-                                // Phase 6이 Attendance를 도입하면 여기에 값을 채운다(D-105 후보 ①)
-                                lastAttendanceDate = null,
+                                // 후보 ①은 `ATTENDED`만 인정한다(policies §6) — 불참은 미사용이다
+                                lastAttendanceDate = lastAttendedClassDates[memberId],
                                 lastActiveReservationClassDate = lastActiveReservationClassDates[memberId],
                                 returnedFromLeaveDate = returnedFromLeaveDates[memberId],
                                 lastSessionPassRegistrationDate = lastSessionPassRegistrationDates[memberId],

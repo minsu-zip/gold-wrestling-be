@@ -255,7 +255,33 @@ BATCH-01·02·04가 모두 뒤집혔고 회귀는 없다. 검증자가 SUMMARY �
   3. 관리자는 공지사항을 등록·수정·삭제할 수 있고, 회원은 공지 목록·상세를 열람할 수 있다
   4. 관리자는 30초 폴링으로 알림 목록과 미확인 카운트를 조회하고 확인 처리할 수 있다 — 알림 레코드 자체는 Phase 4에서 생성된다 (NOTIF-01, 예약 생성/변경/취소·휴강 이벤트)
   5. 관리자는 최근 예약 이벤트 타임라인(활동 피드, 알림과 동일 데이터의 다른 뷰)을 조회할 수 있다
-**Plans**: TBD
+**Plans**: 11 plans / 9 waves — **3개 청크로 납품한다 (D-084)**.
+청크 A `feature/phase-06a-foundation`(wave 1~2, 문서·스키마·CR-03 배선·공지) ·
+청크 B `feature/phase-06b-attendance`(wave 3~6, 출석 체크·저녁반 0.5회 차감) ·
+청크 C `feature/phase-06c-notification`(wave 7~9, 알림 폴링·활동 피드·마감).
+청크 경계 = wave 경계이며 순차 진행한다. 각 청크의 마지막 플랜에서 `openapi.yaml`을 재생성한다
+(06-04 · 06-08 · 06-10) — 같은 wave에서 두 플랜이 `openapi.yaml`을 동시에 건드리지 않도록 wave를 배치했다.
+
+**청크 A — 기반 (wave 1~2)**
+- [x] 06-01-PLAN.md — glossary·policies §4.2·decisions(D-132~135)·error-codes 정합 + ErrorCode 6종 + `EVENING_HALF_REFUND` (ATTEND-01/02, NOTICE-01, NOTIF-03)
+- [x] 06-02-PLAN.md — V11 스키마(attendance·notice·활동 피드 인덱스) + 엔티티·리포지토리 + 유니크/ATTENDED 필터 통합테스트 (ATTEND-01/02, NOTICE-01/02, NOTIF-03)
+- [x] 06-03-PLAN.md — [이월 CR-03] `InactivityBatchRunner` 기준일 후보 ① 배선 + 불참·소급 회귀 테스트 (ATTEND-01)
+- [x] 06-04-PLAN.md — 공지 CRUD(관리자) + 회원 목록·상세 + openapi 재생성 (NOTICE-01/02)
+
+**청크 B — 출석·저녁반 차감 (wave 3~6)**
+- [x] 06-05-PLAN.md — [TDD] `EveningHalfDeductionPolicy` + `existsActiveEveningMembership` + 출석 예외 5종 (ATTEND-01/02)
+- [ ] 06-06-PLAN.md — `AttendanceService` 명단 프리로드 + 예약제/1:1 출석 upsert (ATTEND-01)
+- [ ] 06-07-PLAN.md — 저녁반 출석 추가(회비 우선·0.5 차감·409 거부) + 삭제 복구(`EVENING_HALF_REFUND`) (ATTEND-02)
+- [ ] 06-08-PLAN.md — `AdminAttendanceController` 4종 + HTTP 계약 테스트 + 동시성 테스트(이중 차감 0건) + openapi 재생성 (ATTEND-01/02)
+
+**청크 C — 알림·피드·마감 (wave 7~9)**
+- [ ] 06-09-PLAN.md — 알림 목록 폴링 + 미확인 카운트 + 모두 읽음 (NOTIF-02)
+- [ ] 06-10-PLAN.md — 활동 피드(기간·종류 필터, 읽음 무관) + openapi 재생성 (NOTIF-03)
+- [ ] 06-11-PLAN.md — phase 마감: cron 운영 켜기 절차(README, D-130) + 문서 정합 + 전체 회귀 + 로컬 실기동 확인 (전 요구사항)
+
+**Note (cron)**: 이 phase가 CR-03을 코드로 닫지만 **`BATCH_INACTIVITY_SCHEDULER_ENABLED` 기본값은
+꺼짐을 유지한다**(D-130이 D-121의 fail-safe를 존치). 켜는 것은 06-11이 README에 남기는 운영 절차의
+일이며, `.env.example` 기본값을 되돌리지 않는다.
 
 ## Progress
 
@@ -269,5 +295,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. 이용권 | 11/11 | Complete    | 2026-08-04 |
 | 4. 시간표·예약 | 15/15 | Complete   | 2026-08-08 |
 | 5. 배치 | 15/16 | In Progress (05-16 사용자 확인 대기) |  |
-| 6. 운영 | 0/TBD | Not started | - |
+| 6. 운영 | 5/11 | In Progress|  |
 </content>

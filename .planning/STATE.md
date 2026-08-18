@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 5 완료 — 재검증 passed 4/4 (2026-08-16). 다음: /gsd-secure-phase 5
-last_updated: "2026-08-16T00:00:00.000Z"
-last_activity: 2026-08-16
+stopped_at: Completed 06-05-PLAN.md
+last_updated: "2026-08-18T09:49:43.086Z"
+last_activity: 2026-08-18
 progress:
   total_phases: 6
-  completed_phases: 4
-  total_plans: 60
-  completed_plans: 59
-  percent: 67
+  completed_phases: 5
+  total_plans: 71
+  completed_plans: 65
+  percent: 83
 ---
 
 # Project State
@@ -21,17 +21,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-30)
 
 **Core value:** 회원이 보는 잔여 횟수는 항상 실제 사용 가능 횟수와 일치한다 (즉시 차감/복구 + 전 이력 + 초과 예약 0건)
-**Current focus:** Phase 05 — batch
+**Current focus:** Phase 06 — operations
 
 ## Current Position
 
-Phase: 05 (batch) — EXECUTING
-Plan: 16 of 16 (본 작업 9 + 갭 클로저 7, 청크 D)
-Status: Phase 5 완료 — 05-16 마감 검증 전 태스크 완료(전체 회귀 767건 0 failures, 로컬 실기동 확인 수행). 재검증 05-VERIFICATION.md = passed 4/4.
+Phase: 06 (operations) — EXECUTING
+Plan: 6 of 11
+Status: Ready to execute
   Task 2(로컬 실기동 202 접수·조회·잔여 변화 확인)는 **사용자 승인 대기** — 아직 아무도 확인하지 않았다.
-Last activity: 2026-08-16
+Last activity: 2026-08-18
 
-Progress: [██████████] 100% (재검증 passed 4/4, 2026-08-16)
+Progress: [█████████░] 92%
 
 ## Performance Metrics
 
@@ -86,6 +86,11 @@ Progress: [██████████] 100% (재검증 passed 4/4, 2026-08-1
 | Phase 5 P12 | 15min | 3 tasks | 10 files |
 | Phase 5 P13 | 25min | 3 tasks | 5 files |
 | Phase 05-batch P14 | 30min | 2 tasks | 11 files |
+| Phase 06-operations P01 | 15min | 2 tasks | 6 files |
+| Phase 06-operations P02 | 35min | 3 tasks | 9 files |
+| Phase 06-operations P03 | ~30min | 2 tasks | 2 files |
+| Phase 06-operations P04 | ~50min | 3 tasks | 10 files |
+| Phase 06-operations P05 | ~25min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -163,6 +168,16 @@ Recent decisions affecting current work:
 - [Phase 5]: 테스트 전역 시행일을 2000-01-01로 고정한다 — 고정하지 않으면 배치 테스트가 '차감 0'을 검증하는 빈 껍데기가 되면서 초록불로 통과한다
 - [Phase 05-16]: 전체 회귀(./gradlew cleanTest test 763건, 0 failures) + ./gradlew build 모두 캐시 없이 그린. "동시 실행은 아직 안전하지 않다"·"응답이 오지 않아도 재호출하지 않는다"·"차감 원자성 보장은 갭 클로저에서 정한다"·"ON_LEAVE→ACTIVE 복귀일" 서술이 src/·docs/ 전체에서 0건임을 grep으로 확인
 - [Phase 05-16]: REQUIREMENTS.md BATCH-01·02·04를 Complete로 전환 — BATCH-01은 CR-03(출석일 후보 부재, Phase 6 범위)이 열려 있는 동안 운영 배포는 cron을 꺼 둔 채 한다는 조건을 함께 명시. 사용자 로컬 실기동 확인(Task 2)은 아직 미완료이므로 05-16 플랜 자체는 완료 처리하지 않음
+- [Phase 06-01]: D-132~D-135: 출석 건별 upsert, EVENING_ATTENDANCE_DEDUCTION_UNAVAILABLE(409) 신설, 공지 열람 게이트 미적용(D-071 연장), 활동 피드 인덱스 V11 예고 — Phase 6 계약(용어·정책·에러코드)을 코드보다 먼저 docs/에 확정
+- [Phase 06-02]: AttendanceRepositoryTest·NoticeRepositoryTest는 InactivityBatchRunnerTest와 동일한 애노테이션 조합(@Transactional 미사용 + @AfterEach 직접 정리)을 쓴다 — 06-06~06-08이 재사용할 컨텍스트를 통일하고, 유니크 위반 단언 직후 abort된 트랜잭션에서 @AfterEach DELETE가 실패하는 문제를 피한다
+- [Phase 06-02]: AttendanceFixtures.branch()는 통합테스트에서 쓰지 않는다 — uq_branch_name UNIQUE + V2의 '송파점' 시드와 충돌하므로 순수 단위테스트 전용으로 남기고, 통합테스트는 BranchRepository.findByName으로 시드된 지점을 재사용한다
+- [Phase 06-03]: InactivityDueDateCalculator·InactivityDueDateCandidates는 계획대로 무변경 — Phase 5가 이미 5종 후보 시그니처를 갖춰 뒀으므로 배선 한 지점(lastAttendanceDate = null -> attendanceRepository.findLastAttendedClassDates 벌크 조회)만 바꿔 CR-03을 닫았다
+- [Phase 06-03]: 회귀 테스트는 저녁반(EVENING) 전용 SESSION_PASS 회원 시나리오를 기본값으로 재현하고(CR-03 실제 사고 시나리오), 1회 실행 상한(maxDeductionsPerRun=1)이 단일 실행 비교를 무의미하게 만들어 repeat(3) 반복 실행으로 캐치업 차이를 검증한다
+- [Phase 06-04]: NoticeExceptions.kt를 NoticeNotFoundException.kt로 개명 — ktlint standard:filename 규칙 위반(단일 클래스 파일은 클래스명과 일치)이라 plan 파일명에서 편차
+- [Phase 06-04]: MemberNoticeController는 회원 상태 게이트를 거치지 않는다(D-134) — 공지는 회원 소유 데이터가 아니고 휴회 회원의 열람을 막을 이유가 없다
+- [Phase 06-05]: EveningHalfDeductionPolicy.selectCandidate는 ReservationPassPolicy.selectCandidate를 재사용하지 않는다 — 예외 타입이 D-133 요구 코드(EVENING_ATTENDANCE_DEDUCTION_UNAVAILABLE)와 달라진다
+- [Phase 06-05]: resolveDeduction은 회비로 커버되는 경우 Pass? 중 null을 반환한다 — 별도 sealed 결과 타입 없이 호출부가 null 분기만으로 처리
+- [Phase 06-05]: existsActiveEveningMembership은 findDeductionCandidates와 같은 D-066 종료일 포함 비교축(endDate >= :classDate)을 재사용해 종료일 당일 경계가 쿼리마다 갈라지지 않게 했다
 
 ### Pending Todos
 
@@ -190,6 +205,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-16T00:00:00.000Z
-Stopped at: Phase 5 완료 (재검증 passed 4/4). 다음 스텝은 /gsd-secure-phase 5 → dev→main PR
-Resume file: .planning/phases/05-batch/05-16-PLAN.md
+Last session: 2026-08-18T09:49:43.079Z
+Stopped at: Completed 06-05-PLAN.md
+Resume file: None

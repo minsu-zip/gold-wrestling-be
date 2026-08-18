@@ -78,6 +78,20 @@
 | 부족분                 | `shortfall`              | `floor(기준일→오늘 경과일 / 14)` − 기준일 이후 `INACTIVITY` 이력 건수(D-106)                                     |
 | 휴회 복귀 시각         | `returnedFromLeaveAt`    | DB `member.returned_from_leave_at` — `ON_LEAVE`에서 벗어난 전이의 시각(대상 상태 무관). 그 외 상태 전이에서는 기록하지 않는다(D-105 기준일 후보 ③ 전용, D-111 CR-04 정정) |
 
+## 운영 (Phase 6)
+
+| 한국어                 | 코드 네이밍       | 설명                                                                                                          |
+| ---------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| 출석 상태             | `AttendanceStatus` | `ATTENDED`(출석) / `ABSENT`(불참). **레코드 부재 = 미체크**이며 저녁반은 `ATTENDED`만 쓴다(불참 상태 없음, D-127) |
+| 출석 확인 주체         | `checkedBy`         | DB `attendance.checked_by_admin_id`                                                                             |
+| 출석 확인 시각         | `checkedAt`         | DB `attendance.checked_at`                                                                                      |
+| 저녁반 차감 연결       | `passTransaction`   | DB `attendance.pass_transaction_id`(nullable). 저녁반 출석이 유발한 0.5회 차감 이력. 예약제/1:1은 항상 null      |
+| 활동 피드              | `ActivityFeed`      | `notification` 테이블의 다른 뷰(읽음 여부 무관 시간순, 기간·종류 필터, D-129)                                    |
+| 미확인 알림 수         | `unreadCount`       | 알림 목록 응답에 포함되는 미확인 건수(별도 엔드포인트 없음, D-129)                                               |
+| 모두 읽음              | `markAllAsRead`     | 개별 읽음은 만들지 않는다(D-129)                                                                                 |
+| 공지 제목              | `title`             | DB `notice.title` — `Notice`(핵심 엔티티 표 기재)의 하위 용어                                                    |
+| 공지 본문              | `content`           | DB `notice.content` — `Notice`는 제목+본문만 존재한다(첨부·고정 없음, D-131)                                     |
+
 ## 회원 상태 (MemberStatus)
 
 `PENDING`(승인대기) / `ACTIVE`(활성) / `ON_LEAVE`(휴회) / `INACTIVE`(비활성)
@@ -115,6 +129,7 @@
 | `CLASS_CANCELED_REFUND` | 휴강으로 인한 복구                 |
 | `INITIAL_GRANT`         | 이용권 등록 시 초기 횟수 부여 (D-055) |
 | `REGISTRATION_CANCELED` | 등록 취소(오등록 정정) 시 잔여를 0으로 상쇄 (D-059) |
+| `EVENING_HALF_REFUND`   | 저녁반 출석 삭제로 인한 0.5회 복구 (D-128)         |
 
 ## 기타 규칙
 

@@ -70,6 +70,17 @@
 | `BATCH_ALREADY_RUNNING` | 409 | 이미 실행 중인 배치가 있어 새 실행을 거부 (CR-01, D-118). 관리자 더블클릭·재시도·cron 겹침은 예상된 상황이고 거부가 안전한 결과다 — 오류가 아니라 상태 충돌이다 | `BatchExecutionRecorder` |
 | `BATCH_EXECUTION_NOT_FOUND` | 404 | 요청한 배치 실행 이력이 없음 (WR-05). 진행 상태 조회(`GET /api/admin/batch/inactivity-runs/{id}`)를 잘못된 id로 호출한 경우 — 응답 문구에 id를 담지 않는다(존재 여부 탐색 방지, conventions §8) | `AdminBatchService` |
 
+## 운영 코드 (Phase 6)
+
+| 코드 | HTTP 상태 | 의미 | 발생 지점 |
+|---|---|---|---|
+| `ATTENDANCE_NOT_FOUND` | 404 | 대상 출석 기록 없음(삭제·수정 대상) | `AttendanceService` |
+| `ATTENDANCE_MEMBER_NOT_RESERVED` | 409 | 예약제/1:1 출석 체크 대상이 그 세션의 활성 예약자가 아님(D-127 "예약자 명단에 대해 체크") | `AttendanceService` |
+| `ATTENDANCE_CLASS_TYPE_MISMATCH` | 409 | 저녁반 전용 API를 `SESSION`/`LESSON` 세션에 호출했거나, 예약자 체크 API를 `EVENING` 세션에 호출함 | `AttendanceService` |
+| `DUPLICATE_ATTENDANCE` | 409 | 같은 회원·같은 세션에 출석 기록이 이미 존재(회원×세션 유니크 위반) | `AttendanceService` |
+| `EVENING_ATTENDANCE_DEDUCTION_UNAVAILABLE` | 409 | 유효한 저녁반 회비도 없고 `SESSION_PASS` 잔여도 0.5 미만이라 저녁반 출석 추가를 거부(D-128·D-133) | `AttendanceService` |
+| `NOTICE_NOT_FOUND` | 404 | 대상 공지 없음 | `NoticeService` |
+
 **폴백 규칙** — 위 표에 매핑되지 않은 예외는 상태값으로 코드를 추측하지 않고 다음으로 고정된다:
 4xx → `MALFORMED_REQUEST`, 그 외 → `INTERNAL_ERROR`. (이때 HTTP 상태는 예외가 정한 값이 그대로 나가므로,
 FE가 특정 코드로 구분해야 하는 에러가 생기면 이 표와 핸들러에 명시 매핑을 추가한다.)

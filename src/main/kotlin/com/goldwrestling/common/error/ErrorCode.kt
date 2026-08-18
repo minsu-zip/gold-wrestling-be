@@ -142,4 +142,22 @@ enum class ErrorCode(
 
     /** 요청한 배치 실행 이력 없음 (WR-05, 실행 상태 조회) */
     BATCH_EXECUTION_NOT_FOUND(HttpStatus.NOT_FOUND),
+
+    /** 대상 출석 기록 없음(삭제·수정 대상) */
+    ATTENDANCE_NOT_FOUND(HttpStatus.NOT_FOUND),
+
+    /** 예약제/1:1 출석 체크 대상이 그 세션의 활성 예약자가 아님(D-127 "예약자 명단에 대해 체크") */
+    ATTENDANCE_MEMBER_NOT_RESERVED(HttpStatus.CONFLICT),
+
+    /** 저녁반 전용 API를 SESSION/LESSON 세션에, 또는 예약자 체크 API를 EVENING 세션에 호출함 */
+    ATTENDANCE_CLASS_TYPE_MISMATCH(HttpStatus.CONFLICT),
+
+    /** 같은 회원·같은 세션에 출석 기록이 이미 존재(회원×세션 유니크 위반) */
+    DUPLICATE_ATTENDANCE(HttpStatus.CONFLICT),
+
+    /** 유효한 저녁반 회비도 없고 SESSION_PASS 잔여도 0.5 미만이라 저녁반 출석 추가를 거부(D-128·D-133) */
+    EVENING_ATTENDANCE_DEDUCTION_UNAVAILABLE(HttpStatus.CONFLICT),
+
+    /** 대상 공지 없음 */
+    NOTICE_NOT_FOUND(HttpStatus.NOT_FOUND),
 }
