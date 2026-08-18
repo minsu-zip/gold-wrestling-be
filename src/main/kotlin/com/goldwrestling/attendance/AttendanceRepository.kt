@@ -10,6 +10,19 @@ interface AttendanceRepository : JpaRepository<Attendance, Long> {
     fun findAllByClassSessionId(classSessionId: Long): List<Attendance>
 
     /**
+     * 명단 응답 전용 조회(`AttendanceService.getRoster`) — `member`를 `join fetch`로 함께 로딩한다.
+     * 명단 응답이 `member.name`을 담으므로 join fetch가 없으면 명단 크기만큼 추가 쿼리가 나간다
+     * (`ReservationRepository.findAllByClassSessionIdInAndStatusWithMember` KDoc과 동일 논리).
+     * [findAllByClassSessionId](06-02이 만든 파생 쿼리)는 그대로 두되, 명단 조회 경로는 이 메서드를 쓴다.
+     */
+    @Query(
+        "select a from Attendance a join fetch a.member where a.classSession.id = :classSessionId",
+    )
+    fun findAllByClassSessionIdWithMember(
+        @Param("classSessionId") classSessionId: Long,
+    ): List<Attendance>
+
+    /**
      * 특정 회원의 특정 세션 출석 기록을 조회한다 — 출석 체크(upsert, D-132) 판정에 쓴다. 존재하면
      * [Attendance.status] UPDATE, 없으면 신규 INSERT로 분기한다.
      */

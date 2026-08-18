@@ -270,9 +270,9 @@ BATCH-01·02·04가 모두 뒤집혔고 회귀는 없다. 검증자가 SUMMARY �
 
 **청크 B — 출석·저녁반 차감 (wave 3~6)**
 - [x] 06-05-PLAN.md — [TDD] `EveningHalfDeductionPolicy` + `existsActiveEveningMembership` + 출석 예외 5종 (ATTEND-01/02)
-- [ ] 06-06-PLAN.md — `AttendanceService` 명단 프리로드 + 예약제/1:1 출석 upsert (ATTEND-01)
-- [ ] 06-07-PLAN.md — 저녁반 출석 추가(회비 우선·0.5 차감·409 거부) + 삭제 복구(`EVENING_HALF_REFUND`) (ATTEND-02)
-- [ ] 06-08-PLAN.md — `AdminAttendanceController` 4종 + HTTP 계약 테스트 + 동시성 테스트(이중 차감 0건) + openapi 재생성 (ATTEND-01/02)
+- [x] 06-06-PLAN.md — `AttendanceService` 명단 프리로드 + 예약제/1:1 출석 upsert (ATTEND-01)
+- [x] 06-07-PLAN.md — 저녁반 출석 추가(회비 우선·0.5 차감·409 거부) + 삭제 복구(`EVENING_HALF_REFUND`) (ATTEND-02)
+- [x] 06-08-PLAN.md — `AdminAttendanceController` 4종 + HTTP 계약 테스트 + 동시성 테스트(이중 차감 0건) + openapi 재생성 (ATTEND-01/02)
 
 **청크 C — 알림·피드·마감 (wave 7~9)**
 - [ ] 06-09-PLAN.md — 알림 목록 폴링 + 미확인 카운트 + 모두 읽음 (NOTIF-02)
@@ -295,5 +295,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. 이용권 | 11/11 | Complete    | 2026-08-04 |
 | 4. 시간표·예약 | 15/15 | Complete   | 2026-08-08 |
 | 5. 배치 | 15/16 | In Progress (05-16 사용자 확인 대기) |  |
-| 6. 운영 | 5/11 | In Progress|  |
+| 6. 운영 | 8/11 | In Progress|  |
 </content>

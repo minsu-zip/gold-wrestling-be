@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06-05-PLAN.md
-last_updated: "2026-08-18T09:49:43.086Z"
+stopped_at: Completed 06-08-PLAN.md
+last_updated: "2026-08-18T13:23:22.513Z"
 last_activity: 2026-08-18
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 71
-  completed_plans: 65
+  completed_plans: 68
   percent: 83
 ---
 
@@ -26,12 +26,12 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 06 (operations) — EXECUTING
-Plan: 6 of 11
+Plan: 4 of 11
 Status: Ready to execute
   Task 2(로컬 실기동 202 접수·조회·잔여 변화 확인)는 **사용자 승인 대기** — 아직 아무도 확인하지 않았다.
 Last activity: 2026-08-18
 
-Progress: [█████████░] 92%
+Progress: [██████████] 96%
 
 ## Performance Metrics
 
@@ -91,6 +91,9 @@ Progress: [█████████░] 92%
 | Phase 06-operations P03 | ~30min | 2 tasks | 2 files |
 | Phase 06-operations P04 | ~50min | 3 tasks | 10 files |
 | Phase 06-operations P05 | ~25min | 3 tasks | 5 files |
+| Phase 06-operations P06 | 15min | 3 tasks | 6 files |
+| Phase 06-operations P07 | ~30min | 3 tasks | 2 files |
+| Phase 06-operations P08 | 25min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -178,6 +181,12 @@ Recent decisions affecting current work:
 - [Phase 06-05]: EveningHalfDeductionPolicy.selectCandidate는 ReservationPassPolicy.selectCandidate를 재사용하지 않는다 — 예외 타입이 D-133 요구 코드(EVENING_ATTENDANCE_DEDUCTION_UNAVAILABLE)와 달라진다
 - [Phase 06-05]: resolveDeduction은 회비로 커버되는 경우 Pass? 중 null을 반환한다 — 별도 sealed 결과 타입 없이 호출부가 null 분기만으로 처리
 - [Phase 06-05]: existsActiveEveningMembership은 findDeductionCandidates와 같은 D-066 종료일 포함 비교축(endDate >= :classDate)을 재사용해 종료일 당일 경계가 쿼리마다 갈라지지 않게 했다
+- [Phase 06-06]: Attendance.checkedBy/checkedAt을 val→var로 변경 — 06-02는 이력이라 불변으로 설계했으나, 소급 정정 시 마지막 확인 관리자·시각 갱신 요구(D-127)를 만족하려면 status와 동일하게 가변이어야 한다
+- [Phase 06-06]: AttendanceService는 이용권 원장 리포지토리를 생성자에 주입하지 않는다 — policies §6 차감과 무관한 참고용 데이터를 구조적으로 강제(T-06-17, grep acceptance로 고정)
+- [Phase 06-operations]: 저녁반 출석 삭제는 attendance 행을 먼저 삭제·flush한 뒤 조건부 UPDATE로 잔여를 복구한다 — FK 참조가 남아 있으면 이력 해석이 모호해지는 것을 방지
+- [Phase 06-operations]: ReservationLedgerSupport를 재사용하지 않고 흐름만 이식 — 복구 금액이 정책 상수(1.0)로 고정돼 있어 0.5 복구에 그대로 쓸 수 없다
+- [Phase 06-08]: 저녁반 회원 검색 전용 API는 만들지 않는다 — FE는 기존 GET /api/admin/members?keyword=로 memberId를 얻어 POST /evening에 넘긴다(06-RESEARCH Open Question 2 확정)
+- [Phase 06-08]: 출석 컨트롤러 경로는 /api/admin/attendances 단일 계층으로 고정 — 스케줄 보드처럼 여러 리소스 계층이 섞이지 않는 단일 리소스는 넓은 클래스 매핑이 필요 없다
 
 ### Pending Todos
 
@@ -205,6 +214,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-18T09:49:43.079Z
-Stopped at: Completed 06-05-PLAN.md
+Last session: 2026-08-18T13:23:22.507Z
+Stopped at: Completed 06-08-PLAN.md
 Resume file: None
