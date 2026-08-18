@@ -6,28 +6,32 @@ info:
 servers:
 - url: /
 tags:
-- name: admin-member
-  description: 관리자 회원 관리
-- name: system
-  description: 서버 상태·환경 확인
 - name: admin-reservation
   description: 관리자 예약 조회·대리 취소·변경
 - name: admin-schedule
   description: 관리자 주간 스케줄 보드 + 휴강 처리·해제
-- name: auth
-  description: 인증·토큰
 - name: admin-pass
   description: 관리자 이용권 관리
 - name: member-pass
   description: 회원 본인 이용권·이력 조회
+- name: member-reservation
+  description: 회원 예약 생성·취소·변경·본인 목록 조회
+- name: admin-member
+  description: 관리자 회원 관리
+- name: system
+  description: 서버 상태·환경 확인
+- name: admin-notice
+  description: 관리자 공지 관리
+- name: member-notice
+  description: 회원 공지 열람
+- name: auth
+  description: 인증·토큰
 - name: admin-batch
   description: 관리자 배치 수동 실행·실행 이력 조회
 - name: member
   description: 회원 본인 정보
 - name: member-schedule
   description: 회원 본인 주간 시간표 조회
-- name: member-reservation
-  description: 회원 예약 생성·취소·변경·본인 목록 조회
 paths:
   /api/members/me/reservations:
     get:
@@ -336,6 +340,52 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/PassResponse"
+  /api/admin/notices:
+    get:
+      tags:
+      - admin-notice
+      summary: 공지 목록 조회 (최신순 페이지)
+      operationId: getList
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageResponseNoticeSummaryResponse"
+    post:
+      tags:
+      - admin-notice
+      summary: "공지 등록 (제목+본문만, 첨부·고정 없음, D-131)"
+      operationId: create
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNoticeRequest"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/NoticeDetailResponse"
   /api/admin/members/{memberId}/rejection:
     post:
       tags:
@@ -563,6 +613,66 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/PassResponse"
+  /api/admin/notices/{noticeId}:
+    get:
+      tags:
+      - admin-notice
+      summary: 공지 상세 조회
+      operationId: getDetail
+      parameters:
+      - name: noticeId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/NoticeDetailResponse"
+    delete:
+      tags:
+      - admin-notice
+      summary: "공지 삭제 (물리 삭제, D-131)"
+      operationId: delete
+      parameters:
+      - name: noticeId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "204":
+          description: No Content
+    patch:
+      tags:
+      - admin-notice
+      summary: 공지 수정
+      operationId: update
+      parameters:
+      - name: noticeId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNoticeRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/NoticeDetailResponse"
   /api/admin/members/{memberId}/status:
     patch:
       tags:
@@ -602,6 +712,54 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/HealthResponse"
+  /api/members/notices:
+    get:
+      tags:
+      - member-notice
+      summary: 공지 목록 조회 (최신순 페이지)
+      operationId: getList_1
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageResponseNoticeSummaryResponse"
+  /api/members/notices/{noticeId}:
+    get:
+      tags:
+      - member-notice
+      summary: 공지 상세 조회
+      operationId: getDetail_1
+      parameters:
+      - name: noticeId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/NoticeDetailResponse"
   /api/members/me:
     get:
       tags:
@@ -867,7 +1025,7 @@ paths:
       tags:
       - admin-member
       summary: 회원 상세 조회 (거절 사유 포함 — 관리자 전용)
-      operationId: getDetail
+      operationId: getDetail_2
       parameters:
       - name: memberId
         in: path
@@ -1359,6 +1517,47 @@ components:
       required:
       - amount
       - note
+    CreateNoticeRequest:
+      type: object
+      description: 공지 등록 요청
+      properties:
+        title:
+          type: string
+          description: 공지 제목(200자 이내)
+          example: 8월 휴관 안내
+          maxLength: 200
+          minLength: 0
+        content:
+          type: string
+          description: 공지 본문(10000자 이내). 이스케이프되지 않은 원문 텍스트다 — 렌더링 시 이스케이프는 FE 책임(T-06-11)
+          example: 8월 15일은 휴관합니다.
+          maxLength: 10000
+          minLength: 0
+      required:
+      - content
+      - title
+    NoticeDetailResponse:
+      type: object
+      description: 공지 상세
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 공지 id
+        title:
+          type: string
+          description: 공지 제목
+        content:
+          type: string
+          description: "공지 본문(원문 텍스트, FE가 이스케이프)"
+        createdAt:
+          type: string
+          format: date-time
+          description: 등록 시각
+        updatedAt:
+          type: string
+          format: date-time
+          description: 수정 시각
     RejectMemberRequest:
       type: object
       description: 거절 사유. 관리자 전용 정보이며 회원에게 원문이 노출되지 않는다 (D-043)
@@ -1624,6 +1823,25 @@ components:
       required:
       - newEndDate
       - reason
+    UpdateNoticeRequest:
+      type: object
+      description: 공지 수정 요청
+      properties:
+        title:
+          type: string
+          description: 공지 제목(200자 이내)
+          example: 8월 휴관 안내(수정)
+          maxLength: 200
+          minLength: 0
+        content:
+          type: string
+          description: 공지 본문(10000자 이내). 이스케이프되지 않은 원문 텍스트다 — 렌더링 시 이스케이프는 FE 책임(T-06-11)
+          example: "8월 15일은 휴관하며, 16일부터 정상 운영합니다."
+          maxLength: 10000
+          minLength: 0
+      required:
+      - content
+      - title
     UpdateMemberStatusRequest:
       type: object
       description: 변경할 회원 상태. PENDING으로 되돌리면 거절 사유가 초기화되어 재신청 상태가 된다 (D-034)
@@ -1649,6 +1867,50 @@ components:
           format: date-time
         timeZone:
           type: string
+    NoticeSummaryResponse:
+      type: object
+      description: 공지 목록 항목
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 공지 id
+        title:
+          type: string
+          description: 공지 제목
+        createdAt:
+          type: string
+          format: date-time
+          description: 등록 시각
+        updatedAt:
+          type: string
+          format: date-time
+          description: 수정 시각
+    PageResponseNoticeSummaryResponse:
+      type: object
+      description: 페이지네이션 응답
+      properties:
+        content:
+          type: array
+          description: 현재 페이지의 항목 목록
+          items:
+            $ref: "#/components/schemas/NoticeSummaryResponse"
+        page:
+          type: integer
+          format: int32
+          description: 현재 페이지 번호(0부터 시작)
+        size:
+          type: integer
+          format: int32
+          description: 페이지 크기
+        totalElements:
+          type: integer
+          format: int64
+          description: 전체 항목 수
+        totalPages:
+          type: integer
+          format: int32
+          description: 전체 페이지 수
     DayScheduleResponse:
       type: object
       description: 하루치 시간표
@@ -1829,6 +2091,7 @@ components:
           - CLASS_CANCELED_REFUND
           - INITIAL_GRANT
           - REGISTRATION_CANCELED
+          - EVENING_HALF_REFUND
         occurredAt:
           type: string
           format: date-time
