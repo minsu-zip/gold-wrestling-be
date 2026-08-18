@@ -120,3 +120,7 @@ None - 외부 서비스 설정 불필요.
 ---
 *Phase: 06-operations*
 *Completed: 2026-08-18*
+
+## Self-Check: PASSED
+
+All created/modified files verified to exist on disk (`AttendanceService.kt`, `AttendanceEveningHalfTest.kt`, this SUMMARY.md); all task commit hashes (`e13712c`, `4b97e2b`, `4c4fdd4`, `47bc3b1`) verified present in git log.
