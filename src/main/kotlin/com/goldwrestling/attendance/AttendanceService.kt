@@ -263,12 +263,25 @@ class AttendanceService(
                 candidatePassId
             }
 
-        // 조건부 UPDATE가 실행됐다면(deductedPassId != null) 영속성 컨텍스트가 clear됐으므로
-        // INSERT에 쓸 엔티티를 모두 재조회한다(ReservationLedgerSupport 관례).
-        val refreshedMember = memberRepository.findById(request.memberId).orElseThrow { MemberNotFoundException(request.memberId) }
+        // 조건부 UPDATE(`adjustRemainingCount`)는 `@Modifying(clearAutomatically = true)`라 실행되는
+        // 순간 영속성 컨텍스트를 비운다 — 그 경로에서만 위에서 읽어 둔 엔티티가 준영속이 되므로
+        // INSERT에 쓸 것들을 재조회한다(ReservationLedgerSupport 관례). 회비로 커버돼 차감이 없었던
+        // 경로는 컨텍스트가 그대로라 재조회가 순수한 낭비다.
+        // 이 지점 앞에 또 다른 벌크 연산을 추가한다면 이 플래그도 함께 갱신해야 한다.
+        val passContextCleared = deductedPassId != null
+        val refreshedMember =
+            if (passContextCleared) {
+                memberRepository.findById(request.memberId).orElseThrow { MemberNotFoundException(request.memberId) }
+            } else {
+                member
+            }
         val refreshedSession =
-            classSessionService.findExisting(request.classScheduleId, request.classDate)
-                ?: throw IllegalStateException("방금 확보한 ClassSession(id=$sessionId)을 찾을 수 없습니다.")
+            if (passContextCleared) {
+                classSessionService.findExisting(request.classScheduleId, request.classDate)
+                    ?: throw IllegalStateException("방금 확보한 ClassSession(id=$sessionId)을 찾을 수 없습니다.")
+            } else {
+                session
+            }
         val refreshedAdmin =
             adminRepository.findById(adminId).orElseThrow {
                 IllegalStateException("저녁반 출석을 추가하려는 관리자(id=$adminId)를 찾을 수 없습니다.")
