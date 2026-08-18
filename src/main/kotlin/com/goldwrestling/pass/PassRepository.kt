@@ -208,4 +208,27 @@ interface PassRepository :
         @Param("memberId") memberId: Long,
         @Param("today") today: LocalDate,
     ): List<Pass>
+
+    /**
+     * 저녁반 회비 우선 판정(policies §4.2, D-128)의 데이터 근거 — 회원이 [classDate] 기준으로
+     * 유효한 `EVENING_MEMBERSHIP`을 보유하는지 조회한다.
+     *
+     * **이 쿼리의 `classDate`는 오늘이 아니라 수업날이다**(D-128·Pitfall 1) — 관리자가 지난 수업의
+     * 출석을 소급 입력할 때, "오늘" 기준으로 판정하면 그날 실제로 유효했던 회비를 놓치고
+     * `SESSION_PASS`를 잘못 차감하게 된다.
+     *
+     * `startDate <= :classDate and endDate >= :classDate` — `endDate >= :classDate`는
+     * [findDeductionCandidates]가 쓰는 것과 **같은 비교축**(D-066 종료일 포함 판정)이다. 다른
+     * 비교식(`>`)을 쓰면 종료일 당일 수업이 경계에서 어긋난다.
+     */
+    @Query(
+        "select count(p) > 0 from Pass p where p.member.id = :memberId " +
+            "and p.type = com.goldwrestling.pass.PassType.EVENING_MEMBERSHIP " +
+            "and p.status = com.goldwrestling.pass.PassStatus.ACTIVE " +
+            "and p.startDate <= :classDate and p.endDate >= :classDate",
+    )
+    fun existsActiveEveningMembership(
+        @Param("memberId") memberId: Long,
+        @Param("classDate") classDate: LocalDate,
+    ): Boolean
 }
