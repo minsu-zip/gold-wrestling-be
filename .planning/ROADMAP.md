@@ -265,7 +265,7 @@ BATCH-01·02·04가 모두 뒤집혔고 회귀는 없다. 검증자가 SUMMARY �
 **청크 A — 기반 (wave 1~2)**
 - [x] 06-01-PLAN.md — glossary·policies §4.2·decisions(D-132~135)·error-codes 정합 + ErrorCode 6종 + `EVENING_HALF_REFUND` (ATTEND-01/02, NOTICE-01, NOTIF-03)
 - [x] 06-02-PLAN.md — V11 스키마(attendance·notice·활동 피드 인덱스) + 엔티티·리포지토리 + 유니크/ATTENDED 필터 통합테스트 (ATTEND-01/02, NOTICE-01/02, NOTIF-03)
-- [ ] 06-03-PLAN.md — [이월 CR-03] `InactivityBatchRunner` 기준일 후보 ① 배선 + 불참·소급 회귀 테스트 (ATTEND-01)
+- [x] 06-03-PLAN.md — [이월 CR-03] `InactivityBatchRunner` 기준일 후보 ① 배선 + 불참·소급 회귀 테스트 (ATTEND-01)
 - [ ] 06-04-PLAN.md — 공지 CRUD(관리자) + 회원 목록·상세 + openapi 재생성 (NOTICE-01/02)
 
 **청크 B — 출석·저녁반 차감 (wave 3~6)**
@@ -295,5 +295,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. 이용권 | 11/11 | Complete    | 2026-08-04 |
 | 4. 시간표·예약 | 15/15 | Complete   | 2026-08-08 |
 | 5. 배치 | 15/16 | In Progress (05-16 사용자 확인 대기) |  |
-| 6. 운영 | 2/11 | In Progress|  |
+| 6. 운영 | 3/11 | In Progress|  |
 </content>

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06-02-PLAN.md
-last_updated: "2026-08-18T09:17:43.197Z"
+stopped_at: Completed 06-03-PLAN.md
+last_updated: "2026-08-18T09:26:27.021Z"
 last_activity: 2026-08-18
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 71
-  completed_plans: 62
+  completed_plans: 63
   percent: 83
 ---
 
@@ -26,12 +26,12 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 ## Current Position
 
 Phase: 06 (operations) — EXECUTING
-Plan: 3 of 11
+Plan: 4 of 11
 Status: Ready to execute
   Task 2(로컬 실기동 202 접수·조회·잔여 변화 확인)는 **사용자 승인 대기** — 아직 아무도 확인하지 않았다.
 Last activity: 2026-08-18
 
-Progress: [█████████░] 87%
+Progress: [█████████░] 89%
 
 ## Performance Metrics
 
@@ -88,6 +88,7 @@ Progress: [█████████░] 87%
 | Phase 05-batch P14 | 30min | 2 tasks | 11 files |
 | Phase 06-operations P01 | 15min | 2 tasks | 6 files |
 | Phase 06-operations P02 | 35min | 3 tasks | 9 files |
+| Phase 06-operations P03 | ~30min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -168,6 +169,8 @@ Recent decisions affecting current work:
 - [Phase 06-01]: D-132~D-135: 출석 건별 upsert, EVENING_ATTENDANCE_DEDUCTION_UNAVAILABLE(409) 신설, 공지 열람 게이트 미적용(D-071 연장), 활동 피드 인덱스 V11 예고 — Phase 6 계약(용어·정책·에러코드)을 코드보다 먼저 docs/에 확정
 - [Phase 06-02]: AttendanceRepositoryTest·NoticeRepositoryTest는 InactivityBatchRunnerTest와 동일한 애노테이션 조합(@Transactional 미사용 + @AfterEach 직접 정리)을 쓴다 — 06-06~06-08이 재사용할 컨텍스트를 통일하고, 유니크 위반 단언 직후 abort된 트랜잭션에서 @AfterEach DELETE가 실패하는 문제를 피한다
 - [Phase 06-02]: AttendanceFixtures.branch()는 통합테스트에서 쓰지 않는다 — uq_branch_name UNIQUE + V2의 '송파점' 시드와 충돌하므로 순수 단위테스트 전용으로 남기고, 통합테스트는 BranchRepository.findByName으로 시드된 지점을 재사용한다
+- [Phase 06-03]: InactivityDueDateCalculator·InactivityDueDateCandidates는 계획대로 무변경 — Phase 5가 이미 5종 후보 시그니처를 갖춰 뒀으므로 배선 한 지점(lastAttendanceDate = null -> attendanceRepository.findLastAttendedClassDates 벌크 조회)만 바꿔 CR-03을 닫았다
+- [Phase 06-03]: 회귀 테스트는 저녁반(EVENING) 전용 SESSION_PASS 회원 시나리오를 기본값으로 재현하고(CR-03 실제 사고 시나리오), 1회 실행 상한(maxDeductionsPerRun=1)이 단일 실행 비교를 무의미하게 만들어 repeat(3) 반복 실행으로 캐치업 차이를 검증한다
 
 ### Pending Todos
 
@@ -195,6 +198,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-18T09:17:43.190Z
-Stopped at: Completed 06-02-PLAN.md
+Last session: 2026-08-18T09:26:27.014Z
+Stopped at: Completed 06-03-PLAN.md
 Resume file: None
