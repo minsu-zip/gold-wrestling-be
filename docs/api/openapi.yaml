@@ -10,6 +10,8 @@ tags:
   description: 관리자 예약 조회·대리 취소·변경
 - name: admin-schedule
   description: 관리자 주간 스케줄 보드 + 휴강 처리·해제
+- name: admin-attendance
+  description: 관리자 출석 체크·저녁반 0.5회 차감
 - name: admin-pass
   description: 관리자 이용권 관리
 - name: member-pass
@@ -33,6 +35,52 @@ tags:
 - name: member-schedule
   description: 회원 본인 주간 시간표 조회
 paths:
+  /api/admin/attendances:
+    get:
+      tags:
+      - admin-attendance
+      summary: "타임별 출석 명단 조회 (예약자 프리로드, 미체크는 status=null)"
+      operationId: getRoster
+      parameters:
+      - name: classScheduleId
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: classDate
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ClassSessionAttendanceRosterResponse"
+    put:
+      tags:
+      - admin-attendance
+      summary: "예약제/1:1 출석 체크 (upsert, 소급 정정 가능)"
+      description: 예약제·1:1 전용이다. 저녁반은 `POST /api/admin/attendances/evening`을 쓴다 —
+        저녁반은 출석 추가가 0.5회 차감을 유발하기 때문이다.
+      operationId: check
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckAttendanceRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AttendanceResponse"
   /api/members/me/reservations:
     get:
       tags:
@@ -587,6 +635,29 @@ paths:
           description: 관리자 권한이 아님 (ACCESS_DENIED)
         "409":
           description: 이미 실행 중인 배치가 있어 거부됨 (BATCH_ALREADY_RUNNING)
+  /api/admin/attendances/evening:
+    post:
+      tags:
+      - admin-attendance
+      summary: "저녁반 출석 추가 (회비 우선 판정, 없으면 0.5회 차감)"
+      description: "유효한 저녁반 회비가 있으면 차감 없이 출석만 기록하고, 없으면 만료 임박순 횟수권에서 0.5회를 차감한다. 둘\
+        \ 다 불가하면 409 EVENING_ATTENDANCE_DEDUCTION_UNAVAILABLE로 거부한다(관리자가 수동 가감으로 충\
+        전 후 재시도). 대상 회원은 `GET /api/admin/members?keyword=`로 검색해 얻은 memberId를 넘긴다 —\
+        \ 이 API는 별도 회원 검색 기능을 갖지 않는다."
+      operationId: addEvening
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddEveningAttendanceRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AttendanceResponse"
   /api/admin/passes/{passId}/period:
     patch:
       tags:
@@ -1069,8 +1140,93 @@ paths:
           description: 관리자 권한이 아님 (ACCESS_DENIED)
         "404":
           description: 그 id의 실행 이력이 없음 (BATCH_EXECUTION_NOT_FOUND)
+  /api/admin/attendances/{attendanceId}:
+    delete:
+      tags:
+      - admin-attendance
+      summary: 출석 삭제
+      description: 저녁반 출석이면 연결된 0.5회 차감을 EVENING_HALF_REFUND로 복구한다.
+      operationId: delete_1
+      parameters:
+      - name: attendanceId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "204":
+          description: No Content
 components:
   schemas:
+    CheckAttendanceRequest:
+      type: object
+      description: 예약제/1:1 출석 체크 요청 — 예약자 명단에 없는 회원은 거부된다(D-132)
+      properties:
+        classScheduleId:
+          type: integer
+          format: int64
+          description: 정기 시간표(ClassSchedule) ID
+        classDate:
+          type: string
+          format: date
+          description: "날짜별 수업 날짜(ISO, yyyy-MM-dd)"
+        memberId:
+          type: integer
+          format: int64
+          description: 출석 체크 대상 회원 ID
+        status:
+          type: string
+          description: 출석 상태 — ATTENDED 또는 ABSENT
+          enum:
+          - ATTENDED
+          - ABSENT
+    AttendanceResponse:
+      type: object
+      description: 출석 단건 응답 — 차감 상세(금액·사유)는 노출하지 않는다(deducted 여부만)
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 출석 기록 ID
+        memberId:
+          type: integer
+          format: int64
+          description: 회원 ID
+        memberName:
+          type: string
+          description: 회원 실명
+        classSessionId:
+          type: integer
+          format: int64
+          description: 날짜별 수업(ClassSession) ID
+        classDate:
+          type: string
+          format: date
+          description: 수업 날짜
+        startTime:
+          type: string
+          description: 수업 시작 시각
+        classType:
+          type: string
+          description: 수업 종류
+          enum:
+          - EVENING
+          - SESSION
+          - LESSON
+        status:
+          type: string
+          description: 출석 상태
+          enum:
+          - ATTENDED
+          - ABSENT
+        deducted:
+          type: boolean
+          description: "차감 발생 여부 — 저녁반 0.5회 차감이 있었으면 true(D-128), 예약제/1:1은 항상 false"
+        checkedAt:
+          type: string
+          format: date-time
+          description: 출석 확인 시각
     ReserveRequest:
       type: object
       description: 예약 생성 요청 — 세션 id가 아니라 시간표 id + 날짜로 받는다(D-094)
@@ -1798,6 +1954,22 @@ components:
           - string
           - "null"
           description: "회원 단위 실패 요약(예외 종류만, 메시지는 담지 않는다) — 실패가 없으면 null"
+    AddEveningAttendanceRequest:
+      type: object
+      description: "저녁반 출석 추가 요청 — 추가 자체가 출석이다(불참 상태 없음, D-127)"
+      properties:
+        classScheduleId:
+          type: integer
+          format: int64
+          description: 정기 시간표(ClassSchedule) ID
+        classDate:
+          type: string
+          format: date
+          description: "날짜별 수업 날짜(ISO, yyyy-MM-dd)"
+        memberId:
+          type: integer
+          format: int64
+          description: 출석 추가 대상 회원 ID
     ChangePassPeriodRequest:
       type: object
       description: "기간·유효기간 수정 요청 — 저녁반은 시작·종료 모두, 횟수권은 종료일만 반영된다(D-062)"
@@ -2288,3 +2460,79 @@ components:
           type: integer
           format: int32
           description: 전체 페이지 수
+    AttendanceRosterEntryResponse:
+      type: object
+      description: 출석 명단 항목 — status가 null이면 미체크(D-127)
+      properties:
+        memberId:
+          type: integer
+          format: int64
+          description: 회원 ID
+        memberName:
+          type: string
+          description: 회원 실명
+        reservationId:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: 예약 ID — 저녁반 명단에서는 항상 null(예약이 없는 수업)
+        attendanceId:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: 출석 기록 ID — 미체크면 null
+        status:
+          type:
+          - string
+          - "null"
+          description: 출석 상태 — null이면 미체크(D-127 레코드 부재 = 미체크)
+          enum:
+          - ATTENDED
+          - ABSENT
+        deducted:
+          type: boolean
+          description: "차감 발생 여부 — 저녁반 0.5회 차감이 있었으면 true, 미체크·예약제/1:1은 항상 false"
+    ClassSessionAttendanceRosterResponse:
+      type: object
+      description: 시간표·날짜별 출석 명단 응답 — classSessionId가 null이면 세션이 아직 없다(예약·출석 없음)
+      properties:
+        classScheduleId:
+          type: integer
+          format: int64
+          description: 정기 시간표(ClassSchedule) ID
+        classDate:
+          type: string
+          format: date
+          description: 수업 날짜
+        classSessionId:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: 날짜별 수업(ClassSession) ID — 세션이 아직 없으면 null
+        classType:
+          type: string
+          description: 수업 종류
+          enum:
+          - EVENING
+          - SESSION
+          - LESSON
+        startTime:
+          type: string
+          description: 수업 시작 시각
+        endTime:
+          type: string
+          description: 수업 종료 시각
+        capacity:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: 정원 — 저녁반(EVENING)은 null
+        entries:
+          type: array
+          description: "명단 — 예약제/1:1은 활성 예약자 전원, 저녁반은 출석 레코드가 있는 회원만"
+          items:
+            $ref: "#/components/schemas/AttendanceRosterEntryResponse"
