@@ -66,3 +66,35 @@ data class MarkAllReadResponse(
     @field:Schema(description = "이번 호출로 새로 읽음 처리된 건수") val updatedCount: Int,
     @field:Schema(description = "처리 후 재조회한 미확인 건수 — 정상 처리라면 0") val unreadCount: Long,
 )
+
+/**
+ * 활동 피드 항목 응답(NOTIF-03, D-129) — `notification` 테이블의 다른 뷰다.
+ *
+ * **[NotificationResponse]와 달리 `isRead`·`readAt`을 담지 않는다** — 피드는 읽음 여부와 무관한
+ * 시간순 타임라인이라는 의미 자체가 이 두 필드를 노출하지 않는 것으로 표현된다.
+ */
+@Schema(description = "활동 피드 항목 응답 — 읽음 여부와 무관한 시간순 타임라인(D-129)")
+data class ActivityFeedItemResponse(
+    @field:Schema(description = "알림 ID") val id: Long,
+    @field:Schema(description = "알림 종류") val type: NotificationType,
+    @field:Schema(description = "알림 문구") val message: String,
+    @field:Schema(description = "관련 회원명 — 휴강 요약 알림은 특정 회원이 없어 null") val memberName: String?,
+    @field:Schema(description = "관련 수업 종류 — 없으면 null") val classType: ClassType?,
+    @field:Schema(description = "관련 수업 날짜 — 없으면 null") val classDate: LocalDate?,
+    @field:Schema(description = "관련 수업 시작 시각 — 없으면 null") val startTime: LocalTime?,
+    @field:Schema(description = "이벤트 발생 시각") val occurredAt: OffsetDateTime,
+) {
+    companion object {
+        fun from(notification: Notification): ActivityFeedItemResponse =
+            ActivityFeedItemResponse(
+                id = requireNotNull(notification.id) { "저장되지 않은 Notification은 응답으로 변환할 수 없습니다." },
+                type = notification.type,
+                message = notification.message,
+                memberName = notification.memberName,
+                classType = notification.classType,
+                classDate = notification.classDate,
+                startTime = notification.startTime,
+                occurredAt = notification.occurredAt,
+            )
+    }
+}
