@@ -19,7 +19,7 @@
 - [x] **Phase 3: 이용권** - Pass 3종 등록, PassTransaction 이력, 수동 가감·기간 수정, 본인 조회 (completed 2026-08-03)
 - [x] **Phase 4: 시간표·예약** - ClassSchedule/ClassSession, 예약 생성·취소·변경 + 즉시 차감/복구, 동시성 보장, 관리자 예약 관리·휴강, Notification 스키마·알림 레코드 생성 (completed 2026-08-08)
 - [x] **Phase 5: 배치** - 2주 미사용 차감, 유효기간 만료 처리, 멱등 실행 (본 작업 9/9 + 갭 클로저 05-10~05-16 완료, 재검증 `passed` 4/4 — CR-03은 Phase 6으로 이월, 그동안 cron은 꺼 둔 채 배포) (completed 2026-08-16)
-- [ ] **Phase 6: 운영** - 출석 체크, 공지사항, 관리자 알림·활동 피드
+- [x] **Phase 6: 운영** - 출석 체크, 공지사항, 관리자 알림·활동 피드 (completed 2026-08-19)
 
 ## Phase Details
 
@@ -190,7 +190,8 @@ BATCH-01·02·04가 모두 뒤집혔고 회귀는 없다. 검증자가 SUMMARY �
 > ⚠️ **배포 조건**: CR-03(기준일 후보 ① 부재)이 Phase 6까지 열려 있으므로, dev→main 배포 시
 > `BATCH_INACTIVITY_SCHEDULER_ENABLED=false`로 **cron을 꺼 둔 채** 올린다(D-116·D-119). 켜 두면
 > 저녁반에만 나오는 `SESSION_PASS` 회원이 2주마다 1.0회씩 부당 차감된다. 이 전제가 산문에만
-> 있어 잊히기 쉬웠으므로 `.env.example` 기본값을 `false`로 바꿔 두었다 — Phase 6에서 되돌린다.
+> 있어 잊히기 쉬웠으므로 `.env.example` 기본값을 `false`로 바꿔 두었다 — Phase 6에서 CR-03을
+> 닫았고, 기본값은 D-130에 따라 꺼짐으로 유지한다. 켜는 것은 README의 운영 절차가 담당한다.
 - **WR-02(전체 실패 무기록)·WR-04(LAZY 프록시 계약 모순)** — CR-01 설계(05-11·05-13)의 부산물로 함께 닫혔다.
 - **CR-03(출석일 후보 부재)은 이번 청크의 범위 밖이다.** Phase 6이 `Attendance`를 도입하기 전까지
   기준일 후보 ①(마지막 출석일)이 항상 null이라 저녁반 전용 회원이 부당 차감될 수 있는 문제는 남아
@@ -275,9 +276,9 @@ BATCH-01·02·04가 모두 뒤집혔고 회귀는 없다. 검증자가 SUMMARY �
 - [x] 06-08-PLAN.md — `AdminAttendanceController` 4종 + HTTP 계약 테스트 + 동시성 테스트(이중 차감 0건) + openapi 재생성 (ATTEND-01/02)
 
 **청크 C — 알림·피드·마감 (wave 7~9)**
-- [ ] 06-09-PLAN.md — 알림 목록 폴링 + 미확인 카운트 + 모두 읽음 (NOTIF-02)
-- [ ] 06-10-PLAN.md — 활동 피드(기간·종류 필터, 읽음 무관) + openapi 재생성 (NOTIF-03)
-- [ ] 06-11-PLAN.md — phase 마감: cron 운영 켜기 절차(README, D-130) + 문서 정합 + 전체 회귀 + 로컬 실기동 확인 (전 요구사항)
+- [x] 06-09-PLAN.md — 알림 목록 폴링 + 미확인 카운트 + 모두 읽음 (NOTIF-02)
+- [x] 06-10-PLAN.md — 활동 피드(기간·종류 필터, 읽음 무관) + openapi 재생성 (NOTIF-03)
+- [x] 06-11-PLAN.md — phase 마감: cron 운영 켜기 절차(README, D-130) + 문서 정합 + 전체 회귀 + 로컬 실기동 확인 (전 요구사항)
 
 **Note (cron)**: 이 phase가 CR-03을 코드로 닫지만 **`BATCH_INACTIVITY_SCHEDULER_ENABLED` 기본값은
 꺼짐을 유지한다**(D-130이 D-121의 fail-safe를 존치). 켜는 것은 06-11이 README에 남기는 운영 절차의
@@ -295,5 +296,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. 이용권 | 11/11 | Complete    | 2026-08-04 |
 | 4. 시간표·예약 | 15/15 | Complete   | 2026-08-08 |
 | 5. 배치 | 15/16 | In Progress (05-16 사용자 확인 대기) |  |
-| 6. 운영 | 8/11 | In Progress|  |
+| 6. 운영 | 11/11 | Complete   | 2026-08-19 |
 </content>

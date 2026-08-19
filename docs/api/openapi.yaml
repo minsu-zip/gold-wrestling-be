@@ -34,6 +34,8 @@ tags:
   description: 회원 본인 정보
 - name: member-schedule
   description: 회원 본인 주간 시간표 조회
+- name: admin-notification
+  description: 관리자 알림 폴링·확인 처리·활동 피드
 paths:
   /api/admin/attendances:
     get:
@@ -388,6 +390,20 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/PassResponse"
+  /api/admin/notifications/read-all:
+    post:
+      tags:
+      - admin-notification
+      summary: 알림 모두 읽음 처리
+      description: 개별 읽음 처리는 제공하지 않는다(D-129).
+      operationId: markAllAsRead
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MarkAllReadResponse"
   /api/admin/notices:
     get:
       tags:
@@ -1028,6 +1044,50 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/PageResponseAdminReservationResponse"
+  /api/admin/notifications:
+    get:
+      tags:
+      - admin-notification
+      summary: 알림 목록 조회(미확인 카운트 포함)
+      description: FE는 30초 주기로 이 엔드포인트를 폴링한다. 미확인 건수가 응답에 포함되므로 별도 카운트 호출이 필요 없다(D-129).
+      operationId: list
+      parameters:
+      - name: unreadOnly
+        in: query
+        description: 미확인 알림만 조회할지 여부
+        required: false
+        schema:
+          type: boolean
+          default: false
+          description: 미확인 알림만 조회할지 여부
+      - name: page
+        in: query
+        description: 페이지 번호(0부터 시작)
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          description: 페이지 번호(0부터 시작)
+          minimum: 0
+      - name: size
+        in: query
+        description: 페이지 크기(1~100)
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          description: 페이지 크기(1~100)
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/NotificationListResponse"
   /api/admin/members:
     get:
       tags:
@@ -1141,6 +1201,73 @@ paths:
           description: 관리자 권한이 아님 (ACCESS_DENIED)
         "404":
           description: 그 id의 실행 이력이 없음 (BATCH_EXECUTION_NOT_FOUND)
+  /api/admin/activity-feed:
+    get:
+      tags:
+      - admin-notification
+      summary: "활동 피드 조회(읽음 여부 무관 시간순, 기간·종류 필터)"
+      description: "알림과 같은 notification 테이블을 읽음 여부와 무관하게 시간순으로 보여주는 다른 뷰다(NOTIF-03,\
+        \ D-129). 별도 저장 경로가 없다."
+      operationId: activityFeed
+      parameters:
+      - name: from
+        in: query
+        description: 이벤트 발생 시각 범위 시작(포함)
+        required: false
+        schema:
+          type: string
+          format: date-time
+          description: 이벤트 발생 시각 범위 시작(포함)
+      - name: to
+        in: query
+        description: 이벤트 발생 시각 범위 끝(포함)
+        required: false
+        schema:
+          type: string
+          format: date-time
+          description: 이벤트 발생 시각 범위 끝(포함)
+      - name: type
+        in: query
+        description: 알림 종류 필터
+        required: false
+        schema:
+          type: string
+          description: 알림 종류 필터
+          enum:
+          - RESERVATION_CREATED
+          - RESERVATION_CANCELED_BY_MEMBER
+          - RESERVATION_CHANGED_BY_MEMBER
+          - RESERVATION_CANCELED_BY_ADMIN
+          - RESERVATION_CHANGED_BY_ADMIN
+          - CLASS_SESSION_SUSPENDED
+      - name: page
+        in: query
+        description: 페이지 번호(0부터 시작)
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          description: 페이지 번호(0부터 시작)
+          minimum: 0
+      - name: size
+        in: query
+        description: 페이지 크기(1~100)
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          description: 페이지 크기(1~100)
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageResponseActivityFeedItemResponse"
   /api/admin/attendances/{attendanceId}:
     delete:
       tags:
@@ -1674,6 +1801,18 @@ components:
       required:
       - amount
       - note
+    MarkAllReadResponse:
+      type: object
+      description: 모두 읽음 처리 응답
+      properties:
+        updatedCount:
+          type: integer
+          format: int32
+          description: 이번 호출로 새로 읽음 처리된 건수
+        unreadCount:
+          type: integer
+          format: int64
+          description: 처리 후 재조회한 미확인 건수 — 정상 처리라면 0
     CreateNoticeRequest:
       type: object
       description: 공지 등록 요청
@@ -2403,6 +2542,101 @@ components:
           type: integer
           format: int32
           description: 전체 페이지 수
+    NotificationListResponse:
+      type: object
+      description: 알림 목록 응답 — 미확인 건수를 함께 담아 폴링 1회로 끝난다(D-129)
+      properties:
+        notifications:
+          $ref: "#/components/schemas/PageResponseNotificationResponse"
+          description: 알림 목록(페이지)
+        unreadCount:
+          type: integer
+          format: int64
+          description: 미확인 건수
+    NotificationResponse:
+      type: object
+      description: 관리자 알림 단건 응답 — 예약/세션 상세로의 이동 링크(id)는 제공하지 않는다
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 알림 ID
+        type:
+          type: string
+          description: 알림 종류
+          enum:
+          - RESERVATION_CREATED
+          - RESERVATION_CANCELED_BY_MEMBER
+          - RESERVATION_CHANGED_BY_MEMBER
+          - RESERVATION_CANCELED_BY_ADMIN
+          - RESERVATION_CHANGED_BY_ADMIN
+          - CLASS_SESSION_SUSPENDED
+        message:
+          type: string
+          description: 알림 문구
+        memberName:
+          type:
+          - string
+          - "null"
+          description: 관련 회원명 — 휴강 요약 알림은 특정 회원이 없어 null
+        classType:
+          type:
+          - string
+          - "null"
+          description: 관련 수업 종류 — 없으면 null
+          enum:
+          - EVENING
+          - SESSION
+          - LESSON
+        classDate:
+          type:
+          - string
+          - "null"
+          format: date
+          description: 관련 수업 날짜 — 없으면 null
+        startTime:
+          type:
+          - string
+          - "null"
+          description: 관련 수업 시작 시각 — 없으면 null
+        occurredAt:
+          type: string
+          format: date-time
+          description: 이벤트 발생 시각
+        readAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+          description: 확인(모두 읽음) 처리 시각 — 미확인이면 null
+        isRead:
+          type: boolean
+          description: 확인 여부
+    PageResponseNotificationResponse:
+      type: object
+      description: 페이지네이션 응답
+      properties:
+        content:
+          type: array
+          description: 현재 페이지의 항목 목록
+          items:
+            $ref: "#/components/schemas/NotificationResponse"
+        page:
+          type: integer
+          format: int32
+          description: 현재 페이지 번호(0부터 시작)
+        size:
+          type: integer
+          format: int32
+          description: 페이지 크기
+        totalElements:
+          type: integer
+          format: int64
+          description: 전체 항목 수
+        totalPages:
+          type: integer
+          format: int32
+          description: 전체 페이지 수
     MemberSummaryResponse:
       type: object
       description: 관리자 회원 목록 항목
@@ -2537,3 +2771,78 @@ components:
           description: "명단 — 예약제/1:1은 활성 예약자 전원, 저녁반은 출석 레코드가 있는 회원만"
           items:
             $ref: "#/components/schemas/AttendanceRosterEntryResponse"
+    ActivityFeedItemResponse:
+      type: object
+      description: 활동 피드 항목 응답 — 읽음 여부와 무관한 시간순 타임라인(D-129)
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 알림 ID
+        type:
+          type: string
+          description: 알림 종류
+          enum:
+          - RESERVATION_CREATED
+          - RESERVATION_CANCELED_BY_MEMBER
+          - RESERVATION_CHANGED_BY_MEMBER
+          - RESERVATION_CANCELED_BY_ADMIN
+          - RESERVATION_CHANGED_BY_ADMIN
+          - CLASS_SESSION_SUSPENDED
+        message:
+          type: string
+          description: 알림 문구
+        memberName:
+          type:
+          - string
+          - "null"
+          description: 관련 회원명 — 휴강 요약 알림은 특정 회원이 없어 null
+        classType:
+          type:
+          - string
+          - "null"
+          description: 관련 수업 종류 — 없으면 null
+          enum:
+          - EVENING
+          - SESSION
+          - LESSON
+        classDate:
+          type:
+          - string
+          - "null"
+          format: date
+          description: 관련 수업 날짜 — 없으면 null
+        startTime:
+          type:
+          - string
+          - "null"
+          description: 관련 수업 시작 시각 — 없으면 null
+        occurredAt:
+          type: string
+          format: date-time
+          description: 이벤트 발생 시각
+    PageResponseActivityFeedItemResponse:
+      type: object
+      description: 페이지네이션 응답
+      properties:
+        content:
+          type: array
+          description: 현재 페이지의 항목 목록
+          items:
+            $ref: "#/components/schemas/ActivityFeedItemResponse"
+        page:
+          type: integer
+          format: int32
+          description: 현재 페이지 번호(0부터 시작)
+        size:
+          type: integer
+          format: int32
+          description: 페이지 크기
+        totalElements:
+          type: integer
+          format: int64
+          description: 전체 항목 수
+        totalPages:
+          type: integer
+          format: int32
+          description: 전체 페이지 수

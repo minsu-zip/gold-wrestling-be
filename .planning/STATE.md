@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 06-08-PLAN.md
-last_updated: "2026-08-18T13:23:22.513Z"
-last_activity: 2026-08-18
+status: verifying
+stopped_at: Completed 06-11-PLAN.md — Phase 6(운영) 마감, 사용자 실기동 승인 완료
+last_updated: "2026-08-19T02:51:19.260Z"
+last_activity: 2026-08-19
 progress:
   total_phases: 6
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 71
-  completed_plans: 68
-  percent: 83
+  completed_plans: 71
+  percent: 100
 ---
 
 # Project State
@@ -21,17 +21,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-30)
 
 **Core value:** 회원이 보는 잔여 횟수는 항상 실제 사용 가능 횟수와 일치한다 (즉시 차감/복구 + 전 이력 + 초과 예약 0건)
-**Current focus:** Phase 06 — operations
+**Current focus:** v1(M1~M6) 로드맵 전체 완료 — Phase 06(운영) 마감
 
 ## Current Position
 
-Phase: 06 (operations) — EXECUTING
-Plan: 4 of 11
-Status: Ready to execute
-  Task 2(로컬 실기동 202 접수·조회·잔여 변화 확인)는 **사용자 승인 대기** — 아직 아무도 확인하지 않았다.
-Last activity: 2026-08-18
+Phase: 06 (operations) — COMPLETE
+Plan: 11 of 11
+Status: 전체 11개 플랜 완료. Task 3(로컬 실기동 확인 — 출석·차감·복구·공지·알림·피드 10항목)를
+  사용자가 승인했다(항목 10 CR-03 배선은 코드·테스트로 실증한 '부분 확인'). v1(M1~M6) 로드맵 전체 마감.
+Last activity: 2026-08-19
 
-Progress: [██████████] 96%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -94,6 +94,9 @@ Progress: [██████████] 96%
 | Phase 06-operations P06 | 15min | 3 tasks | 6 files |
 | Phase 06-operations P07 | ~30min | 3 tasks | 2 files |
 | Phase 06-operations P08 | 25min | 3 tasks | 4 files |
+| Phase 06-operations P09 | ~30min | 3 tasks | 6 files |
+| Phase 06-operations P10 | ~20min | 3 tasks | 7 files |
+| Phase 06-operations P11 | ~35min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -187,6 +190,11 @@ Recent decisions affecting current work:
 - [Phase 06-operations]: ReservationLedgerSupport를 재사용하지 않고 흐름만 이식 — 복구 금액이 정책 상수(1.0)로 고정돼 있어 0.5 복구에 그대로 쓸 수 없다
 - [Phase 06-08]: 저녁반 회원 검색 전용 API는 만들지 않는다 — FE는 기존 GET /api/admin/members?keyword=로 memberId를 얻어 POST /evening에 넘긴다(06-RESEARCH Open Question 2 확정)
 - [Phase 06-08]: 출석 컨트롤러 경로는 /api/admin/attendances 단일 계층으로 고정 — 스케줄 보드처럼 여러 리소스 계층이 섞이지 않는 단일 리소스는 넓은 클래스 매핑이 필요 없다
+- [Phase 06-09]: Notification.memberName은 Member FK가 아니라 비정규화 문자열이라, 알림 픽스처는 실제 Member 없이 문자열만으로 만든다 — 회원 토큰 발급이 필요한 권한 테스트만 예외적으로 실제 Member를 생성한다
+- [Phase 06-09]: Phase 4의 NotificationService(생성 전용)는 무변경 — 조회 책임은 신규 NotificationQueryService로 완전히 분리했다
+- [Phase 06-10]: 활동 피드 범위 역전(from > to)은 새 에러코드를 만들지 않고 Specification AND 조합이 자연히 빈 목록을 반환하도록 둔다 — 예약 조회 전용인 INVALID_RESERVATION_SEARCH_RANGE를 재사용하지 않았다
+- [Phase 06-10]: AdminNotificationController 클래스 매핑을 /api/admin/notifications에서 /api/admin으로 넓히고 기존 두 메서드에 /notifications, /notifications/read-all 하위 경로를 붙였다 — 알림과 피드는 같은 테이블의 다른 뷰지만 FE 화면이 달라 하위 경로로 두면 오해된다(AdminScheduleController 선례). 노출 경로 문자열은 06-09 값과 동일하게 유지해 FE 계약을 깨지 않았다
+- [Phase 06-11]: CR-03 배선 확인은 로컬 DB에 출석 유무로 결과가 갈리는 회원이 없어 InactivityBatchRunner.kt의 코드 경로 + InactivityBatchRunnerTest 대조 테스트로 실증하고 실기동은 '부분 확인'으로 기록, 사용자가 이 상태로 승인
 
 ### Pending Todos
 
@@ -214,6 +222,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-18T13:23:22.507Z
-Stopped at: Completed 06-08-PLAN.md
+Last session: 2026-08-19T02:51:19.253Z
+Stopped at: Completed 06-11-PLAN.md — Phase 6(운영) 마감, 사용자 실기동 승인 완료
 Resume file: None

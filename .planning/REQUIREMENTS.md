@@ -67,7 +67,7 @@
 - [x] **NOTICE-01**: 관리자가 공지사항을 등록/수정/삭제할 수 있다
 - [x] **NOTICE-02**: 회원이 공지 목록·상세를 열람할 수 있다
 - [x] **NOTIF-01**: 예약 생성/변경/취소·휴강 시 관리자 알림이 생성된다 — Notification 스키마·레코드 생성은 Phase 4에서 구현 (조회·확인·폴링·피드는 Phase 6)
-- [ ] **NOTIF-02**: 관리자가 알림 목록을 폴링(30초)으로 조회하고 확인 처리할 수 있다 — 미확인 카운트 제공
+- [x] **NOTIF-02**: 관리자가 알림 목록을 폴링(30초)으로 조회하고 확인 처리할 수 있다 — 미확인 카운트 제공
 - [x] **NOTIF-03**: 관리자가 최근 활동 피드(예약 이벤트 타임라인)를 조회할 수 있다 — 알림과 동일 데이터의 다른 뷰
 
 ## v2 Requirements
@@ -145,7 +145,7 @@
 | ATTEND-02 | Phase 6 | Complete |
 | NOTICE-01 | Phase 6 | Complete |
 | NOTICE-02 | Phase 6 | Complete |
-| NOTIF-02 | Phase 6 | Pending |
+| NOTIF-02 | Phase 6 | Complete |
 | NOTIF-03 | Phase 6 | Complete |
 
 **Coverage:**

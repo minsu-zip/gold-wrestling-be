@@ -48,6 +48,33 @@
    DB 없이 앱만 띄우려면 `src/test/.../TestGoldWrestlingApplication.kt`의 `main`을 실행한다
    (Testcontainers가 일회용 PostgreSQL을 올려 붙여 준다).
 
+## 미사용 차감 배치 운영 (cron 켜기 절차)
+
+2주 미사용 시 자동 차감(`docs/policies.md` §4.3)의 cron은 배포 시 **기본적으로 꺼져 있다**
+(D-121 fail-safe — 설정을 빠뜨리면 "돌지 않는" 쪽으로 안전하게 실패한다). 아래 절차를 **순서대로**
+따라야 안전하게 켤 수 있다.
+
+1. **전제 확인** — 출석 배선(Phase 6, `InactivityBatchRunner`가 `AttendanceRepository`로 마지막
+   출석일을 실제 조회하는 배선)이 배포됐는지 확인한다. 이 배선 없이 cron을 켜면 저녁반에만 나오는
+   `SESSION_PASS` 회원이 2주마다 1.0회씩 부당 차감된다(CR-03의 실제 피해).
+2. **수동 실행 1회 검증** — `POST /api/admin/batch/inactivity-runs`(202 접수) → 응답 `Location`
+   헤더의 실행 상태 조회 URL을 폴링해 `SUCCESS`와 처리·차감 건수를 확인한다.
+   **정책 시행일(`BATCH_INACTIVITY_POLICY_EFFECTIVE_DATE`, 기본 `2026-09-01`) 이전에는 차감 0건이
+   정상**이다 — 0건을 "동작 안 함"으로 오독하지 않는다(D-119).
+3. **cron 활성화** — 배포 환경 변수에 `BATCH_INACTIVITY_SCHEDULER_ENABLED=true`를 **명시적으로**
+   설정한다. 기본값은 꺼짐이며 코드로 되돌리지 않는다(D-121 fail-safe — 설정을 빠뜨리면 꺼진 채로
+   남는다). 관리자 수동 실행 API는 이 값과 무관하게 항상 동작한다.
+4. **되돌리기** — 이상 징후(예상보다 많은 `INACTIVITY` 이력)가 보이면 같은 변수를 `false`로 바꿔
+   재배포하면 즉시 멈춘다. 이미 발생한 차감은 관리자 수동 가감(`ADMIN_ADJUST`)으로 정정한다 —
+   배치는 환불하지 않는다(D-127).
+
+| 환경변수 | 기본값 | 의미 |
+|---|---|---|
+| `BATCH_INACTIVITY_SCHEDULER_ENABLED` | `false` | cron 자동 실행 킬 스위치. `true`를 명시해야만 스케줄러 빈이 등록된다(D-121). 관리자 수동 실행 API는 이 값과 무관하게 항상 동작한다 |
+| `BATCH_INACTIVITY_POLICY_EFFECTIVE_DATE` | `2026-09-01` | 정책 시행일 하한. 이 날짜 이전의 미사용은 차감 부채로 치지 않는다(D-119) |
+| `BATCH_INACTIVITY_MAX_DEDUCTIONS_PER_RUN` | `1` | 배치 1회 실행에서 회원 1명당 최대 차감 횟수. 밀린 주기는 다음 실행이 이어받는다(D-119) |
+| `BATCH_INACTIVITY_STALE_RUN_TIMEOUT` | `30m` | 이 시간을 넘긴 `RUNNING` 실행 이력은 죽은 것으로 보고 정리한다(D-117) |
+
 ## 테스트 · 코드 포맷
 
 ```bash
