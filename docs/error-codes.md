@@ -76,9 +76,9 @@
 |---|---|---|---|
 | `ATTENDANCE_NOT_FOUND` | 404 | 대상 출석 기록 없음(삭제·수정 대상) | `AttendanceService` |
 | `ATTENDANCE_MEMBER_NOT_RESERVED` | 409 | 예약제/1:1 출석 체크 대상이 그 세션의 활성 예약자가 아님(D-127 "예약자 명단에 대해 체크") | `AttendanceService` |
-| `ATTENDANCE_CLASS_TYPE_MISMATCH` | 409 | 저녁반 전용 API를 `SESSION`/`LESSON` 세션에 호출했거나, 예약자 체크 API를 `EVENING` 세션에 호출함 | `AttendanceService` |
+| `ATTENDANCE_CLASS_TYPE_MISMATCH` | 409 | 저녁반 전용 API를 `SESSION`/`LESSON` 세션에 호출했거나, 예약자 체크 API를 `EVENING` 세션에 호출함 | `AttendanceService`(예약자 체크 API 오용), `EveningHalfDeductionPolicy.requireEveningSession`(저녁반 API 오용) |
 | `DUPLICATE_ATTENDANCE` | 409 | 같은 회원·같은 세션에 출석 기록이 이미 존재(회원×세션 유니크 위반) | `AttendanceService` |
-| `EVENING_ATTENDANCE_DEDUCTION_UNAVAILABLE` | 409 | 유효한 저녁반 회비도 없고 `SESSION_PASS` 잔여도 0.5 미만이라 저녁반 출석 추가를 거부(D-128·D-133) | `AttendanceService` |
+| `EVENING_ATTENDANCE_DEDUCTION_UNAVAILABLE` | 409 | 유효한 저녁반 회비도 없고 `SESSION_PASS` 잔여도 0.5 미만이라 저녁반 출석 추가를 거부(D-128·D-133) | `EveningHalfDeductionPolicy.selectCandidate`(차감 후보 자체가 없음), `AttendanceService`(후보는 있었으나 조건부 UPDATE 경쟁 패배) |
 | `NOTICE_NOT_FOUND` | 404 | 대상 공지 없음 | `NoticeService` |
 
 **폴백 규칙** — 위 표에 매핑되지 않은 예외는 상태값으로 코드를 추측하지 않고 다음으로 고정된다:
