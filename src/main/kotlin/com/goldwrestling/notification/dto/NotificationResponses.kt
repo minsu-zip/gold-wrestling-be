@@ -1,5 +1,6 @@
 package com.goldwrestling.notification.dto
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import com.goldwrestling.member.dto.PageResponse
 import com.goldwrestling.notification.Notification
 import com.goldwrestling.notification.NotificationType
@@ -16,6 +17,14 @@ import java.time.OffsetDateTime
  * `LAZY`이고, 표시에 필요한 정보(회원명·수업 종류·날짜·시각)는 이벤트 발생 시점에 이미 비정규화
  * 필드로 담겨 있다(D-097). 그래서 이 응답에는 `reservationId`·`classSessionId`도 넣지 않는다 —
  * FE가 알림에서 예약 상세로 이동하는 요구가 요구사항(NOTIF-02)에 없다.
+ *
+ * **[isRead]에 `@get:JsonProperty`가 붙는 이유**: Kotlin의 `is` 접두 Boolean 프로퍼티는 getter가
+ * `isRead()`로 생성되는데, Jackson은 이를 `isRead`로 직렬화하는 반면 springdoc은 자바 빈 규약대로
+ * 접두사를 떼어 `read`로 스키마를 만든다. 그대로 두면 **실제 응답(`isRead`)과 openapi.yaml 계약
+ * (`read`)이 어긋나** FE가 생성한 타입으로 읽으면 항상 `undefined`가 된다(PR #20 리뷰 Warning에서
+ * 실제 응답과 재생성된 스키마를 대조해 확인). getter에 이름을 고정해 둘을 일치시킨다.
+ * `@field:Schema`가 아니라 `@get:Schema`인 것도 같은 이유다 — 스키마가 getter에서 유도되므로
+ * 필드에 붙은 설명은 유실된다.
  */
 @Schema(description = "관리자 알림 단건 응답 — 예약/세션 상세로의 이동 링크(id)는 제공하지 않는다")
 data class NotificationResponse(
@@ -27,7 +36,9 @@ data class NotificationResponse(
     @field:Schema(description = "관련 수업 날짜 — 없으면 null") val classDate: LocalDate?,
     @field:Schema(description = "관련 수업 시작 시각 — 없으면 null") val startTime: LocalTime?,
     @field:Schema(description = "이벤트 발생 시각") val occurredAt: OffsetDateTime,
-    @field:Schema(description = "확인 여부") val isRead: Boolean,
+    @get:JsonProperty("isRead")
+    @get:Schema(description = "확인 여부")
+    val isRead: Boolean,
     @field:Schema(description = "확인(모두 읽음) 처리 시각 — 미확인이면 null") val readAt: OffsetDateTime?,
 ) {
     companion object {

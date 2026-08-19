@@ -2609,8 +2609,9 @@ components:
           - "null"
           format: date-time
           description: 확인(모두 읽음) 처리 시각 — 미확인이면 null
-        read:
+        isRead:
           type: boolean
+          description: 확인 여부
     PageResponseNotificationResponse:
       type: object
       description: 페이지네이션 응답

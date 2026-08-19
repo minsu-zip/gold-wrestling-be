@@ -286,6 +286,23 @@ class AdminNotificationControllerTest {
             .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
     }
 
+    @Test
+    fun `확인 여부 필드는 read가 아니라 isRead라는 이름으로 직렬화된다`() {
+        // Kotlin의 is 접두 Boolean은 getter가 isRead()라 springdoc이 자바 빈 규약대로 read로
+        // 스키마를 만든다. 실제 직렬화는 isRead라서, 이름을 고정하지 않으면 openapi.yaml 계약과
+        // 실제 응답이 어긋나 FE가 생성한 타입으로 읽으면 항상 undefined가 된다(PR #20 리뷰 Warning).
+        val admin = persistAdmin()
+        val token = adminAccessToken(admin)
+        val session = persistSession()
+        persistNotification(session, isRead = false)
+
+        mockMvc
+            .perform(get(BASE_PATH).header(HttpHeaders.AUTHORIZATION, "Bearer $token"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.notifications.content[0].isRead").value(false))
+            .andExpect(jsonPath("$.notifications.content[0].read").doesNotExist())
+    }
+
     // ── fixtures ──────────────────────────────────────────────────────────
 
     private fun songpaBranch(): Branch = branchRepository.findByName("송파점")!!
