@@ -50,6 +50,18 @@ import java.time.OffsetDateTime
  * UPDATE가 실제로 커밋돼야 [read-all 직후 재조회 테스트]가 stale 값 회귀를 실제로 검증할 수
  * 있다. 대신 [cleanUp]에서 이 클래스가 만든 데이터만 직접 지운다.
  *
+ * **그 대가로 이 클래스는 전역 상태에 의존한다.** `unreadCount`를 절대값으로 단언하고
+ * (`totalElements 3 unreadCount 2`), `markAllAsRead`는 `notification` 테이블 전체를 읽음
+ * 처리한다 — 알림에는 관리자·지점 스코프 컬럼이 없다(D-129, 관리자 1~2명이 공유하는 단일
+ * 스트림이라 의도된 설계다). 따라서 **알림 행을 커밋한 채 남기는 테스트가 하나라도 생기면
+ * 이 클래스가 깨진다.**
+ *
+ * 지금은 알림을 만드는 모든 테스트가 이 규약을 지킨다 — `AdminScheduleControllerTest`·
+ * `AdminReservationSearchTest`는 클래스 레벨 `@Transactional`로 롤백하고,
+ * `ClassSessionSuspensionTest`·`AdminReservationCancellationTest`는 `delete from notification`
+ * 으로 직접 지운다. **알림을 발생시키는 테스트를 새로 만들 때도 둘 중 하나를 반드시 지킨다.**
+ * (PR #20 리뷰 Info)
+ *
  * `Notification.memberName`은 [Notification] 엔티티의 비정규화 표시 필드일 뿐 `Member`로의 FK가
  * 아니므로, 알림 픽스처는 실제 `Member`를 만들지 않고 문자열만 채운다 — 회원 토큰 발급 테스트만
  * 예외적으로 실제 `Member`가 필요하다(토큰 검증 시 존재 확인).
@@ -225,19 +237,24 @@ class AdminNotificationControllerTest {
     }
 
     @Test
-    fun `회원 토큰으로 GET 호출 시 403과 ACCESS_DENIED를 반환한다`() {
-        val member = persistMember()
-        val memberToken = tokenService.issueTokenPair(PrincipalType.MEMBER, member.id!!).accessToken
+    fun `회원 토큰으로 목록을 조회하면 403과 ACCESS_DENIED를 반환한다`() {
+        val memberToken = memberAccessToken()
 
         mockMvc
             .perform(get(BASE_PATH).header(HttpHeaders.AUTHORIZATION, "Bearer $memberToken"))
             .andExpect(status().isForbidden)
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
             .andExpect(jsonPath("$.code").value("ACCESS_DENIED"))
+    }
+
+    @Test
+    fun `회원 토큰으로 모두 읽음을 호출하면 403과 ACCESS_DENIED를 반환한다`() {
+        val memberToken = memberAccessToken()
 
         mockMvc
             .perform(post("$BASE_PATH/read-all").header(HttpHeaders.AUTHORIZATION, "Bearer $memberToken"))
             .andExpect(status().isForbidden)
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
             .andExpect(jsonPath("$.code").value("ACCESS_DENIED"))
     }
 
@@ -304,6 +321,11 @@ class AdminNotificationControllerTest {
     }
 
     // ── fixtures ──────────────────────────────────────────────────────────
+
+    private fun memberAccessToken(): String {
+        val member = persistMember()
+        return tokenService.issueTokenPair(PrincipalType.MEMBER, member.id!!).accessToken
+    }
 
     private fun songpaBranch(): Branch = branchRepository.findByName("송파점")!!
 
