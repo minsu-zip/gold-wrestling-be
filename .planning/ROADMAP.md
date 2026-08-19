@@ -19,7 +19,7 @@
 - [x] **Phase 3: 이용권** - Pass 3종 등록, PassTransaction 이력, 수동 가감·기간 수정, 본인 조회 (completed 2026-08-03)
 - [x] **Phase 4: 시간표·예약** - ClassSchedule/ClassSession, 예약 생성·취소·변경 + 즉시 차감/복구, 동시성 보장, 관리자 예약 관리·휴강, Notification 스키마·알림 레코드 생성 (completed 2026-08-08)
 - [x] **Phase 5: 배치** - 2주 미사용 차감, 유효기간 만료 처리, 멱등 실행 (본 작업 9/9 + 갭 클로저 05-10~05-16 완료, 재검증 `passed` 4/4 — CR-03은 Phase 6으로 이월, 그동안 cron은 꺼 둔 채 배포) (completed 2026-08-16)
-- [ ] **Phase 6: 운영** - 출석 체크, 공지사항, 관리자 알림·활동 피드
+- [x] **Phase 6: 운영** - 출석 체크, 공지사항, 관리자 알림·활동 피드 (completed 2026-08-19)
 
 ## Phase Details
 
@@ -278,7 +278,7 @@ BATCH-01·02·04가 모두 뒤집혔고 회귀는 없다. 검증자가 SUMMARY �
 **청크 C — 알림·피드·마감 (wave 7~9)**
 - [x] 06-09-PLAN.md — 알림 목록 폴링 + 미확인 카운트 + 모두 읽음 (NOTIF-02)
 - [x] 06-10-PLAN.md — 활동 피드(기간·종류 필터, 읽음 무관) + openapi 재생성 (NOTIF-03)
-- [ ] 06-11-PLAN.md — phase 마감: cron 운영 켜기 절차(README, D-130) + 문서 정합 + 전체 회귀 + 로컬 실기동 확인 (전 요구사항)
+- [x] 06-11-PLAN.md — phase 마감: cron 운영 켜기 절차(README, D-130) + 문서 정합 + 전체 회귀 + 로컬 실기동 확인 (전 요구사항)
 
 **Note (cron)**: 이 phase가 CR-03을 코드로 닫지만 **`BATCH_INACTIVITY_SCHEDULER_ENABLED` 기본값은
 꺼짐을 유지한다**(D-130이 D-121의 fail-safe를 존치). 켜는 것은 06-11이 README에 남기는 운영 절차의
@@ -296,5 +296,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. 이용권 | 11/11 | Complete    | 2026-08-04 |
 | 4. 시간표·예약 | 15/15 | Complete   | 2026-08-08 |
 | 5. 배치 | 15/16 | In Progress (05-16 사용자 확인 대기) |  |
-| 6. 운영 | 10/11 | In Progress|  |
+| 6. 운영 | 11/11 | Complete   | 2026-08-19 |
 </content>
