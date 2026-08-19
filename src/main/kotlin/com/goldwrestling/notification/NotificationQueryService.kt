@@ -1,10 +1,14 @@
 package com.goldwrestling.notification
 
 import com.goldwrestling.member.dto.PageResponse
+import com.goldwrestling.notification.dto.ActivityFeedItemResponse
+import com.goldwrestling.notification.dto.ActivityFeedSearchCondition
 import com.goldwrestling.notification.dto.MarkAllReadResponse
 import com.goldwrestling.notification.dto.NotificationListResponse
 import com.goldwrestling.notification.dto.NotificationResponse
 import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
+import org.springframework.data.jpa.domain.Specification
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -61,5 +65,30 @@ class NotificationQueryService(
         val updatedCount = notificationRepository.markAllAsRead(OffsetDateTime.now(clock))
         val unreadCount = notificationRepository.countByIsReadFalse()
         return MarkAllReadResponse(updatedCount = updatedCount, unreadCount = unreadCount)
+    }
+
+    /**
+     * 활동 피드(NOTIF-03, D-129)를 조회한다 — `notification` 테이블의 다른 뷰다. 정렬은
+     * `occurredAt` 내림차순 + `id` 내림차순 고정(동률 발생 시각의 순서를 안정적으로 만든다,
+     * `NotificationRepository.findAllByOrderByOccurredAtDescIdDesc`와 동일 축).
+     *
+     * **`isRead` 조건을 절대 걸지 않는다** — 피드는 읽음 여부와 무관한 시간순 타임라인이다(D-129).
+     */
+    fun getActivityFeed(condition: ActivityFeedSearchCondition): PageResponse<ActivityFeedItemResponse> {
+        val specification =
+            Specification.allOf<Notification>(
+                listOfNotNull(
+                    NotificationSpecifications.occurredBetween(condition.from, condition.to),
+                    NotificationSpecifications.hasType(condition.type),
+                ),
+            )
+        val pageable =
+            PageRequest.of(
+                condition.page,
+                condition.size,
+                Sort.by(Sort.Direction.DESC, "occurredAt").and(Sort.by(Sort.Direction.DESC, "id")),
+            )
+        val page = notificationRepository.findAll(specification, pageable)
+        return PageResponse.from(page, ActivityFeedItemResponse::from)
     }
 }
