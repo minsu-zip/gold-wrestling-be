@@ -6,6 +6,7 @@ import com.goldwrestling.notification.dto.ActivityFeedSearchCondition
 import com.goldwrestling.notification.dto.MarkAllReadResponse
 import com.goldwrestling.notification.dto.NotificationListResponse
 import com.goldwrestling.notification.dto.NotificationResponse
+import com.goldwrestling.notification.dto.NotificationSearchCondition
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.data.jpa.domain.Specification
@@ -34,14 +35,10 @@ class NotificationQueryService(
      * 알림 목록을 조회한다. [unreadOnly]가 `true`면 미확인만, `false`면 전체를 최신순으로 반환하고,
      * 두 경우 모두 [NotificationListResponse.unreadCount]를 함께 채운다(D-129 "폴링 1회로 끝난다").
      */
-    fun getNotifications(
-        unreadOnly: Boolean,
-        page: Int,
-        size: Int,
-    ): NotificationListResponse {
-        val pageable = PageRequest.of(page, size)
+    fun getNotifications(condition: NotificationSearchCondition): NotificationListResponse {
+        val pageable = PageRequest.of(condition.page, condition.size)
         val notificationPage =
-            if (unreadOnly) {
+            if (condition.unreadOnly) {
                 notificationRepository.findAllByIsReadFalseOrderByOccurredAtDescIdDesc(pageable)
             } else {
                 notificationRepository.findAllByOrderByOccurredAtDescIdDesc(pageable)

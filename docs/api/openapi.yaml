@@ -1054,24 +1054,33 @@ paths:
       parameters:
       - name: unreadOnly
         in: query
+        description: 미확인 알림만 조회할지 여부
         required: false
         schema:
           type: boolean
           default: false
+          description: 미확인 알림만 조회할지 여부
       - name: page
         in: query
+        description: 페이지 번호(0부터 시작)
         required: false
         schema:
           type: integer
           format: int32
           default: 0
+          description: 페이지 번호(0부터 시작)
+          minimum: 0
       - name: size
         in: query
+        description: 페이지 크기(1~100)
         required: false
         schema:
           type: integer
           format: int32
           default: 20
+          description: 페이지 크기(1~100)
+          maximum: 100
+          minimum: 1
       responses:
         "200":
           description: OK

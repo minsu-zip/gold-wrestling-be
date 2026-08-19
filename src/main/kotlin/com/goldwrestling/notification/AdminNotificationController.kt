@@ -5,6 +5,7 @@ import com.goldwrestling.notification.dto.ActivityFeedItemResponse
 import com.goldwrestling.notification.dto.ActivityFeedSearchCondition
 import com.goldwrestling.notification.dto.MarkAllReadResponse
 import com.goldwrestling.notification.dto.NotificationListResponse
+import com.goldwrestling.notification.dto.NotificationSearchCondition
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
@@ -13,7 +14,6 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.ModelAttribute
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
 /**
@@ -45,10 +45,8 @@ class AdminNotificationController(
                 "카운트 호출이 필요 없다(D-129).",
     )
     fun list(
-        @RequestParam(defaultValue = "false") unreadOnly: Boolean,
-        @RequestParam(defaultValue = "0") page: Int,
-        @RequestParam(defaultValue = "20") size: Int,
-    ): NotificationListResponse = notificationQueryService.getNotifications(unreadOnly, page, size)
+        @ParameterObject @ModelAttribute @Valid condition: NotificationSearchCondition,
+    ): NotificationListResponse = notificationQueryService.getNotifications(condition)
 
     @PostMapping("/notifications/read-all")
     @Operation(
