@@ -276,7 +276,7 @@ BATCH-01·02·04가 모두 뒤집혔고 회귀는 없다. 검증자가 SUMMARY �
 
 **청크 C — 알림·피드·마감 (wave 7~9)**
 - [x] 06-09-PLAN.md — 알림 목록 폴링 + 미확인 카운트 + 모두 읽음 (NOTIF-02)
-- [ ] 06-10-PLAN.md — 활동 피드(기간·종류 필터, 읽음 무관) + openapi 재생성 (NOTIF-03)
+- [x] 06-10-PLAN.md — 활동 피드(기간·종류 필터, 읽음 무관) + openapi 재생성 (NOTIF-03)
 - [ ] 06-11-PLAN.md — phase 마감: cron 운영 켜기 절차(README, D-130) + 문서 정합 + 전체 회귀 + 로컬 실기동 확인 (전 요구사항)
 
 **Note (cron)**: 이 phase가 CR-03을 코드로 닫지만 **`BATCH_INACTIVITY_SCHEDULER_ENABLED` 기본값은
@@ -295,5 +295,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. 이용권 | 11/11 | Complete    | 2026-08-04 |
 | 4. 시간표·예약 | 15/15 | Complete   | 2026-08-08 |
 | 5. 배치 | 15/16 | In Progress (05-16 사용자 확인 대기) |  |
-| 6. 운영 | 8/11 | In Progress|  |
+| 6. 운영 | 10/11 | In Progress|  |
 </content>
