@@ -275,7 +275,7 @@ BATCH-01·02·04가 모두 뒤집혔고 회귀는 없다. 검증자가 SUMMARY �
 - [x] 06-08-PLAN.md — `AdminAttendanceController` 4종 + HTTP 계약 테스트 + 동시성 테스트(이중 차감 0건) + openapi 재생성 (ATTEND-01/02)
 
 **청크 C — 알림·피드·마감 (wave 7~9)**
-- [ ] 06-09-PLAN.md — 알림 목록 폴링 + 미확인 카운트 + 모두 읽음 (NOTIF-02)
+- [x] 06-09-PLAN.md — 알림 목록 폴링 + 미확인 카운트 + 모두 읽음 (NOTIF-02)
 - [ ] 06-10-PLAN.md — 활동 피드(기간·종류 필터, 읽음 무관) + openapi 재생성 (NOTIF-03)
 - [ ] 06-11-PLAN.md — phase 마감: cron 운영 켜기 절차(README, D-130) + 문서 정합 + 전체 회귀 + 로컬 실기동 확인 (전 요구사항)
 
