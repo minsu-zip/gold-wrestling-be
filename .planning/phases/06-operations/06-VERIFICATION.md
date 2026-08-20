@@ -1,7 +1,7 @@
 ---
 phase: 06-operations
 verified: 2026-08-19T23:47:02Z
-status: human_needed
+status: passed
 score: 5/5 success criteria verified (+ CR-03 이월 항목 verified)
 overrides_applied: 0
 ---
@@ -11,7 +11,7 @@ overrides_applied: 0
 **Phase Goal:** 관리자가 모든 수업의 출석을 체크하고 공지사항을 운영하며, 예약 관련 이벤트를
 알림·활동 피드로 실시간에 가깝게 확인할 수 있다.
 **Verified:** 2026-08-19T23:47:02Z
-**Status:** human_needed
+**Status:** passed (2026-08-20 갱신 — 최초 판정 `human_needed`)
 **재검증 여부:** 아니오 — 최초 검증 (이전 VERIFICATION.md 없음)
 
 이 리포트는 SUMMARY.md의 주장을 그대로 옮기지 않고, dev 브랜치(HEAD `2dc5030`, PR #18/#19/#20
@@ -180,6 +180,21 @@ task로 미룰지 결정한다.
 **Why human:** 코드 분석으로 결함의 존재와 영향 범위는 확인했으나(정상 경로는 안전), 수정 우선순위는
 제품 판단(관리자 콘솔이 잘못된 쿼리 파라미터를 보낼 가능성이 실제로 있는지)이 필요하다.
 
+**✅ 해소 (2026-08-20)** — 사용자 판단: 즉시 수정. quick task
+`.planning/quick/260820-cp1-api-page-size/`로 진행해 PR #22로 dev에 머지됐다.
+`NoticeSearchCondition`(`@Min(0)` / `@Min(1) @Max(100)`)을 신설해 두 컨트롤러가 공유하게 했고,
+회귀 테스트 6건과 openapi 재생성을 함께 넣었다. 실제 앱으로 전후를 확인했다:
+
+| 요청 | 수정 전 | 수정 후 |
+|---|---|---|
+| `?size=0` | 500 (관리자·회원 모두) | **400 VALIDATION_FAILED** |
+| `?page=-1` | 500 (관리자·회원 모두) | **400 VALIDATION_FAILED** |
+| `?size=100000` | 200 (전량 조회) | **400 VALIDATION_FAILED** |
+| `?size=20` | 200 | 200 (변화 없음) |
+
+전수 스캔 결과 공지 2곳이 유일한 예외였고(다른 6개 목록 API는 이미 조건 객체 + `@Min`/`@Max`),
+이 수정으로 프로젝트 전체가 같은 관례가 됐다. 전체 회귀 857건 0 failures.
+
 ## Gaps Summary
 
 **Blocking gap 없음.** 5개 Success Criteria(ATTEND-01/02, NOTICE-01/02, NOTIF-02/03에 대응)와 CR-03
@@ -192,9 +207,14 @@ diff로 직접 확인했다.
 가능하다)는 이 결함과 무관하게 달성됐으므로 `gaps_found`로 분류하지 않았지만, 사용자 판단을 위해
 `status: human_needed`로 표시하고 위 Human Verification 섹션 3에 결정 사항으로 남긴다.
 
-status가 `human_needed`인 이유는 D-01 처리 방향 결정과, CR-03 운영 배포 후 재확인 권장 사항 둘 다
-사람의 판단/후속 조치가 필요하기 때문이다 — 자동화 검사는 모두 통과했다(passed 조건은 human
-verification 섹션이 비어 있을 때만 유효하므로, 이 상태에서 `passed`를 선언하지 않는다).
+최초 판정이 `human_needed`였던 이유는 D-01 처리 방향 결정이 사람의 판단을 필요로 했기 때문이다.
+Human Verification 섹션의 1번(실기동 10항목)은 이미 완료·승인된 항목이고, 2번(CR-03 운영 데이터
+재확인)은 문서 자체가 "이번 phase의 완료를 막지는 않는다"고 명시한 배포 후 관찰 항목이다. 즉
+완료를 실제로 막고 있던 것은 3번 하나였다.
+
+**2026-08-20 `passed`로 갱신** — 3번이 PR #22 머지로 해소됐다(위 Human Verification 3 참조).
+남은 2번은 배포 후 관찰 항목으로 계속 열려 있으며, 이 phase의 완료 조건이 아니다.
+자동화 검사는 최초 검증 시점부터 전부 통과 상태였다.
 
 ---
 

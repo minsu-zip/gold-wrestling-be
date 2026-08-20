@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 06-11-PLAN.md — Phase 6(운영) 마감, 사용자 실기동 승인 완료
-last_updated: "2026-08-19T02:51:19.260Z"
+status: milestone_complete
+stopped_at: Milestone complete (Phase 06 was final phase)
+last_updated: 2026-08-20T00:38:40.329Z
 last_activity: 2026-08-19
 progress:
   total_phases: 6
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-30)
 
 **Core value:** 회원이 보는 잔여 횟수는 항상 실제 사용 가능 횟수와 일치한다 (즉시 차감/복구 + 전 이력 + 초과 예약 0건)
-**Current focus:** v1(M1~M6) 로드맵 전체 완료 — Phase 06(운영) 마감
+**Current focus:** Milestone complete
 
 ## Current Position
 
-Phase: 06 (operations) — COMPLETE
-Plan: 11 of 11
-Status: 전체 11개 플랜 완료. Task 3(로컬 실기동 확인 — 출석·차감·복구·공지·알림·피드 10항목)를
+Phase: 06
+Plan: Not started
+Status: Milestone complete
   사용자가 승인했다(항목 10 CR-03 배선은 코드·테스트로 실증한 '부분 확인'). v1(M1~M6) 로드맵 전체 마감.
-Last activity: 2026-08-19
+Last activity: 2026-08-20
 
 Progress: [██████████] 100%
 
@@ -37,7 +37,7 @@ Progress: [██████████] 100%
 
 **Velocity:**
 
-- Total plans completed: 29
+- Total plans completed: 40
 - Average duration: -
 - Total execution time: 0h
 
@@ -48,6 +48,7 @@ Progress: [██████████] 100%
 | 01 | 3 | - | - |
 | 02 | 15 | - | - |
 | 3 | 11 | - | - |
+| 06 | 11 | - | - |
 
 **Recent Trend:**
 
