@@ -3,6 +3,7 @@ package com.goldwrestling.notice
 import com.goldwrestling.admin.Admin
 import com.goldwrestling.admin.AdminRepository
 import com.goldwrestling.notice.dto.CreateNoticeRequest
+import com.goldwrestling.notice.dto.NoticeSearchCondition
 import com.goldwrestling.notice.dto.UpdateNoticeRequest
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -112,7 +113,7 @@ class NoticeServiceTest {
         val page = PageImpl(listOf(notice(id = NOTICE_ID)))
         given(noticeRepository.findAllByOrderByCreatedAtDescIdDesc(PageRequest.of(0, 20))).willReturn(page)
 
-        val result = service.getList(page = 0, size = 20)
+        val result = service.getList(NoticeSearchCondition(page = 0, size = 20))
 
         assertThat(result.content).hasSize(1)
         assertThat(result.content.first().id).isEqualTo(NOTICE_ID)

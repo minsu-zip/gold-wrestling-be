@@ -117,6 +117,50 @@ class MemberNoticeControllerTest {
             .andExpect(jsonPath("$.code").value("NOTICE_NOT_FOUND"))
     }
 
+    @Test
+    fun `size가 0이면 500이 아니라 400 VALIDATION_FAILED다`() {
+        // 검증 없이 PageRequest.of(page, 0)에 들어가면 IllegalArgumentException이 나고
+        // 포괄 핸들러가 이를 500으로 바꿔 버린다 — 잘못된 입력은 4xx여야 한다(conventions §8).
+        val member = persistMember()
+        val token = tokenService.issueTokenPair(PrincipalType.MEMBER, member.id!!).accessToken
+
+        mockMvc
+            .perform(
+                get(NOTICES_PATH)
+                    .param("size", "0")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token"),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+    }
+
+    @Test
+    fun `page가 음수면 500이 아니라 400 VALIDATION_FAILED다`() {
+        val member = persistMember()
+        val token = tokenService.issueTokenPair(PrincipalType.MEMBER, member.id!!).accessToken
+
+        mockMvc
+            .perform(
+                get(NOTICES_PATH)
+                    .param("page", "-1")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token"),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+    }
+
+    @Test
+    fun `size가 101이면 400 VALIDATION_FAILED다`() {
+        val member = persistMember()
+        val token = tokenService.issueTokenPair(PrincipalType.MEMBER, member.id!!).accessToken
+
+        mockMvc
+            .perform(
+                get(NOTICES_PATH)
+                    .param("size", "101")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token"),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────
 
     private fun getList(token: String): JsonNode {

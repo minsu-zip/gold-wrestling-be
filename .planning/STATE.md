@@ -211,6 +211,7 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260806-und | D-083 카카오 프로필(닉네임·프로필 이미지) 수집·저장 및 MyProfileResponse 노출 | 2026-08-06 | 7f363a9 | [260806-und-d-083-myprofileresponse](./quick/260806-und-d-083-myprofileresponse/) |
+| 260820-cp1 | D-01 공지 목록 2경로(admin·member) page/size 검증 추가 — 500→400, NoticeSearchCondition 신설 | 2026-08-20 | 46cd949 | [260820-cp1-api-page-size](./quick/260820-cp1-api-page-size/) |
 
 ## Deferred Items
 
