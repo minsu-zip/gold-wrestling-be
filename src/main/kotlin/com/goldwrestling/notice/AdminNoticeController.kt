@@ -4,21 +4,23 @@ import com.goldwrestling.auth.AuthenticatedPrincipal
 import com.goldwrestling.member.dto.PageResponse
 import com.goldwrestling.notice.dto.CreateNoticeRequest
 import com.goldwrestling.notice.dto.NoticeDetailResponse
+import com.goldwrestling.notice.dto.NoticeSearchCondition
 import com.goldwrestling.notice.dto.NoticeSummaryResponse
 import com.goldwrestling.notice.dto.UpdateNoticeRequest
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import org.springdoc.core.annotations.ParameterObject
 import org.springframework.http.HttpStatus
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.ModelAttribute
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
@@ -39,9 +41,8 @@ class AdminNoticeController(
     @GetMapping
     @Operation(summary = "공지 목록 조회 (최신순 페이지)")
     fun getList(
-        @RequestParam(defaultValue = "0") page: Int,
-        @RequestParam(defaultValue = "20") size: Int,
-    ): PageResponse<NoticeSummaryResponse> = noticeService.getList(page, size)
+        @ParameterObject @ModelAttribute @Valid condition: NoticeSearchCondition,
+    ): PageResponse<NoticeSummaryResponse> = noticeService.getList(condition)
 
     @GetMapping("/{noticeId}")
     @Operation(summary = "공지 상세 조회")

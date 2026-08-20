@@ -4,6 +4,7 @@ import com.goldwrestling.admin.AdminRepository
 import com.goldwrestling.member.dto.PageResponse
 import com.goldwrestling.notice.dto.CreateNoticeRequest
 import com.goldwrestling.notice.dto.NoticeDetailResponse
+import com.goldwrestling.notice.dto.NoticeSearchCondition
 import com.goldwrestling.notice.dto.NoticeSummaryResponse
 import com.goldwrestling.notice.dto.UpdateNoticeRequest
 import org.springframework.data.domain.PageRequest
@@ -24,12 +25,11 @@ class NoticeService(
     private val adminRepository: AdminRepository,
     private val clock: Clock,
 ) {
-    fun getList(
-        page: Int,
-        size: Int,
-    ): PageResponse<NoticeSummaryResponse> {
+    fun getList(condition: NoticeSearchCondition): PageResponse<NoticeSummaryResponse> {
         val result =
-            noticeRepository.findAllByOrderByCreatedAtDescIdDesc(PageRequest.of(page, size))
+            noticeRepository.findAllByOrderByCreatedAtDescIdDesc(
+                PageRequest.of(condition.page, condition.size),
+            )
         return PageResponse.from(result, NoticeSummaryResponse::from)
     }
 
