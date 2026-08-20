@@ -16,16 +16,16 @@
 
 ### 인증·회원 (M2) — AUTH / MEMBER
 
-- [ ] **AUTH-01**: 회원이 카카오 OAuth로 가입·로그인할 수 있다 (가입 직후 상태 `PENDING`) — 카카오는 인증 수단으로만 사용, 기본 제공 정보만 수신 (policies §5.1)
-- [ ] **AUTH-02**: 로그인 시 JWT access/refresh 토큰이 발급되고, refresh로 access를 갱신할 수 있다
-- [ ] **AUTH-03**: 관리자가 ID/PW로 로그인해 관리자 기능에 접근할 수 있다 — 카카오 연동 없음, 회원과 동일한 JWT 체계, 계정은 시드 데이터로 생성 (D-026)
-- [ ] **AUTH-04**: 역할(MEMBER/ADMIN)·상태 기반 인가 — `PENDING` 회원은 승인 대기 정보 외 기능 접근 불가
-- [ ] **AUTH-05**: 최초 카카오 로그인 후 온보딩으로 실명·전화번호를 등록할 수 있다 (필수, 전화번호 형식 검증) — 온보딩 완료 전에는 승인 대기 정보 외 기능 접근 불가 (policies §5.1)
-- [ ] **AUTH-06**: 온보딩 미완료 회원이 재로그인하면 온보딩 대상으로 식별된다
-- [ ] **MEMBER-01**: 관리자가 가입을 승인/거절할 수 있다 — 승인 목록에는 온보딩 완료된 `PENDING` 회원만 노출 (승인 시 `ACTIVE` 전환)
-- [ ] **MEMBER-02**: 관리자가 회원 목록·상세를 조회하고 이름·전화번호로 검색할 수 있다
-- [ ] **MEMBER-03**: 관리자가 회원 상태를 변경할 수 있다 (`ACTIVE`/`ON_LEAVE`/`INACTIVE`)
-- [ ] **MEMBER-04**: 회원이 본인 프로필(이름·전화번호)을 조회할 수 있다 — 수정은 MVP에서 관리자만 (셀프 수정은 v2 PROF-01)
+- [x] **AUTH-01**: 회원이 카카오 OAuth로 가입·로그인할 수 있다 (가입 직후 상태 `PENDING`) — 카카오는 인증 수단으로만 사용, 기본 제공 정보만 수신 (policies §5.1)
+- [x] **AUTH-02**: 로그인 시 JWT access/refresh 토큰이 발급되고, refresh로 access를 갱신할 수 있다
+- [x] **AUTH-03**: 관리자가 ID/PW로 로그인해 관리자 기능에 접근할 수 있다 — 카카오 연동 없음, 회원과 동일한 JWT 체계, 계정은 시드 데이터로 생성 (D-026)
+- [x] **AUTH-04**: 역할(MEMBER/ADMIN)·상태 기반 인가 — `PENDING` 회원은 승인 대기 정보 외 기능 접근 불가
+- [x] **AUTH-05**: 최초 카카오 로그인 후 온보딩으로 실명·전화번호를 등록할 수 있다 (필수, 전화번호 형식 검증) — 온보딩 완료 전에는 승인 대기 정보 외 기능 접근 불가 (policies §5.1)
+- [x] **AUTH-06**: 온보딩 미완료 회원이 재로그인하면 온보딩 대상으로 식별된다
+- [x] **MEMBER-01**: 관리자가 가입을 승인/거절할 수 있다 — 승인 목록에는 온보딩 완료된 `PENDING` 회원만 노출 (승인 시 `ACTIVE` 전환)
+- [x] **MEMBER-02**: 관리자가 회원 목록·상세를 조회하고 이름·전화번호로 검색할 수 있다
+- [x] **MEMBER-03**: 관리자가 회원 상태를 변경할 수 있다 (`ACTIVE`/`ON_LEAVE`/`INACTIVE`)
+- [x] **MEMBER-04**: 회원이 본인 프로필(이름·전화번호)을 조회할 수 있다 — 수정은 MVP에서 관리자만 (셀프 수정은 v2 PROF-01)
 
 ### 이용권 (M3) — PASS
 
@@ -55,7 +55,7 @@
 
 ### 배치 (M5) — BATCH
 
-- [x] **BATCH-01**: `SESSION_PASS` 2주 미사용 시 1회 자동 차감, 이후 2주마다 반복(`INACTIVITY`) — 기준일: 마지막 출석일 / 마지막 취소되지 않은 예약의 수업일 / `ON_LEAVE`→`ACTIVE` 복귀일 / `SESSION_PASS` 등록일(`created_at`) / 마지막 양(+) `ADMIN_ADJUST` 일자 중 **가장 최근 날짜**, 판정은 회원 단위 (D-027, D-105) — 정책 시행일 하한·1회 실행 상한으로 소급 차감을 닫았다(D-119, 05-14). **단, 출석일 후보는 Phase 6에서 채운다(CR-03, 범위 밖 — 그 사이 운영 배포는 cron을 꺼 둔 채 한다, D-116)**
+- [x] **BATCH-01**: `SESSION_PASS` 2주 미사용 시 1회 자동 차감, 이후 2주마다 반복(`INACTIVITY`) — 기준일: 마지막 출석일 / 마지막 취소되지 않은 예약의 수업일 / `ON_LEAVE`→`ACTIVE` 복귀일 / `SESSION_PASS` 등록일(`created_at`) / 마지막 양(+) `ADMIN_ADJUST` 일자 중 **가장 최근 날짜**, 판정은 회원 단위 (D-027, D-105) — 정책 시행일 하한·1회 실행 상한으로 소급 차감을 닫았다(D-119, 05-14). 출석일 후보는 **Phase 6 `06-03`에서 채워 기준일 5종이 완결됐다(CR-03 마감, D-130)** — `InactivityBatchRunner`가 `AttendanceRepository.findLastAttendedClassDates`로 마지막 `ATTENDED` 수업일을 실제 조회한다. cron 킬 스위치는 D-121대로 기본 꺼짐을 유지하며, 켜는 절차는 README에 있다
 - [x] **BATCH-02**: 차감 예외가 지켜진다 — `ON_LEAVE` 기간, 잔여 0, 유효기간 만료 이용권은 차감하지 않음 — 휴회에서 벗어나는 모든 전이에서 복귀 시각을 기록해 우회 경로의 소급 차감도 닫았다(CR-04, 05-10)
 - [x] **BATCH-03**: 유효기간(등록일+1년) 만료 이용권이 사용 불가 처리된다 — **별도 배치 구현물 없이** 기존 메커니즘(D-064 조회 시점 `displayStatus` 계산 + Phase 4 예약 경로의 수업날 기준 거부)으로 충족하고, Phase 5는 이를 **검증 테스트로 실증**한다 (D-107)
 - [x] **BATCH-04**: 배치는 멱등하다 — 같은 날 중복 실행돼도 이중 차감 0건 (매일 새벽 실행) — `RUNNING` 부분 유니크 인덱스 + 409 거부로 동시 실행 이중 차감을 닫았다(D-117·D-118, 05-11~05-13·05-15)
@@ -106,16 +106,16 @@
 | FOUND-01 | Phase 1 | Complete |
 | FOUND-02 | Phase 1 | Complete |
 | FOUND-03 | Phase 1 | Complete |
-| AUTH-01 | Phase 2 | Pending |
-| AUTH-02 | Phase 2 | Pending |
-| AUTH-03 | Phase 2 | Pending |
-| AUTH-04 | Phase 2 | Pending |
-| AUTH-05 | Phase 2 | Pending |
-| AUTH-06 | Phase 2 | Pending |
-| MEMBER-01 | Phase 2 | Pending |
-| MEMBER-02 | Phase 2 | Pending |
-| MEMBER-03 | Phase 2 | Pending |
-| MEMBER-04 | Phase 2 | Pending |
+| AUTH-01 | Phase 2 | Complete |
+| AUTH-02 | Phase 2 | Complete |
+| AUTH-03 | Phase 2 | Complete |
+| AUTH-04 | Phase 2 | Complete |
+| AUTH-05 | Phase 2 | Complete |
+| AUTH-06 | Phase 2 | Complete |
+| MEMBER-01 | Phase 2 | Complete |
+| MEMBER-02 | Phase 2 | Complete |
+| MEMBER-03 | Phase 2 | Complete |
+| MEMBER-04 | Phase 2 | Complete |
 | PASS-01 | Phase 3 | Complete |
 | PASS-02 | Phase 3 | Complete |
 | PASS-03 | Phase 3 | Complete |
@@ -137,7 +137,7 @@
 | RESV-08 | Phase 4 | Complete |
 | RESV-09 | Phase 4 | Complete |
 | NOTIF-01 | Phase 4 | Complete |
-| BATCH-01 | Phase 5 | Complete (CR-03 출석일 후보는 Phase 6에서 채운다 — 범위 밖, 그 사이 cron 비활성 배포) |
+| BATCH-01 | Phase 5 | Complete (CR-03 출석일 후보는 Phase 6 `06-03`에서 채워 기준일 5종 완결 — cron 기본 꺼짐 유지, 켜는 절차는 README/D-130) |
 | BATCH-02 | Phase 5 | Complete |
 | BATCH-03 | Phase 5 | Complete |
 | BATCH-04 | Phase 5 | Complete |
