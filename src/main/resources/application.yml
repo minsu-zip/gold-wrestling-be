@@ -1,0 +1,116 @@
+spring:
+  application:
+    name: gold-wrestling-be
+
+  mvc:
+    # 우리 GlobalExceptionHandler(ResponseEntityExceptionHandler 상속)가 있는 동안엔 자동 등록되는
+    # ProblemDetailsExceptionHandler가 물러나므로 실제 응답은 우리 클래스가 전담한다. 이 키는 우리 핸들러가
+    # 빠졌을 때도 내장 예외가 ProblemDetail로 나가게 하는 2차 방어선이다 (common/error/GlobalExceptionHandler.kt).
+    problemdetails:
+      enabled: true
+
+  # 로컬 개발용 .env 를 properties 로 읽어들인다(파일이 없으면 무시).
+  # 배포 환경에서는 .env 없이 OS 환경변수로 동일한 키를 주입한다.
+  config:
+    import: optional:file:.env[.properties]
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:gold_wrestling}
+    username: ${DB_USERNAME:gold}
+    password: ${DB_PASSWORD:}
+    hikari:
+      pool-name: gold-wrestling-pool
+
+  jpa:
+    # 스키마는 Flyway 가 유일한 주체. Hibernate 는 매핑 검증만 한다.
+    hibernate:
+      ddl-auto: validate
+    # 뷰 렌더링 시점까지 커넥션·트랜잭션을 붙잡지 않도록 명시적으로 끈다.
+    open-in-view: false
+    properties:
+      hibernate:
+        # timestamp 를 JDBC 로 주고받을 때 사용할 시간대
+        jdbc.time_zone: ${TZ:Asia/Seoul}
+        format_sql: true
+        # N+1 을 조용히 넘기지 않도록 컬렉션 페치 배치 사이즈 지정
+        default_batch_fetch_size: 100
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # 빈 DB 에서 시작하므로 baseline 불필요. 히스토리 불일치는 즉시 실패시킨다.
+    baseline-on-migrate: false
+    validate-on-migrate: true
+
+  jackson:
+    time-zone: ${TZ:Asia/Seoul}
+
+server:
+  port: ${SERVER_PORT:8080}
+  # 에러 응답은 전역 예외 핸들러가 담당한다. 기본 에러 페이지에 내부 정보를 흘리지 않는다.
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+
+logging:
+  level:
+    org.hibernate.orm.jdbc.bind: info
+
+goldwrestling:
+  batch:
+    # 2주 미사용 차감 cron(매일 04:00 Asia/Seoul)의 킬 스위치 (decisions.md D-116, D-121).
+    # 이 배치는 사람 개입 없이 회원 잔여를 깎는 유일한 경로라 즉시 멈출 수단이 필요하다.
+    # false 로 두면 InactivityBatchScheduler 빈 자체가 등록되지 않는다 —
+    # 관리자 수동 실행 API(POST /api/admin/batch/inactivity-runs)는 이 값과 무관하게 계속 동작한다.
+    #
+    # 기본값이 false 인 것은 의도다(fail-safe, D-121). 환경변수를 빠뜨리면 배치가 "돌지 않는" 쪽으로
+    # 안전하게 실패한다 — 켜진 채로 실패하면 CR-03(출석일 후보 부재)이 열려 있는 동안 저녁반 전용
+    # 회원의 잔여가 2주마다 부당하게 깎인다. Phase 6에서 출석 기록이 채워지면 그때
+    # BATCH_INACTIVITY_SCHEDULER_ENABLED=true 로 켠다.
+    inactivity-scheduler-enabled: ${BATCH_INACTIVITY_SCHEDULER_ENABLED:false}
+    # 위 킬 스위치 키는 @ConditionalOnProperty 가 원시 이름으로 읽으므로 아래 블록으로 옮기지 않는다 (D-116).
+    inactivity:
+      # 정책 시행일 하한 — 이 날짜 이전의 미사용은 차감 부채로 치지 않는다 (D-119, 소급 차감 방지)
+      policy-effective-date: ${BATCH_INACTIVITY_POLICY_EFFECTIVE_DATE:2026-09-01}
+      # 배치 1회 실행에서 회원 1명당 최대 차감 횟수 — 사고 피해 상한 (D-119)
+      max-deductions-per-run: ${BATCH_INACTIVITY_MAX_DEDUCTIONS_PER_RUN:1}
+      # 이 시간을 넘긴 RUNNING 행은 죽은 실행으로 보고 FAILED(STALE)로 정리한다 (D-117·D-118)
+      stale-run-timeout: ${BATCH_INACTIVITY_STALE_RUN_TIMEOUT:30m}
+  cors:
+    # FE dev 서버는 5180 / preview 5181 고정 (decisions.md D-012)
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5180,http://localhost:5181}
+  jwt:
+    # 자체 JWT(HS256 대칭키) 서명 시크릿 — access 30분 / refresh 14일 정책 (decisions.md D-033)
+    secret: ${JWT_SECRET:}
+    access-token-expiry-minutes: ${JWT_ACCESS_TOKEN_EXPIRY_MINUTES:30}
+    refresh-token-expiry-days: ${JWT_REFRESH_TOKEN_EXPIRY_DAYS:14}
+  kakao:
+    # 카카오 인가코드 → 토큰 교환·사용자 조회 (decisions.md D-032)
+    rest-api-key: ${KAKAO_REST_API_KEY:}
+    client-secret: ${KAKAO_CLIENT_SECRET:}
+    redirect-uri: ${KAKAO_REDIRECT_URI:}
+  # 신규 회원(카카오 가입) 자동 배정 지점 (decisions.md D-047)
+  default-branch-name: ${DEFAULT_BRANCH_NAME:송파점}
+  admin-seed:
+    # 첫 관리자 계정 시드. 비워 두면 기동 시 시드를 건너뛴다 (decisions.md D-038)
+    login-id: ${ADMIN_SEED_LOGIN_ID:}
+    password: ${ADMIN_SEED_PASSWORD:}
+    name: ${ADMIN_SEED_NAME:관리자}

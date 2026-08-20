@@ -1,0 +1,26 @@
+# --- 시크릿 (절대 커밋 금지) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+credentials*.json
+secrets/
+
+# --- OS / IDE ---
+.DS_Store
+.idea/
+*.iml
+.vscode/
+
+# --- Build ---
+build/
+!src/**/build/
+.gradle/
+.kotlin/
+out/
+
+# --- Gradle wrapper (jar는 커밋 대상) ---
+!gradle/wrapper/gradle-wrapper.jar

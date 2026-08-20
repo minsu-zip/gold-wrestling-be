@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:18.4-alpine
+    container_name: gold-wrestling-postgres
+    restart: unless-stopped
+    environment:
+      # 값은 .env 에서 주입된다 (docker compose 가 프로젝트 루트 .env 를 자동으로 읽는다)
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      TZ: Asia/Seoul
+      PGTZ: Asia/Seoul
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      # Postgres 18+ 이미지는 데이터 디렉터리를 메이저 버전별 하위 폴더로 관리한다.
+      # /var/lib/postgresql/data 에 마운트하면 기동 자체가 실패하므로 /var/lib/postgresql 에 마운트한다.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:
