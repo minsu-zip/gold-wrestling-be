@@ -1434,3 +1434,72 @@
 - 기각 대안: 알림 전용 페이지 + 피드 페이지 분리(같은 데이터를 두 화면에서 보여 혼란), 팝오버 열면
   자동 읽음(뱃지 무의미), 뱃지용 폴링과 팝오버용 조회를 별도 쿼리로(30초당 2회), 공지 마크다운
   렌더(새 의존성 + 계약이 원문 텍스트라 명시), PENDING 회원에게 공지 비노출(D-134 취지 위반).
+
+## D-141. FE M6 접근성 게이트 이원화: 공통 컴포넌트·레이아웃 셸 스토리만 axe `'error'`, 페이지는 `'todo'` + 심각도 분류
+
+- 2026-08-28 / Storybook a11y(`parameters.a11y.test`)를 **`src/components/common/` 8개 + `src/components/layout/`
+  셸 3개(AdminShell·AuthShell·MemberShell) 스토리 meta에서 `'error'`**로 승격해 axe 위반이 `pnpm test:stories`
+  실패가 되게 한다. 페이지·feature 스토리는 전역 `'todo'`(보고만)를 유지하되 **위반 리포트를 심각도로 분류**한다 —
+  키보드 도달 불가·폼 라벨 누락·이름 없는 인터랙티브 요소·다이얼로그 접근성 이름 누락은 M6에서 수정, 경미한
+  대비(메타 텍스트 AA 미달 등)는 백로그. 수동 점검은 **axe가 못 잡는 포커스 순서·포커스 트랩·닫힘 후 복귀만**,
+  핵심 플로우(회원 로그인→예약→취소, 관리자 로그인→보드→명단 패널→출석) 한정. **[Phase 6 discuss 확정]**
+- 이유: 공통 컴포넌트·셸은 모든 화면이 통과하는 경로라 여기서 막으면 페이지 위반의 대부분이 원천에서 사라진다.
+  페이지 498개 스토리를 한 번에 `'error'`로 올리면 대비 같은 경미 위반으로 게이트가 막혀 출시선이 밀린다 —
+  분류해 "지금 고칠 것"과 "미룰 것"을 가른다. 수동 점검을 핵심 플로우로 한정하는 이유는 axe로 못 잡는 영역만
+  사람이 보는 게 비용 대비 효과가 크기 때문이다.
+- 기각 대안: 전 스토리 `'error'`(경미 위반으로 게이트 마비), 전부 `'todo'` 유지(게이트 없음 — M6 목표 미달),
+  `components/common`만 승격하고 셸 제외(내비게이션이 접근성 핵심 경로인데 강제에서 빠짐).
+
+## D-142. FE M6 반응형 증빙: Playwright 360/768/1280 순회 — 스크린샷 아티팩트 + 구조 단언, 픽셀 기준선 없음, 불일치 방치 금지
+
+- 2026-08-28 / 반응형 전수 점검(QA-01)의 증빙은 **Playwright 전용 스펙**이 핵심 화면 × **360 / 768 / 1280**을
+  `setViewportSize`로 순회하며 (a) `page.screenshot()` 아티팩트를 리포트에 첨부하고 (b) **구조 단언**으로 판정한다 —
+  design-system §반응형 표 4행(내비 하단 탭↔헤더/사이드바 640, 목록 카드형 행↔`<table>` 640, 상세 편집·명단
+  패널 하단 Sheet↔Dialog/우측 Sheet 640, 주간 시간표 2종 리스트↔`<table>` 1024). **`toHaveScreenshot` 픽셀
+  기준선은 쓰지 않는다.** 768 태블릿 구간(내비는 데스크탑, 시간표는 리스트)은 명시 대상. **표와 어긋난 화면은
+  화면 수정이 기본, 화면이 옳으면 표를 고치고 여기 기록** — 불일치를 남긴 채 페이즈를 닫지 않는다. **[Phase 6 discuss 확정]**
+- 이유: 픽셀 기준선은 macOS(로컬)와 Linux(CI)의 폰트 렌더링 차이로 플랫폼별 스냅샷을 이중 관리해야 하고
+  D-143의 CI 게이트를 흔든다. 표와의 대조는 "어느 컴포넌트가 보이는가"라는 구조 사실이므로 구조 단언이 정확히
+  그것을 검증하고, 스크린샷은 사람이 보는 증빙으로 남기면 된다. 360은 Storybook(390)·iPhone 14(390)보다
+  좁은 실기기 하한(M5 리서치 항목과 동일)이다.
+- 기각 대안: `toHaveScreenshot` 픽셀 회귀(플랫폼별 기준선·폰트 플레이키), Storybook Mobile 스토리 전수만으로
+  증빙(뷰포트 390 하나·768 구간 미검증), 수동 체크리스트만(재현 불가·회귀 못 잡음), 새 Playwright 프로젝트
+  추가(스펙 전체가 3배로 늘어남 — 전용 스펙 안 순회가 싸다).
+
+## D-143. FE 테스트 CI는 M6, 배포 CI는 M7: lint/typecheck/unit/storybook + E2E 별도 job, main 필수 status check, E2E는 MSW 유지, 계약 밖 검출은 MSW `'error'`(Vitest·Storybook)
+
+- 2026-08-28 / `.github/workflows/`에 **테스트 CI 워크플로**를 M6에 추가한다 — PR + `dev`/`main` push 트리거,
+  **Job A** `lint`·`format:check`·`typecheck`·`test:unit`·`test:stories`, **Job B(별도)** `test:e2e` 두 프로젝트
+  (chromium + webkit, MSW 모드). `pnpm/action-setup` + `setup-node cache: 'pnpm'`(D-006 후속 메모 이행).
+  두 job을 **`main` 브랜치 보호의 required status check로 등록**(레포 설정 — 사용자가 직접). **E2E는 MSW 유지**,
+  실 BE 스모크와 **배포 워크플로(S3+CloudFront)는 M7** — D-006의 "GitHub Actions 워크플로우 작성 시(M7)"는
+  배포 CI를 가리키는 것으로 좁힌다. 계약 밖 호출 검출은 **MSW `onUnhandledRequest: 'error'`** — Vitest는
+  이미 적용, **Storybook 워커는 `addonMsw(setup)`으로 기본 핸들러 + `'error'` 주입**(preview의 죽은
+  `parameters.msw` 설정 해소), **E2E 워커는 `'bypass'` 유지**(`page.route` 스텁이 MSW에는 미처리 요청).
+  실행되지 않은 경로는 잡지 못하므로 성공 기준 4 증빙은 M5의 api 호출 경로 ↔ openapi.yaml 대조 표를
+  페이즈 말에 1회 재실행한다. **[Phase 6 discuss 확정]**
+- 이유: "출시선"은 로컬에서 초록인 것이 아니라 머지가 막히는 것이다 — status check 없이는 게이트가 아니다.
+  E2E를 CI에 넣지 않으면 QA-02가 규약으로만 남는다. 카카오 로그인은 실 환경 자동화가 불가능하므로 MSW가
+  구조적으로 옳고, 실 BE 스모크는 배포 환경이 생기는 M7에 붙이는 게 맞다. MSW `'error'`는 "계약 밖 엔드포인트
+  0건(코드에도 목에도)" 불변식과 결합될 때 계약 밖 호출을 즉시 드러내는 가장 싼 장치다.
+- 기각 대안: CI 전체를 M7로(M6 동안 게이트 부재), E2E 로컬 전용(게이트 아님), 실 BE 스모크 M6 포함(배포 환경
+  없음·카카오 자동화 불가), E2E 워커도 `'error'`(page.route 스텁 전부 파괴), 계약 밖 검출을 grep 스크립트로만
+  (실행 시점 검출 없음 — 대조 표는 보조 증빙으로만 유지).
+
+## D-144. FE M6 이월 포함 기준 "게이트를 흔드는 것 + 사용자에게 보이는 것": 플레이키 스토리·관리자 착지 `/admin`·preview.tsx·IN-02/03/05 포함, 변경 모드 다른 주는 BE-REQ-006, searchParams 승격은 백로그
+
+- 2026-08-28 / M3~M5 이월 항목 중 **포함:** (a) `ReservationsPage.stories > ScheduleForbidden` 콜드런 플레이키
+  수정(CI 게이트 필수), (b) **관리자 로그인 착지 `/admin/members` → `/admin`(보드)** + E2E 기대 갱신(D-137의
+  "`/admin` = 보드" 후속), (c) `.storybook/preview.tsx` MSW setup 교체(D-143 게이트 관련), (d) 05-REVIEW
+  **IN-02·IN-03·IN-05를 한 태스크로**(E2E 스텁 픽스처 — IN-03 계약 위반 형태, IN-02 뱃지≠서버 진실, IN-05는
+  같은 파일). **BE 요청으로 전환:** 대리 변경 모드에서 다른 주로 이동 시 대상 종류를 몰라 `TYPE_MISMATCH`로
+  오분류되는 문제는 FE에 `UNKNOWN_TARGET` 사유를 추가하지 않고 **BE-REQ-006 `GET /api/admin/reservations/
+  {reservationId}`**로 요청, 현 동작 유지. **백로그 명시 이관:** `lib/searchParams.ts` 승격. **제외(이미 해소):**
+  Vitest 브라우저 포트 충돌(`VITEST_BROWSER_PORT`), 04-REVIEW Warning(전부 fixed). **[Phase 6 discuss 확정]**
+- 이유: 마감 페이즈는 "남은 것 전부"가 아니라 출시선 기준으로 고른다. 플레이키는 CI를 붉게 만들고, 착지 화면·
+  뱃지 숫자는 관리자가 매일 보는 것이며, 계약 위반 픽스처는 "계약 밖 0건" 불변식의 테스트 쪽 구멍이다.
+  변경 모드 사유 오분류는 근본 원인이 단건 조회 계약 부재라 FE 우회(`UNKNOWN_TARGET`)는 문구만 바꾸고 문제를
+  영구화한다 — BE-CHANGE-REQUESTS의 목적("우회 코드가 영구화되지 않게")대로 요청으로 남긴다. searchParams
+  승격은 내부 구조 정리라 두 기준 어느 쪽도 아니다.
+- 기각 대안: 이월 전부 포함(마감 페이즈 비대화), `UNKNOWN_TARGET` FE 사유 추가(우회 영구화), IN-05 제외
+  (같은 파일을 두 번 여는 비용이 더 큼), 착지 변경 보류(M5 D-01과 어긋난 채 출시).
