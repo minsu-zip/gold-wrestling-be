@@ -1493,8 +1493,9 @@
   "`/admin` = 보드" 후속), (c) `.storybook/preview.tsx` MSW setup 교체(D-143 게이트 관련), (d) 05-REVIEW
   **IN-02·IN-03·IN-05를 한 태스크로**(E2E 스텁 픽스처 — IN-03 계약 위반 형태, IN-02 뱃지≠서버 진실, IN-05는
   같은 파일). **BE 요청으로 전환:** 대리 변경 모드에서 다른 주로 이동 시 대상 종류를 몰라 `TYPE_MISMATCH`로
-  오분류되는 문제는 FE에 `UNKNOWN_TARGET` 사유를 추가하지 않고 **BE-REQ-006 `GET /api/admin/reservations/
-  {reservationId}`**로 요청, 현 동작 유지. **백로그 명시 이관:** `lib/searchParams.ts` 승격. **제외(이미 해소):**
+  오분류되는 문제는 FE에 `UNKNOWN_TARGET` 사유를 추가하지 않고 "BE에 필요한 변경"(FE
+  `.planning/BE-CHANGE-REQUESTS.md`의 **BE-REQ-006** — `GET /api/admin/reservations/{reservationId}`)으로
+  요청, 현 동작 유지. **백로그 명시 이관:** `lib/searchParams.ts` 승격. **제외(이미 해소):**
   Vitest 브라우저 포트 충돌(`VITEST_BROWSER_PORT`), 04-REVIEW Warning(전부 fixed). **[Phase 6 discuss 확정]**
 - 이유: 마감 페이즈는 "남은 것 전부"가 아니라 출시선 기준으로 고른다. 플레이키는 CI를 붉게 만들고, 착지 화면·
   뱃지 숫자는 관리자가 매일 보는 것이며, 계약 위반 픽스처는 "계약 밖 0건" 불변식의 테스트 쪽 구멍이다.
