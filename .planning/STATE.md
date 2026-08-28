@@ -5,7 +5,7 @@ milestone_name: milestone
 status: milestone_complete
 stopped_at: Milestone complete (Phase 06 was final phase)
 last_updated: 2026-08-20T00:38:40.329Z
-last_activity: 2026-08-19
+last_activity: 2026-08-28
 progress:
   total_phases: 6
   completed_phases: 6
@@ -29,7 +29,7 @@ Phase: 06
 Plan: Not started
 Status: Milestone complete
   사용자가 승인했다(항목 10 CR-03 배선은 코드·테스트로 실증한 '부분 확인'). v1(M1~M6) 로드맵 전체 마감.
-Last activity: 2026-08-20
+Last activity: 2026-08-28 - Completed quick task 260828-g4o: 이슈 #12(WR-02) 휴강 캐스케이드 × 등록취소 경합 해결 (미커밋)
 
 Progress: [██████████] 100%
 
@@ -213,6 +213,7 @@ None yet.
 |---|-------------|------|--------|-----------|
 | 260806-und | D-083 카카오 프로필(닉네임·프로필 이미지) 수집·저장 및 MyProfileResponse 노출 | 2026-08-06 | 7f363a9 | [260806-und-d-083-myprofileresponse](./quick/260806-und-d-083-myprofileresponse/) |
 | 260820-cp1 | D-01 공지 목록 2경로(admin·member) page/size 검증 추가 — 500→400, NoticeSearchCondition 신설 | 2026-08-20 | 46cd949 | [260820-cp1-api-page-size](./quick/260820-cp1-api-page-size/) |
+| 260828-g4o | 이슈 #12(WR-02) 휴강 캐스케이드 × 등록취소 경합 시 500 → 현재 상태 재판정 + 0행 스킵, 등록취소 이중 검사 (D-145) | 2026-08-28 | (미커밋 — 사용자 확인 대기) | [260828-g4o-issue-12-suspend-cancel-race](./quick/260828-g4o-issue-12-suspend-cancel-race/) |
 
 ## Deferred Items
 
