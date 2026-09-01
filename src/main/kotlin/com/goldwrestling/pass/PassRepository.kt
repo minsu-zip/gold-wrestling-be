@@ -146,20 +146,31 @@ interface PassRepository :
      * 배치 대상 회원 벌크 조회(BATCH-01·02, Phase 5) — 차감 가능한 `SESSION_PASS`를 가진 회원 id를
      * 중복 없이 오름차순으로 반환한다.
      *
-     * **BATCH-02의 예외 3종(휴회·잔여 0·만료)이 전부 이 한 쿼리의 필터로 구현된다** — 다른 곳에
-     * 같은 예외를 다시 구현하지 않는다(RESEARCH Pitfall 2). 과거 휴회 기간을 경과일에서 빼는 로직을
-     * 추가하지 않는다 — 복귀일 기준일 리셋(D-105)이 이미 그 역할을 한다.
+     * **BATCH-02의 예외 4종(휴회·비활성·잔여 0·만료)이 전부 이 한 쿼리의 필터로 구현된다** — 다른
+     * 곳에 같은 예외를 다시 구현하지 않는다(RESEARCH Pitfall 2). 과거 제외 기간을 경과일에서 빼는
+     * 로직을 추가하지 않는다 — 제외 이탈 시각의 기준일 리셋(D-105 후보 ③)이 이미 그 역할을 한다.
      *
      * - `endDate >= :today` — [Pass.isExpired]가 쓰는 것과 같은 비교축(D-066 종료일 포함 판정)
      * - `remainingCount > 0` — 소진된 이용권은 대상이 아니다
-     * - `member.status <> ON_LEAVE` — 휴회 중인 회원은 현재 상태로 즉시 제외한다
+     * - `member.status not in (ON_LEAVE, INACTIVE)` — 차감 제외 상태인 회원은 현재 상태로 즉시
+     *   제외한다. `INACTIVE`가 들어간 것은 WR-06 결정이다(D-147) — 탈퇴·장기 미이용 회원의 잔여가
+     *   계속 깎여 0이 되면 환불 분쟁의 소지가 된다.
+     *
+     * **상태 목록을 여기에 문자열로 늘어놓지 말 것** — 판정의 근거는
+     * [com.goldwrestling.member.MemberStatus.DEDUCTION_EXCLUDED] 하나이고, 기준일 후보 ③을 기록하는
+     * `AdminMemberService.changeStatus`가 같은 집합을 본다. JPQL에는 상수 참조를 넣을 수 없어 값이
+     * 중복되므로, 두 곳이 어긋나면 `InactivityBatchQueryTest`의 "차감 제외 상태 목록은 MemberStatus
+     * DEDUCTION_EXCLUDED와 일치한다" 케이스가 실패한다.
      */
     @Query(
         "select distinct p.member.id from Pass p " +
             "where p.type = com.goldwrestling.pass.PassType.SESSION_PASS " +
             "and p.status = com.goldwrestling.pass.PassStatus.ACTIVE " +
             "and p.endDate >= :today and p.remainingCount > 0 " +
-            "and p.member.status <> com.goldwrestling.member.MemberStatus.ON_LEAVE " +
+            "and p.member.status not in (" +
+            "com.goldwrestling.member.MemberStatus.ON_LEAVE, " +
+            "com.goldwrestling.member.MemberStatus.INACTIVE" +
+            ") " +
             "order by p.member.id asc",
     )
     fun findMemberIdsWithDeductibleSessionPass(

@@ -29,7 +29,7 @@ class InactivityDueDateCalculatorTest {
                 candidates(
                     lastAttendanceDate = null,
                     lastActiveReservationClassDate = LocalDate.of(2026, 7, 1),
-                    returnedFromLeaveDate = LocalDate.of(2026, 7, 10),
+                    deductionExclusionExitedDate = LocalDate.of(2026, 7, 10),
                     lastSessionPassRegistrationDate = LocalDate.of(2026, 6, 1),
                     lastPositiveAdjustDate = LocalDate.of(2026, 5, 1),
                 ),
@@ -45,7 +45,7 @@ class InactivityDueDateCalculatorTest {
             InactivityDueDateCalculator.resolveDueDate(
                 candidates(
                     lastActiveReservationClassDate = LocalDate.of(2026, 1, 1),
-                    returnedFromLeaveDate = LocalDate.of(2026, 8, 1),
+                    deductionExclusionExitedDate = LocalDate.of(2026, 8, 1),
                     lastSessionPassRegistrationDate = LocalDate.of(2026, 2, 1),
                 ),
                 ANCIENT_EFFECTIVE_DATE,
@@ -176,14 +176,14 @@ class InactivityDueDateCalculatorTest {
     private fun candidates(
         lastAttendanceDate: LocalDate? = null,
         lastActiveReservationClassDate: LocalDate? = null,
-        returnedFromLeaveDate: LocalDate? = null,
+        deductionExclusionExitedDate: LocalDate? = null,
         lastSessionPassRegistrationDate: LocalDate? = null,
         lastPositiveAdjustDate: LocalDate? = null,
     ): InactivityDueDateCandidates =
         InactivityDueDateCandidates(
             lastAttendanceDate = lastAttendanceDate,
             lastActiveReservationClassDate = lastActiveReservationClassDate,
-            returnedFromLeaveDate = returnedFromLeaveDate,
+            deductionExclusionExitedDate = deductionExclusionExitedDate,
             lastSessionPassRegistrationDate = lastSessionPassRegistrationDate,
             lastPositiveAdjustDate = lastPositiveAdjustDate,
         )

@@ -112,6 +112,46 @@ class InactivityBatchQueryTest {
         assertThat(ids).doesNotContain(member.id)
     }
 
+    /**
+     * WR-06 / D-147 — policies §4.3의 차감 예외에 `INACTIVE`가 더해졌다. 이 쿼리 필터가
+     * `MemberStatus.DEDUCTION_EXCLUDED`(= `ON_LEAVE`·`INACTIVE`)와 어긋나면 여기서 잡힌다.
+     */
+    @Test
+    fun `INACTIVE 회원은 차감 가능한 SESSION_PASS가 있어도 결과에서 제외된다`() {
+        val member = persistMember(status = MemberStatus.INACTIVE)
+        persistSessionPass(member, remaining = "1.0", endDate = today.plusDays(30))
+
+        val ids = passRepository.findMemberIdsWithDeductibleSessionPass(today)
+
+        assertThat(ids).doesNotContain(member.id)
+    }
+
+    /**
+     * 제외 상태 목록이 두 곳(JPQL 필터 / `MemberStatus.DEDUCTION_EXCLUDED`)에 중복돼 있어 — JPQL에는
+     * 상수 참조를 넣을 수 없다 — 한쪽만 고치는 사고를 이 테스트가 막는다.
+     */
+    @Test
+    fun `차감 제외 상태 목록은 MemberStatus DEDUCTION_EXCLUDED와 일치한다`() {
+        val excludedIds =
+            MemberStatus.DEDUCTION_EXCLUDED.map { status ->
+                val member = persistMember(status = status)
+                persistSessionPass(member, remaining = "1.0", endDate = today.plusDays(30))
+                member.id
+            }
+        val includedStatuses = MemberStatus.entries - MemberStatus.DEDUCTION_EXCLUDED
+        val includedIds =
+            includedStatuses.map { status ->
+                val member = persistMember(status = status)
+                persistSessionPass(member, remaining = "1.0", endDate = today.plusDays(30))
+                member.id
+            }
+
+        val ids = passRepository.findMemberIdsWithDeductibleSessionPass(today)
+
+        assertThat(ids).doesNotContainAnyElementsOf(excludedIds)
+        assertThat(ids).containsAll(includedIds)
+    }
+
     @Test
     fun `잔여가 0인 SESSION_PASS만 가진 회원은 제외된다`() {
         val member = persistMember()
@@ -336,16 +376,16 @@ class InactivityBatchQueryTest {
         assertThat(result).hasSize(3)
     }
 
-    // ── findReturnedFromLeaveTimestamps ──────────────────────────────────────
+    // ── findDeductionExclusionExitTimestamps ──────────────────────────────────────
 
     @Test
-    fun `findReturnedFromLeaveTimestamps는 returnedFromLeaveAt이 있는 회원만 반환한다`() {
+    fun `findDeductionExclusionExitTimestamps는 deductionExclusionExitedAt이 있는 회원만 반환한다`() {
         val returned = persistMember()
-        returned.returnedFromLeaveAt = today.minusDays(5).atTime9am()
+        returned.deductionExclusionExitedAt = today.minusDays(5).atTime9am()
         memberRepository.saveAndFlush(returned)
         val neverLeft = persistMember()
 
-        val result = memberRepository.findReturnedFromLeaveTimestamps(listOf(returned.id!!, neverLeft.id!!))
+        val result = memberRepository.findDeductionExclusionExitTimestamps(listOf(returned.id!!, neverLeft.id!!))
 
         assertThat(result).extracting<Long> { it.getMemberId() }.containsExactly(returned.id)
         assertThat(result.first().getTimestamp()).isEqualTo(today.minusDays(5).atTime9am())
@@ -361,7 +401,7 @@ class InactivityBatchQueryTest {
         persistReservation(inScope, pass, classDate = today.plusDays(3))
         persistPassTransaction(pass, amount = "0.5", reason = TransactionReason.ADMIN_ADJUST, occurredAt = today.minusDays(2).atTime9am())
         persistPassTransaction(pass, amount = "-1.0", reason = TransactionReason.INACTIVITY, occurredAt = today.minusDays(2).atTime9am())
-        outOfScope.returnedFromLeaveAt = today.minusDays(2).atTime9am()
+        outOfScope.deductionExclusionExitedAt = today.minusDays(2).atTime9am()
         memberRepository.saveAndFlush(outOfScope)
 
         val scoped = listOf(inScope.id!!)
@@ -374,13 +414,13 @@ class InactivityBatchQueryTest {
         assertThat(passTransactionRepository.findInactivityEventTimestamps(scoped))
             .extracting<Long> { it.getMemberId() }
             .containsOnly(inScope.id)
-        assertThat(memberRepository.findReturnedFromLeaveTimestamps(scoped)).isEmpty()
+        assertThat(memberRepository.findDeductionExclusionExitTimestamps(scoped)).isEmpty()
 
         // 빈 memberIds — "in ()" 빈 컬렉션이 예외 없이 빈 결과를 반환하는지 실제로 실행해 확인한다.
         assertThat(reservationRepository.findLastActiveReservationClassDates(emptyList())).isEmpty()
         assertThat(passTransactionRepository.findLastPositiveAdjustTimestamps(emptyList())).isEmpty()
         assertThat(passTransactionRepository.findInactivityEventTimestamps(emptyList())).isEmpty()
-        assertThat(memberRepository.findReturnedFromLeaveTimestamps(emptyList())).isEmpty()
+        assertThat(memberRepository.findDeductionExclusionExitTimestamps(emptyList())).isEmpty()
     }
 
     // ── fixtures ──────────────────────────────────────────────────────────
