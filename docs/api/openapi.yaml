@@ -90,6 +90,26 @@ paths:
       summary: "본인 예약 목록 조회 (활성 예약만, classDate·startTime 오름차순)"
       operationId: findMyReservations
       parameters:
+      - name: from
+        in: query
+        description: 조회 시작 수업 날짜(포함) — 생략하면 하한 없음
+        required: false
+        schema:
+          type: string
+          format: date
+          description: 조회 시작 수업 날짜(포함) — 생략하면 하한 없음
+          example: 2026-09-01
+        example: 2026-09-01
+      - name: to
+        in: query
+        description: 조회 종료 수업 날짜(포함) — 생략하면 상한 없음
+        required: false
+        schema:
+          type: string
+          format: date
+          description: 조회 종료 수업 날짜(포함) — 생략하면 상한 없음
+          example: 2026-09-30
+        example: 2026-09-30
       - name: page
         in: query
         description: 페이지 번호(0부터 시작)
@@ -919,12 +939,12 @@ paths:
       parameters:
       - name: passId
         in: query
-        description: 이용권 ID 필터 — 본인 이용권이 아니면 결과가 비어 있다
+        description: 이용권 ID 필터 — 조회 대상 회원의 이용권이 아니면 결과가 비어 있다
         required: false
         schema:
           type: integer
           format: int64
-          description: 이용권 ID 필터 — 본인 이용권이 아니면 결과가 비어 있다
+          description: 이용권 ID 필터 — 조회 대상 회원의 이용권이 아니면 결과가 비어 있다
       - name: page
         in: query
         description: 페이지 번호(0부터 시작)
@@ -1186,6 +1206,55 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/MemberDetailResponse"
+  /api/admin/members/{memberId}/pass-transactions:
+    get:
+      tags:
+      - admin-pass
+      summary: "회원 차감/복구 이력 조회 (관리자 메모 포함, 취소된 이용권 이력 포함)"
+      operationId: getMemberTransactions
+      parameters:
+      - name: memberId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: passId
+        in: query
+        description: 이용권 ID 필터 — 조회 대상 회원의 이용권이 아니면 결과가 비어 있다
+        required: false
+        schema:
+          type: integer
+          format: int64
+          description: 이용권 ID 필터 — 조회 대상 회원의 이용권이 아니면 결과가 비어 있다
+      - name: page
+        in: query
+        description: 페이지 번호(0부터 시작)
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          description: 페이지 번호(0부터 시작)
+          minimum: 0
+      - name: size
+        in: query
+        description: 페이지 크기(1~100)
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+          description: 페이지 크기(1~100)
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageResponseAdminPassTransactionResponse"
   /api/admin/batch/inactivity-runs/{batchExecutionId}:
     get:
       tags:
@@ -2709,6 +2778,81 @@ components:
           type: integer
           format: int32
           description: 전체 페이지 수
+    AdminPassTransactionResponse:
+      type: object
+      description: 관리자용 회원 차감/복구 이력 항목 — 관리자 메모(note)와 이용권 상태를 포함한다
+      properties:
+        transactionId:
+          type: integer
+          format: int64
+          description: 이력 ID
+        passId:
+          type: integer
+          format: int64
+          description: 이용권 ID
+        passType:
+          type: string
+          description: 이용권 종류
+          enum:
+          - EVENING_MEMBERSHIP
+          - SESSION_PASS
+          - LESSON_PASS
+        passStatus:
+          type: string
+          description: 이용권 상태 — 취소(CANCELED)된 이용권의 이력도 포함된다(D-059 감사 가능성)
+          enum:
+          - ACTIVE
+          - CANCELED
+        amount:
+          type: number
+          description: "증감 수량(+차감/복구, 부호로 방향 구분)"
+        reason:
+          type: string
+          description: 차감/복구 사유 코드
+          enum:
+          - RESERVE
+          - CANCEL_REFUND
+          - ADMIN_ADJUST
+          - EVENING_HALF
+          - INACTIVITY
+          - CLASS_CANCELED_REFUND
+          - INITIAL_GRANT
+          - REGISTRATION_CANCELED
+          - EVENING_HALF_REFUND
+        note:
+          type:
+          - string
+          - "null"
+          description: 관리자 메모 — 수동 가감(ADMIN_ADJUST) 등에서 관리자가 남긴 사유. 없으면 null
+        occurredAt:
+          type: string
+          format: date-time
+          description: 발생 시각
+    PageResponseAdminPassTransactionResponse:
+      type: object
+      description: 페이지네이션 응답
+      properties:
+        content:
+          type: array
+          description: 현재 페이지의 항목 목록
+          items:
+            $ref: "#/components/schemas/AdminPassTransactionResponse"
+        page:
+          type: integer
+          format: int32
+          description: 현재 페이지 번호(0부터 시작)
+        size:
+          type: integer
+          format: int32
+          description: 페이지 크기
+        totalElements:
+          type: integer
+          format: int64
+          description: 전체 항목 수
+        totalPages:
+          type: integer
+          format: int32
+          description: 전체 페이지 수
     AttendanceRosterEntryResponse:
       type: object
       description: 출석 명단 항목 — status가 null이면 미체크(D-127)
@@ -2720,6 +2864,11 @@ components:
         memberName:
           type: string
           description: 회원 실명
+        phoneNumber:
+          type:
+          - string
+          - "null"
+          description: 회원 전화번호 — 동명이인 구분용. 온보딩 전 회원은 null
         reservationId:
           type:
           - integer

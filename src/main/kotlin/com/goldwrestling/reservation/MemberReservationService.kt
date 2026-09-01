@@ -222,6 +222,11 @@ class MemberReservationService(
      *
      * 정렬은 `classDate` 오름차순, 같은 날이면 `startTime` 오름차순 — 회원이 달력을 보는 순서와
      * 같다.
+     *
+     * `condition.from`/`to`가 있으면 수업 날짜 범위로 더 좁힌다(BE-REQ-004, D-150). 지난 예약도
+     * 계속 `ACTIVE`로 남고 정렬이 오름차순이라, 필터가 없으면 시간이 지날수록 "다가오는 예약"이
+     * 뒤 페이지로 밀린다 — 조건 DTO의 KDoc에 배경이 있다. 파라미터를 주지 않으면 종전과 동일하게
+     * 전체를 반환한다.
      */
     fun findMyReservations(
         memberId: Long,
@@ -229,9 +234,13 @@ class MemberReservationService(
     ): PageResponse<ReservationResponse> {
         val specification =
             Specification.allOf<Reservation>(
-                listOf(
+                listOfNotNull(
                     ReservationSpecifications.ownedByMember(memberId),
                     ReservationSpecifications.hasStatus(ReservationStatus.ACTIVE),
+                    // 기간 필터(BE-REQ-004, D-150) — 관리자 조회(04-12)가 이미 쓰던 조건을 그대로
+                    // 재사용한다. 둘 다 null이면 `classDateBetween`이 null을 반환해
+                    // `listOfNotNull`에서 빠지므로, 파라미터를 주지 않은 기존 호출은 동작이 같다.
+                    ReservationSpecifications.classDateBetween(condition.from, condition.to),
                 ),
             )
         val pageable =

@@ -3,13 +3,19 @@ package com.goldwrestling.pass
 import com.goldwrestling.admin.AdminRepository
 import com.goldwrestling.member.MemberNotFoundException
 import com.goldwrestling.member.MemberRepository
+import com.goldwrestling.member.dto.PageResponse
 import com.goldwrestling.pass.dto.AdjustPassRequest
+import com.goldwrestling.pass.dto.AdminPassTransactionResponse
 import com.goldwrestling.pass.dto.CancelPassRequest
 import com.goldwrestling.pass.dto.ChangePassPeriodRequest
 import com.goldwrestling.pass.dto.PassResponse
+import com.goldwrestling.pass.dto.PassTransactionSearchCondition
 import com.goldwrestling.pass.dto.RegisterPassRequest
 import com.goldwrestling.reservation.ReservationRepository
 import com.goldwrestling.reservation.ReservationStatus
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
+import org.springframework.data.jpa.domain.Specification
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
@@ -339,5 +345,42 @@ class AdminPassService(
         return passRepository
             .findAllByMemberIdOrderByStartDateDescIdDesc(memberId)
             .map { PassResponse.from(it, today) }
+    }
+
+    /**
+     * 관리자가 **특정 회원의** 차감/복구 이력을 이용권 필터 + page/size로 조회한다
+     * (PASS-05, BE-REQ-003, D-149).
+     *
+     * 회원 본인 조회([MemberPassService.getMyTransactions])와 두 가지가 다르다 — 둘 다 관리자
+     * 화면의 목적(감사·문의 대응)에서 나온다:
+     * 1. **취소된 이용권의 이력을 숨기지 않는다** — `passNotCanceled()` 조건을 붙이지 않는다.
+     *    회원 화면은 취소 이용권을 "없었던 것처럼" 감추지만(D-059·D-073), 관리자는 오등록 정정의
+     *    상쇄 이력(`REGISTRATION_CANCELED`)까지 볼 수 있어야 한다.
+     * 2. **응답에 `note`가 있다** — [com.goldwrestling.pass.dto.AdminPassTransactionResponse].
+     *    D-070이 감춘 것은 "회원에게"이지 관리자에게가 아니다.
+     *
+     * 스코프는 경로 변수 [memberId]에서 온다. 회원 경로처럼 IDOR을 걱정할 필요는 없지만
+     * ([SecurityConfig]가 `/api/admin` 하위 전체를 `ROLE_ADMIN`으로 잠근다), **존재하지 않는 회원 id로
+     * 빈 페이지를 반환하지 않도록** 회원 존재를 먼저 확인해 404를 준다 — [getMemberPasses]와 같은
+     * 관례이고, 관리자가 오타로 빈 화면을 보고 "이력이 없다"고 오독하는 것을 막는다.
+     *
+     * 정렬은 회원 경로와 같은 `occurredAt` 내림차순 고정이다.
+     */
+    fun getMemberTransactions(
+        memberId: Long,
+        condition: PassTransactionSearchCondition,
+    ): PageResponse<AdminPassTransactionResponse> {
+        memberRepository.findById(memberId).orElseThrow { MemberNotFoundException(memberId) }
+
+        val specification =
+            Specification.allOf<PassTransaction>(
+                listOfNotNull(
+                    PassTransactionSpecifications.ownedByMember(memberId),
+                    PassTransactionSpecifications.hasPassId(condition.passId),
+                ),
+            )
+        val pageable = PageRequest.of(condition.page, condition.size, Sort.by(Sort.Direction.DESC, "occurredAt"))
+        val page = passTransactionRepository.findAll(specification, pageable)
+        return PageResponse.from(page) { AdminPassTransactionResponse.from(it) }
     }
 }

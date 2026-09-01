@@ -154,6 +154,36 @@ class AttendanceServiceTest {
         assertThat(entry.status).isNull()
         assertThat(entry.attendanceId).isNull()
         assertThat(entry.deducted).isFalse()
+        // BE-REQ-005(D-148) — 명단 항목은 동명이인 구분용 전화번호를 함께 싣는다.
+        assertThat(entry.phoneNumber).isEqualTo(member.phoneNumber)
+    }
+
+    /**
+     * BE-REQ-005 / D-148 — 회원 식별의 기준이 "이름 + 전화번호"인데(policies §5.1) 명단이 이름만
+     * 실으면 동명이인을 구분할 수 없다. 관리자가 엉뚱한 회원의 출석을 지우면 저녁반 경로에서는
+     * 0.5회 복구가 잘못된 이용권에 일어난다(D-128).
+     */
+    @Test
+    fun `동명이인이 있어도 명단 항목의 전화번호로 구분할 수 있다`() {
+        val schedule = songpaSessionSchedule()
+        val classDate = nextClassDate(schedule)
+        val session = persistClassSession(schedule, classDate)
+
+        val first = persistMember()
+        val second = persistMember()
+        listOf(first, second).forEach { member ->
+            member.name = "김레슬"
+            memberRepository.saveAndFlush(member)
+            val pass = persistSessionPass(member, remaining = "3.0", endDate = classDate.plusYears(1))
+            persistActiveReservation(member, pass, session)
+        }
+
+        val roster = attendanceService.getRoster(schedule.id!!, classDate)
+
+        assertThat(roster.entries.map { it.memberName }).containsOnly("김레슬")
+        assertThat(roster.entries.map { it.phoneNumber })
+            .containsExactlyInAnyOrder(first.phoneNumber, second.phoneNumber)
+        assertThat(roster.entries.map { it.phoneNumber }.distinct()).hasSize(2)
     }
 
     @Test

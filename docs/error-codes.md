@@ -25,7 +25,7 @@
 | `REFRESH_TOKEN_INVALID` | 401 | refresh 토큰이 없음/만료/폐기됨/재사용 감지됨 | `TokenService` |
 | `KAKAO_AUTH_FAILED` | 401 | 카카오가 인가 코드 교환 또는 사용자 조회를 거부함 | `KakaoApiClient` |
 | `KAKAO_UNAVAILABLE` | 502 | 카카오 API가 응답하지 않거나 5xx를 반환 | `KakaoApiClient` |
-| `MEMBER_NOT_FOUND` | 404 | 대상 회원 없음 | `AdminMemberService` |
+| `MEMBER_NOT_FOUND` | 404 | 대상 회원 없음 | `AdminMemberService`, `AdminPassService`(회원 이용권·이력 조회) |
 | `MEMBER_NOT_ACTIVE` | 403 | 상태 게이트 위반. 회원 상태가 요구 조건(`ACTIVE`)이 아님 | `MemberStateGate` |
 | `ONBOARDING_ALREADY_COMPLETED` | 409 | 이미 온보딩을 마친 회원의 온보딩 재제출 (프로필 수정은 v2 PROF-01) | `MemberProfileService` |
 | `MEMBER_STATE_CONFLICT` | 409 | 승인 대상이 아니거나 허용되지 않는 상태 전이 | `AdminMemberService` |
