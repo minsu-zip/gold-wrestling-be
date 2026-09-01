@@ -1,5 +1,6 @@
 ---
 quick_id: 260820-cp1
+status: complete
 phase: quick/260820-cp1
 plan: 01
 subsystem: api/notice

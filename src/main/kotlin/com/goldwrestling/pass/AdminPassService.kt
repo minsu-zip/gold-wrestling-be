@@ -3,13 +3,19 @@ package com.goldwrestling.pass
 import com.goldwrestling.admin.AdminRepository
 import com.goldwrestling.member.MemberNotFoundException
 import com.goldwrestling.member.MemberRepository
+import com.goldwrestling.member.dto.PageResponse
 import com.goldwrestling.pass.dto.AdjustPassRequest
+import com.goldwrestling.pass.dto.AdminPassTransactionResponse
 import com.goldwrestling.pass.dto.CancelPassRequest
 import com.goldwrestling.pass.dto.ChangePassPeriodRequest
 import com.goldwrestling.pass.dto.PassResponse
+import com.goldwrestling.pass.dto.PassTransactionSearchCondition
 import com.goldwrestling.pass.dto.RegisterPassRequest
 import com.goldwrestling.reservation.ReservationRepository
 import com.goldwrestling.reservation.ReservationStatus
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
+import org.springframework.data.jpa.domain.Specification
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
@@ -249,6 +255,15 @@ class AdminPassService(
      * 오등록 정정은 드문 운영 행위이고, 연쇄 복구가 `REGISTRATION_CANCELED` 상쇄와 곧바로
      * 충돌한다(D-089) — 관리자가 대리 취소(`refund=false`)로 먼저 정리하는 명시적 2단계 절차가
      * 안전하다.
+     *
+     * **이중 검사(D-145, 이슈 #12/WR-02)**: 위 선행 검사는 정확한 실패 사유를 주기 위한 것일 뿐
+     * 방어선이 아니다 — 선행 검사~상태 전환(`cancelIfNotCanceled`) 사이에 창이 있어, 그 사이에
+     * 예약이 커밋되면 취소가 그대로 통과해 "활성 예약이 달린 CANCELED 이용권"이 남을 수 있다.
+     * `cancelIfNotCanceled` 직후(= 이 트랜잭션이 이용권 행 잠금을 확보한 뒤) 같은 검사를
+     * `zeroRemainingCount` **이전에** 한 번 더 한다 — 그 창에서 커밋된 예약을 확실히 본다.
+     * `zeroRemainingCount`보다 뒤에 두면 그 사이 예약이 잔여를 차감해 `zeroRemainingCount`가
+     * 0행을 반환하고, 실제 원인(활성 예약)이 [PassStateConflictException]("잔여가 방금
+     * 변경되어…")으로 잘못 보고된다.
      */
     @Transactional
     fun cancel(
@@ -274,6 +289,14 @@ class AdminPassService(
         if (statusUpdated == 0) {
             // 사전 판정 이후 다른 트랜잭션이 먼저 취소를 확정한 것 — 경쟁 패배.
             throw PassAlreadyCanceledException()
+        }
+
+        // 이중 검사(D-145, 이슈 #12/WR-02) — 이 트랜잭션이 이용권 행 잠금을 확보한 뒤이므로,
+        // 선행 검사~상태 전환 사이에 커밋된 예약을 여기서는 확실히 본다. zeroRemainingCount보다
+        // 반드시 앞에 둔다 — 뒤에 두면 그 사이 예약이 잔여를 차감해 zeroRemainingCount가 0행을
+        // 반환하고 실제 원인(활성 예약)이 PassStateConflictException으로 잘못 보고된다.
+        if (reservationRepository.existsByPassIdAndStatus(passId, ReservationStatus.ACTIVE)) {
+            throw PassHasActiveReservationException()
         }
 
         if (offset.compareTo(BigDecimal.ZERO) != 0) {
@@ -322,5 +345,42 @@ class AdminPassService(
         return passRepository
             .findAllByMemberIdOrderByStartDateDescIdDesc(memberId)
             .map { PassResponse.from(it, today) }
+    }
+
+    /**
+     * 관리자가 **특정 회원의** 차감/복구 이력을 이용권 필터 + page/size로 조회한다
+     * (PASS-05, BE-REQ-003, D-149).
+     *
+     * 회원 본인 조회([MemberPassService.getMyTransactions])와 두 가지가 다르다 — 둘 다 관리자
+     * 화면의 목적(감사·문의 대응)에서 나온다:
+     * 1. **취소된 이용권의 이력을 숨기지 않는다** — `passNotCanceled()` 조건을 붙이지 않는다.
+     *    회원 화면은 취소 이용권을 "없었던 것처럼" 감추지만(D-059·D-073), 관리자는 오등록 정정의
+     *    상쇄 이력(`REGISTRATION_CANCELED`)까지 볼 수 있어야 한다.
+     * 2. **응답에 `note`가 있다** — [com.goldwrestling.pass.dto.AdminPassTransactionResponse].
+     *    D-070이 감춘 것은 "회원에게"이지 관리자에게가 아니다.
+     *
+     * 스코프는 경로 변수 [memberId]에서 온다. 회원 경로처럼 IDOR을 걱정할 필요는 없지만
+     * ([SecurityConfig]가 `/api/admin` 하위 전체를 `ROLE_ADMIN`으로 잠근다), **존재하지 않는 회원 id로
+     * 빈 페이지를 반환하지 않도록** 회원 존재를 먼저 확인해 404를 준다 — [getMemberPasses]와 같은
+     * 관례이고, 관리자가 오타로 빈 화면을 보고 "이력이 없다"고 오독하는 것을 막는다.
+     *
+     * 정렬은 회원 경로와 같은 `occurredAt` 내림차순 고정이다.
+     */
+    fun getMemberTransactions(
+        memberId: Long,
+        condition: PassTransactionSearchCondition,
+    ): PageResponse<AdminPassTransactionResponse> {
+        memberRepository.findById(memberId).orElseThrow { MemberNotFoundException(memberId) }
+
+        val specification =
+            Specification.allOf<PassTransaction>(
+                listOfNotNull(
+                    PassTransactionSpecifications.ownedByMember(memberId),
+                    PassTransactionSpecifications.hasPassId(condition.passId),
+                ),
+            )
+        val pageable = PageRequest.of(condition.page, condition.size, Sort.by(Sort.Direction.DESC, "occurredAt"))
+        val page = passTransactionRepository.findAll(specification, pageable)
+        return PageResponse.from(page) { AdminPassTransactionResponse.from(it) }
     }
 }

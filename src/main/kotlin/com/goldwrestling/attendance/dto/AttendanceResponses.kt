@@ -62,6 +62,14 @@ data class AttendanceResponse(
 data class AttendanceRosterEntryResponse(
     @field:Schema(description = "회원 ID") val memberId: Long,
     @field:Schema(description = "회원 실명") val memberName: String,
+    // 동명이인 식별용 보조 정보(BE-REQ-005, D-148). 회원 식별의 기준이 "이름 + 전화번호"이므로
+    // (policies §5.1) 이름만으로는 명단에서 같은 이름의 두 회원을 구분할 수 없다 — 저녁반 출석
+    // 삭제가 0.5회 복구를 유발하는 만큼(D-128) 잘못 고르면 엉뚱한 회원의 잔여가 바뀐다.
+    //
+    // nullable인 이유: `Member.phoneNumber`가 온보딩 전에는 null이다(policies §5.1). 정상 운영에서
+    // 명단에 오르는 회원은 모두 온보딩을 마쳤지만, 값이 없다고 명단 조회 전체를 500으로 떨어뜨리는
+    // 것은 과하다 — 이름(`memberName`)은 표시의 필수 요소라 여전히 non-null을 강제한다.
+    @field:Schema(description = "회원 전화번호 — 동명이인 구분용. 온보딩 전 회원은 null") val phoneNumber: String?,
     @field:Schema(description = "예약 ID — 저녁반 명단에서는 항상 null(예약이 없는 수업)") val reservationId: Long?,
     @field:Schema(description = "출석 기록 ID — 미체크면 null") val attendanceId: Long?,
     @field:Schema(description = "출석 상태 — null이면 미체크(D-127 레코드 부재 = 미체크)") val status: AttendanceStatus?,

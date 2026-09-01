@@ -6,7 +6,6 @@ import com.goldwrestling.admin.AdminRepository
 import com.goldwrestling.branch.BranchRepository
 import com.goldwrestling.common.time.WeekRange
 import com.goldwrestling.notification.NotificationService
-import com.goldwrestling.pass.PassStatus
 import com.goldwrestling.pass.TransactionReason
 import com.goldwrestling.reservation.Reservation
 import com.goldwrestling.reservation.ReservationLedgerSupport
@@ -37,9 +36,11 @@ import java.time.OffsetDateTime
  * 호출하지 않고 대신 [weekStart]를 그 주의 월요일로 **정규화**만 한다.
  *
  * 휴강 처리([suspend])는 이 phase에서 유일하게 **한 요청이 N건의 예약을 건드리는** 경로다 —
- * 차감 복구·이력 저장은 [ReservationLedgerSupport.restorePassAfterCancellation]을
- * [TransactionReason.CLASS_CANCELED_REFUND]와 함께 재사용해 회원/관리자 취소(`CANCEL_REFUND`)와
- * 원장에서 구분한다(T-04-67). 알림은 세션당 1건 요약형이다(D-097, T-04-69).
+ * 차감 복구·이력 저장은 [ReservationLedgerSupport.restorePassAfterSuspension]을 쓴다.
+ * 이 메서드는 [TransactionReason.CLASS_CANCELED_REFUND] 이력을 남겨 회원/관리자 취소
+ * (`CANCEL_REFUND`)와 원장에서 구분하고(T-04-67), 복구 직전 이용권의 **현재** 상태를 다시 읽어
+ * 판정한다 — 등록취소와 동시 발생하면 예외 대신 스킵한다(D-145, 이슈 #12/WR-02). 알림은 세션당
+ * 1건 요약형이다(D-097, T-04-69).
  */
 @Service
 @Transactional(readOnly = true)
@@ -171,15 +172,19 @@ class AdminScheduleService(
      * 복구 판정(D-091) → ⑥ `reserved_count`를 일괄 초기화한다 → ⑦ 알림을 정확히 1회 생성한다.
      *
      * **③~⑤에서 반복되는 벌크 UPDATE(`clearAutomatically`) 때문에, ④에서 필요한 스칼라 값
-     * (reservationId·passId·passStatus)을 [ReservationCancellationSnapshot]으로 미리 리스트에
-     * 뽑아둔다** — 그렇지 않으면 루프 도중 이전 반복의 벌크 UPDATE가 준영속화한 엔티티의 LAZY
-     * 연관에 접근해 `LazyInitializationException`이 난다(04-RESEARCH.md Pitfall 2 확장).
+     * (reservationId·passId)을 [ReservationCancellationSnapshot]으로 미리 리스트에 뽑아둔다** —
+     * 그렇지 않으면 루프 도중 이전 반복의 벌크 UPDATE가 준영속화한 엔티티의 LAZY 연관에 접근해
+     * `LazyInitializationException`이 난다(04-RESEARCH.md Pitfall 2 확장). **복구 판정은 이
+     * 스냅샷의 값이 아니라 복구 직전 현재 이용권 상태로 한다** — 스냅샷을 뜬 뒤(④)부터 복구를
+     * 반영하기까지(⑤) 창이 있어, 그 사이 다른 관리자가 같은 이용권을 등록취소하면 스냅샷이 뜬
+     * 시점의 상태는 낡은(stale) 값이 되기 때문이다(D-145, 이슈 #12/WR-02 — 자세한 재판정·스킵
+     * 로직은 [ReservationLedgerSupport.restorePassAfterSuspension] KDoc 참고).
      *
      * ⑥은 건별 [ClassSessionRepository.decrementReservedCount]를 N번 부르는 대신
      * [ClassSessionRepository.resetReservedCount] 단일 호출로 반영한다 — 건별 호출은 N번의 UPDATE와
      * N번의 영속성 컨텍스트 clear를 유발한다. 그래서 [ReservationLedgerSupport.restoreAfterCancellation]
-     * (세션 정원까지 함께 반영)이 아니라 [ReservationLedgerSupport.restorePassAfterCancellation]
-     * (잔여 판정 + 이력 저장만)을 예약마다 호출한다.
+     * (세션 정원까지 함께 반영)이 아니라 [ReservationLedgerSupport.restorePassAfterSuspension]
+     * (잔여 판정 + 이력 저장만, 휴강 캐스케이드 전용)을 예약마다 호출한다.
      */
     @Transactional
     fun suspend(
@@ -221,7 +226,6 @@ class AdminScheduleService(
                 ReservationCancellationSnapshot(
                     reservationId = requireNotNull(reservation.id) { "저장되지 않은 예약이 조회될 수 없습니다." },
                     passId = requireNotNull(reservation.pass.id) { "저장된 예약은 항상 Pass를 참조합니다." },
-                    passStatus = reservation.pass.status,
                 )
             }
 
@@ -238,14 +242,11 @@ class AdminScheduleService(
                 return@forEach
             }
             canceledCount++
-            reservationLedgerSupport.restorePassAfterCancellation(
+            reservationLedgerSupport.restorePassAfterSuspension(
                 passId = snapshot.passId,
-                passStatus = snapshot.passStatus,
-                refundRequested = true,
+                reservationId = snapshot.reservationId,
                 canceledAt = now,
-                member = null,
                 admin = admin,
-                reason = TransactionReason.CLASS_CANCELED_REFUND,
             )
         }
 
@@ -343,9 +344,14 @@ class AdminScheduleService(
  * 휴강 캐스케이드([AdminScheduleService.suspend])가 활성 예약 목록을 조회한 직후에만 만드는
  * 스칼라 스냅샷 — 반복 중 벌크 UPDATE(`clearAutomatically`)로 준영속화되는 [Reservation]·[Pass]
  * 엔티티의 LAZY 연관을 다시 건드리지 않기 위해서다.
+ *
+ * **이용권 상태(`passStatus`)는 담지 않는다** — 예전에는 여기 담아 복구 판정에 그대로 썼지만,
+ * 스냅샷을 뜬 시점과 복구를 반영하는 시점 사이에 다른 관리자가 같은 이용권을 등록취소하면 그
+ * 값이 낡은(stale) 값이 되어 정상적인 휴강 요청이 500으로 실패했다(D-145, 이슈 #12/WR-02). 복구
+ * 판정은 이제 [ReservationLedgerSupport.restorePassAfterSuspension]이 복구 직전 현재 상태를
+ * 다시 조회해서 한다.
  */
 private data class ReservationCancellationSnapshot(
     val reservationId: Long,
     val passId: Long,
-    val passStatus: PassStatus,
 )

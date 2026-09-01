@@ -1,18 +1,23 @@
 package com.goldwrestling.pass
 
 import com.goldwrestling.auth.AuthenticatedPrincipal
+import com.goldwrestling.member.dto.PageResponse
 import com.goldwrestling.pass.dto.AdjustPassRequest
+import com.goldwrestling.pass.dto.AdminPassTransactionResponse
 import com.goldwrestling.pass.dto.CancelPassRequest
 import com.goldwrestling.pass.dto.ChangePassPeriodRequest
 import com.goldwrestling.pass.dto.PassResponse
+import com.goldwrestling.pass.dto.PassTransactionSearchCondition
 import com.goldwrestling.pass.dto.RegisterPassRequest
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import org.springdoc.core.annotations.ParameterObject
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.ModelAttribute
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -88,4 +93,14 @@ class AdminPassController(
     fun getMemberPasses(
         @PathVariable memberId: Long,
     ): List<PassResponse> = adminPassService.getMemberPasses(memberId)
+
+    // 아래 springdoc 스펙 생성 힌트: PassTransactionSearchCondition을 "condition" 객체 파라미터
+    // 1개가 아니라 passId/page/size 개별 쿼리 파라미터로 펼쳐 기술하라는 뜻이다(D-054,
+    // MemberPassController와 동일 관례 — 없으면 FE 생성기가 바인딩하지 못한다).
+    @GetMapping("/members/{memberId}/pass-transactions")
+    @Operation(summary = "회원 차감/복구 이력 조회 (관리자 메모 포함, 취소된 이용권 이력 포함)")
+    fun getMemberTransactions(
+        @PathVariable memberId: Long,
+        @ParameterObject @ModelAttribute @Valid condition: PassTransactionSearchCondition,
+    ): PageResponse<AdminPassTransactionResponse> = adminPassService.getMemberTransactions(memberId, condition)
 }

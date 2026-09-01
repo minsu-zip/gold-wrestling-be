@@ -55,8 +55,9 @@ import java.time.ZoneId
  * 실행 거부에 쓰이지만, **부족분 계산의 근거는 여전히 원장(`PassTransaction`)의 `INACTIVITY`
  * 건수뿐이다.** 둘을 섞으면 상태 기반 캐치업(D-106)이 무너진다.
  *
- * 휴회 예외는 대상 회원 조회 필터(현재 `ON_LEAVE` 제외)와 기준일 후보 ③(복귀일 리셋) **두 곳으로만**
- * 구현된다 — 휴회 일수를 경과일에서 빼는 세 번째 메커니즘을 만들지 않는다(RESEARCH Pitfall 2).
+ * 차감 제외 예외는 대상 회원 조회 필터(`MemberStatus.DEDUCTION_EXCLUDED` = `ON_LEAVE`·`INACTIVE` 제외)와
+ * 기준일 후보 ③(제외 이탈 시각 리셋) **두 곳으로만** 구현된다 — 제외 일수를 경과일에서 빼는 세 번째
+ * 메커니즘을 만들지 않는다(RESEARCH Pitfall 2, D-147).
  */
 @Component
 class InactivityBatchRunner(
@@ -109,7 +110,7 @@ class InactivityBatchRunner(
     /**
      * [start]가 만든 실행([executionId])의 본문을 돌리고 이력을 확정한 뒤 확정된 엔티티를 반환한다.
      *
-     * 흐름: ① 대상 회원 벌크 조회 → ② 기준일 후보 4종 + `INACTIVITY` 이력 벌크 조회(비어 있으면
+     * 흐름: ① 대상 회원 벌크 조회 → ② 기준일 후보 5종 + `INACTIVITY` 이력 벌크 조회(비어 있으면
      * 건너뜀) → ③ 회원별로 [InactivityDueDateCalculator]로 기준일·부족분을 계산 →
      * ④ 부족분만큼 [InactivityDeductionService.deductOnce]를 반복 호출(대상 소진 시 그 회원은
      * 즉시 중단 — 남은 부족분은 다음 실행이 이어받는다) → ⑤ 회원 단위 예외를 흡수해 나머지 회원을
@@ -135,9 +136,9 @@ class InactivityBatchRunner(
                     attendanceRepository.findLastAttendedClassDates(memberIds).associate { it.getMemberId() to it.getDate() }
                 val lastActiveReservationClassDates =
                     reservationRepository.findLastActiveReservationClassDates(memberIds).associate { it.getMemberId() to it.getDate() }
-                val returnedFromLeaveDates =
+                val deductionExclusionExitedDates =
                     memberRepository
-                        .findReturnedFromLeaveTimestamps(memberIds)
+                        .findDeductionExclusionExitTimestamps(memberIds)
                         .associate { it.getMemberId() to it.getTimestamp()?.toSeoulLocalDate() }
                 val lastSessionPassRegistrationDates =
                     passRepository
@@ -160,7 +161,7 @@ class InactivityBatchRunner(
                                 // 후보 ①은 `ATTENDED`만 인정한다(policies §6) — 불참은 미사용이다
                                 lastAttendanceDate = lastAttendedClassDates[memberId],
                                 lastActiveReservationClassDate = lastActiveReservationClassDates[memberId],
-                                returnedFromLeaveDate = returnedFromLeaveDates[memberId],
+                                deductionExclusionExitedDate = deductionExclusionExitedDates[memberId],
                                 lastSessionPassRegistrationDate = lastSessionPassRegistrationDates[memberId],
                                 lastPositiveAdjustDate = lastPositiveAdjustDates[memberId],
                             )

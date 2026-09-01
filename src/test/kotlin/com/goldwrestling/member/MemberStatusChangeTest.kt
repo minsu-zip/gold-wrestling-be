@@ -293,7 +293,7 @@ class MemberStatusChangeTest {
     // ---------- 휴회 복귀 시각 기록 (D-105 기준일 후보 ③, D-111) ----------
 
     @Test
-    fun `ON_LEAVE 회원을 ACTIVE로 바꾸면 returnedFromLeaveAt이 Clock 기준 현재 시각으로 채워진다`() {
+    fun `ON_LEAVE 회원을 ACTIVE로 바꾸면 deductionExclusionExitedAt이 Clock 기준 현재 시각으로 채워진다`() {
         val member = persistMember(kakaoId = 9218L, status = MemberStatus.ON_LEAVE)
         val adminToken = adminAccessToken(loginId = "admin-status-return-fill")
         val fixedInstant = Instant.parse("2026-08-20T01:00:00Z")
@@ -302,11 +302,11 @@ class MemberStatusChangeTest {
         mockMvc.perform(statusRequest(member.id!!, adminToken, "ACTIVE")).andExpect(status().isOk)
 
         val reloaded = memberRepository.findById(member.id!!).orElseThrow()
-        assertThat(reloaded.returnedFromLeaveAt).isEqualTo(OffsetDateTime.now(clock))
+        assertThat(reloaded.deductionExclusionExitedAt).isEqualTo(OffsetDateTime.now(clock))
     }
 
     @Test
-    fun `PENDING 회원을 ACTIVE로 바꾸면 returnedFromLeaveAt은 여전히 null이다`() {
+    fun `PENDING 회원을 ACTIVE로 바꾸면 deductionExclusionExitedAt은 여전히 null이다`() {
         val member =
             persistMember(kakaoId = 9219L, status = MemberStatus.PENDING, name = "김복귀", phoneNumber = "01088887777")
         val adminToken = adminAccessToken(loginId = "admin-status-return-pending")
@@ -314,34 +314,41 @@ class MemberStatusChangeTest {
         mockMvc.perform(statusRequest(member.id!!, adminToken, "ACTIVE")).andExpect(status().isOk)
 
         val reloaded = memberRepository.findById(member.id!!).orElseThrow()
-        assertThat(reloaded.returnedFromLeaveAt).isNull()
+        assertThat(reloaded.deductionExclusionExitedAt).isNull()
     }
 
+    /**
+     * D-147(WR-06) — `INACTIVE`도 차감 제외 상태가 됐으므로, 거기서 벗어나는 전이도 기준일 후보 ③을
+     * 기록한다. 종전에는 이 케이스에서 값이 `null`로 남았고(휴회만 제외 상태였다), 그 결과 복귀한
+     * 회원의 기준일이 비활성 이전으로 되돌아가 **비활성 기간 전체가 소급 차감**됐다.
+     */
     @Test
-    fun `INACTIVE 회원을 ACTIVE로 바꿔도 returnedFromLeaveAt은 여전히 null이다`() {
+    fun `INACTIVE 회원을 ACTIVE로 바꾸면 deductionExclusionExitedAt이 채워진다`() {
         val member =
             persistMember(kakaoId = 9220L, status = MemberStatus.INACTIVE, name = "김재활성화", phoneNumber = "01077776666")
         val adminToken = adminAccessToken(loginId = "admin-status-return-inactive")
+        val fixedInstant = Instant.parse("2026-08-21T01:00:00Z")
+        (clock as MutableTestClock).setTo(fixedInstant)
 
         mockMvc.perform(statusRequest(member.id!!, adminToken, "ACTIVE")).andExpect(status().isOk)
 
         val reloaded = memberRepository.findById(member.id!!).orElseThrow()
-        assertThat(reloaded.returnedFromLeaveAt).isNull()
+        assertThat(reloaded.deductionExclusionExitedAt).isEqualTo(OffsetDateTime.now(clock))
     }
 
     @Test
-    fun `ACTIVE 회원을 ON_LEAVE로 바꾸면 returnedFromLeaveAt은 갱신되지 않는다`() {
+    fun `ACTIVE 회원을 ON_LEAVE로 바꾸면 deductionExclusionExitedAt은 갱신되지 않는다`() {
         val member = persistMember(kakaoId = 9221L, status = MemberStatus.ACTIVE)
         val adminToken = adminAccessToken(loginId = "admin-status-return-onleave-start")
 
         mockMvc.perform(statusRequest(member.id!!, adminToken, "ON_LEAVE")).andExpect(status().isOk)
 
         val reloaded = memberRepository.findById(member.id!!).orElseThrow()
-        assertThat(reloaded.returnedFromLeaveAt).isNull()
+        assertThat(reloaded.deductionExclusionExitedAt).isNull()
     }
 
     @Test
-    fun `두 번째 휴회 후 다시 복귀하면 returnedFromLeaveAt이 더 최근 시각으로 덮어써진다`() {
+    fun `두 번째 휴회 후 다시 복귀하면 deductionExclusionExitedAt이 더 최근 시각으로 덮어써진다`() {
         val member = persistMember(kakaoId = 9222L, status = MemberStatus.ON_LEAVE)
         val adminToken = adminAccessToken(loginId = "admin-status-return-twice")
         val firstReturn = Instant.parse("2026-08-20T01:00:00Z")
@@ -351,7 +358,7 @@ class MemberStatusChangeTest {
         // 같은 트랜잭션 안에서는 findById가 영속성 컨텍스트의 동일 인스턴스를 돌려주므로(1차 캐시),
         // 엔티티 참조가 아니라 이 시점의 값만 별도 변수로 떼어 둔다 — 그렇지 않으면 두 번째 복귀
         // 이후 값도 같은 인스턴스를 통해 갱신되어 "더 최근으로 바뀌었는지" 비교가 항상 참이 된다.
-        val afterFirstReturn = memberRepository.findById(member.id!!).orElseThrow().returnedFromLeaveAt
+        val afterFirstReturn = memberRepository.findById(member.id!!).orElseThrow().deductionExclusionExitedAt
         assertThat(afterFirstReturn).isEqualTo(OffsetDateTime.ofInstant(firstReturn, clock.zone))
 
         mockMvc.perform(statusRequest(member.id!!, adminToken, "ON_LEAVE")).andExpect(status().isOk)
@@ -360,12 +367,12 @@ class MemberStatusChangeTest {
         mockMvc.perform(statusRequest(member.id!!, adminToken, "ACTIVE")).andExpect(status().isOk)
 
         val reloaded = memberRepository.findById(member.id!!).orElseThrow()
-        assertThat(reloaded.returnedFromLeaveAt).isEqualTo(OffsetDateTime.ofInstant(secondReturn, clock.zone))
-        assertThat(reloaded.returnedFromLeaveAt).isNotEqualTo(afterFirstReturn)
+        assertThat(reloaded.deductionExclusionExitedAt).isEqualTo(OffsetDateTime.ofInstant(secondReturn, clock.zone))
+        assertThat(reloaded.deductionExclusionExitedAt).isNotEqualTo(afterFirstReturn)
     }
 
     @Test
-    fun `approve로 PENDING에서 ACTIVE가 되어도 returnedFromLeaveAt을 건드리지 않는다`() {
+    fun `approve로 PENDING에서 ACTIVE가 되어도 deductionExclusionExitedAt을 건드리지 않는다`() {
         val member =
             persistMember(kakaoId = 9223L, status = MemberStatus.PENDING, name = "김승인", phoneNumber = "01066665555")
         val adminToken = adminAccessToken(loginId = "admin-status-return-approve")
@@ -377,13 +384,20 @@ class MemberStatusChangeTest {
             ).andExpect(status().isOk)
 
         val reloaded = memberRepository.findById(member.id!!).orElseThrow()
-        assertThat(reloaded.returnedFromLeaveAt).isNull()
+        assertThat(reloaded.deductionExclusionExitedAt).isNull()
     }
 
     // ---------- 휴회 이탈 전이 전체 기록 (CR-04, D-111 정정) ----------
 
+    /**
+     * D-147(WR-06) — `ON_LEAVE`와 `INACTIVE`가 **둘 다** 차감 제외 상태이므로 그 사이의 이동은
+     * 아직 제외를 벗어난 것이 아니다. 여기서 기록해 버리면 `INACTIVE`로 오래 머문 회원이 복귀할 때
+     * 기준일이 그 오래전 시각으로 남아 복귀 즉시 밀린 주기가 몰아서 차감된다 — 유예 리셋은
+     * 아래 `ON_LEAVE→INACTIVE→ACTIVE` 테스트가 검증하듯 **집합을 실제로 벗어나는 시점**에 한 번만
+     * 일어나야 한다.
+     */
     @Test
-    fun `ON_LEAVE에서 INACTIVE로 바꾸면 returnedFromLeaveAt이 채워진다`() {
+    fun `ON_LEAVE에서 INACTIVE로 바꾸면 제외 상태 안의 이동이라 deductionExclusionExitedAt이 채워지지 않는다`() {
         val member = persistMember(kakaoId = 9224L, status = MemberStatus.ON_LEAVE)
         val adminToken = adminAccessToken(loginId = "admin-status-return-fill-inactive")
         val fixedInstant = Instant.parse("2026-08-20T01:00:00Z")
@@ -392,11 +406,11 @@ class MemberStatusChangeTest {
         mockMvc.perform(statusRequest(member.id!!, adminToken, "INACTIVE")).andExpect(status().isOk)
 
         val reloaded = memberRepository.findById(member.id!!).orElseThrow()
-        assertThat(reloaded.returnedFromLeaveAt).isEqualTo(OffsetDateTime.now(clock))
+        assertThat(reloaded.deductionExclusionExitedAt).isNull()
     }
 
     @Test
-    fun `ON_LEAVE에서 PENDING으로 바꾸면 returnedFromLeaveAt이 채워진다`() {
+    fun `ON_LEAVE에서 PENDING으로 바꾸면 deductionExclusionExitedAt이 채워진다`() {
         val member = persistMember(kakaoId = 9225L, status = MemberStatus.ON_LEAVE)
         val adminToken = adminAccessToken(loginId = "admin-status-return-fill-pending")
         val fixedInstant = Instant.parse("2026-08-20T01:00:00Z")
@@ -405,37 +419,46 @@ class MemberStatusChangeTest {
         mockMvc.perform(statusRequest(member.id!!, adminToken, "PENDING")).andExpect(status().isOk)
 
         val reloaded = memberRepository.findById(member.id!!).orElseThrow()
-        assertThat(reloaded.returnedFromLeaveAt).isEqualTo(OffsetDateTime.now(clock))
+        assertThat(reloaded.deductionExclusionExitedAt).isEqualTo(OffsetDateTime.now(clock))
     }
 
     @Test
-    fun `ON_LEAVE에서 다시 ON_LEAVE로 바꾸면 returnedFromLeaveAt은 갱신되지 않는다`() {
+    fun `ON_LEAVE에서 다시 ON_LEAVE로 바꾸면 deductionExclusionExitedAt은 갱신되지 않는다`() {
         val member = persistMember(kakaoId = 9226L, status = MemberStatus.ON_LEAVE)
         val adminToken = adminAccessToken(loginId = "admin-status-return-noop-onleave")
 
         mockMvc.perform(statusRequest(member.id!!, adminToken, "ON_LEAVE")).andExpect(status().isOk)
 
         val reloaded = memberRepository.findById(member.id!!).orElseThrow()
-        assertThat(reloaded.returnedFromLeaveAt).isNull()
+        assertThat(reloaded.deductionExclusionExitedAt).isNull()
     }
 
+    /**
+     * CR-04가 지목한 우회 경로(`ON_LEAVE→INACTIVE→ACTIVE`)를 D-147 규칙으로 다시 고정한다.
+     *
+     * CR-04의 요구는 "이 경로에서 기준일이 제외 시작 이전으로 되돌아가면 안 된다"였고, 그건 그대로
+     * 지켜진다. 달라진 것은 **기록 시점**이다 — 종전에는 `ON_LEAVE→INACTIVE`에서 찍고 그 값을 끝까지
+     * 유지했지만, 이제 `INACTIVE`도 차감 제외 상태이므로 **실제로 제외를 벗어나는 `→ACTIVE` 시점**에
+     * 한 번 찍는다. 결과적으로 기준일이 더 늦어져(= 유예가 더 넉넉해져) 회원에게 불리해질 여지가 없다.
+     */
     @Test
-    fun `ON_LEAVE에서 INACTIVE를 거쳐 ACTIVE로 돌아와도 최초 이탈 시각이 유지된다`() {
+    fun `ON_LEAVE에서 INACTIVE를 거쳐 ACTIVE로 돌아오면 제외를 실제로 벗어난 시각이 기록된다`() {
         val member = persistMember(kakaoId = 9227L, status = MemberStatus.ON_LEAVE)
         val adminToken = adminAccessToken(loginId = "admin-status-return-bypass")
-        val leaveExitInstant = Instant.parse("2026-08-20T01:00:00Z")
-        (clock as MutableTestClock).setTo(leaveExitInstant)
+        val leaveToInactiveInstant = Instant.parse("2026-08-20T01:00:00Z")
+        (clock as MutableTestClock).setTo(leaveToInactiveInstant)
 
+        // ① 제외 상태 안에서의 이동 — 아직 벗어난 것이 아니므로 기록하지 않는다.
         mockMvc.perform(statusRequest(member.id!!, adminToken, "INACTIVE")).andExpect(status().isOk)
-        val afterLeaveExit = memberRepository.findById(member.id!!).orElseThrow().returnedFromLeaveAt
-        assertThat(afterLeaveExit).isEqualTo(OffsetDateTime.ofInstant(leaveExitInstant, clock.zone))
+        assertThat(memberRepository.findById(member.id!!).orElseThrow().deductionExclusionExitedAt).isNull()
 
-        val laterInstant = Instant.parse("2026-09-05T03:30:00Z")
-        (clock as MutableTestClock).setTo(laterInstant)
+        // ② 제외 집합을 실제로 벗어나는 전이 — 이 시각이 새 유예의 시작이다.
+        val exitInstant = Instant.parse("2026-09-05T03:30:00Z")
+        (clock as MutableTestClock).setTo(exitInstant)
         mockMvc.perform(statusRequest(member.id!!, adminToken, "ACTIVE")).andExpect(status().isOk)
 
         val reloaded = memberRepository.findById(member.id!!).orElseThrow()
-        assertThat(reloaded.returnedFromLeaveAt).isEqualTo(afterLeaveExit)
+        assertThat(reloaded.deductionExclusionExitedAt).isEqualTo(OffsetDateTime.ofInstant(exitInstant, clock.zone))
     }
 
     private fun statusRequest(

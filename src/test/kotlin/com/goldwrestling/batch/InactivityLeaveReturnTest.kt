@@ -28,14 +28,16 @@ import java.time.LocalDate
 import java.time.OffsetDateTime
 
 /**
- * `ON_LEAVE`에서 벗어나는 우회 복귀 경로(`ON_LEAVE`→`INACTIVE`→`ACTIVE`)에서 휴회 기간이 소급
- * 차감되지 않는다는 것을 실제 배치 실행으로 실증한다(CR-04, BATCH-02, D-111 정정).
+ * **차감 제외 상태(`ON_LEAVE`·`INACTIVE`, `MemberStatus.DEDUCTION_EXCLUDED`)에서 벗어나는 경로**에서
+ * 제외 기간이 소급 차감되지 않는다는 것을 실제 배치 실행으로 실증한다
+ * (CR-04, WR-06, BATCH-02, D-111·D-147 정정). 우회 복귀(`ON_LEAVE`→`INACTIVE`→`ACTIVE`)와
+ * 단순 복귀(`INACTIVE`→`ACTIVE`)를 모두 덮는다.
  *
  * `AdminMemberService.changeStatus`가 이 수정 전에는 `ON_LEAVE`→`ACTIVE` **직행**에서만
- * `returnedFromLeaveAt`을 기록했다 — 그래서 우회 경로는 기준일이 휴회 시작 이전(등록일 등)으로
+ * `deductionExclusionExitedAt`을 기록했다 — 그래서 우회 경로는 기준일이 휴회 시작 이전(등록일 등)으로
  * 되돌아가 휴회 기간 전체가 소급 차감됐다(6개월 휴회 복귀 시 최대 12회). 이 테스트는 상태 전이를
  * `AdminMemberService.changeStatus`로 실제로 일으켜 그 회귀를 방어한다 — 엔티티에 직접
- * `returnedFromLeaveAt`을 대입하면 이번 수정의 회귀 방어가 되지 않는다.
+ * `deductionExclusionExitedAt`을 대입하면 이번 수정의 회귀 방어가 되지 않는다.
  *
  * 애노테이션 조합은 `InactivityBatchIdempotencyTest`와 동일하게
  * `@Import(TestcontainersConfiguration::class, TestClockConfiguration::class)`로 맞춰 컨텍스트
@@ -200,6 +202,107 @@ class InactivityLeaveReturnTest {
         assertThat(result.deductedCount).isGreaterThan(0)
         assertThat(remainingOf(idlePass.id!!)).isLessThan(BigDecimal("5.0"))
         assertLedgerInvariant(idlePass.id!!)
+    }
+
+    /**
+     * WR-06 / D-147 — `INACTIVE`(탈퇴·장기 미이용)도 차감 예외 상태다(policies §4.3).
+     *
+     * 종전에는 대상 조회 필터가 `ON_LEAVE`만 제외해, 탈퇴한 회원의 `SESSION_PASS` 잔여가 2주마다
+     * 계속 깎여 결국 0이 됐다 — 나중에 환불을 요구하면 "시스템이 다 썼다고 한다"는 분쟁이 된다.
+     */
+    @Test
+    fun `INACTIVE 회원은 200일 방치돼도 차감 대상에서 제외된다`() {
+        val registeredAt = OffsetDateTime.parse("2025-06-01T09:00:00+09:00")
+        val admin = persistAdmin()
+
+        val inactiveMember = persistMember()
+        val inactivePass =
+            persistSessionPass(
+                member = inactiveMember,
+                remaining = "5.0",
+                endDate = registeredAt.toLocalDate().plusDays(400),
+                createdAt = registeredAt,
+            )
+        setClock(registeredAt)
+        adminMemberService.changeStatus(inactiveMember.id!!, MemberStatus.INACTIVE)
+
+        // 대조군 — 같은 기간 방치됐지만 ACTIVE인 회원. 같은 실행에서 차감이 발생함을 보여
+        // "배치가 아예 안 돌았다"가 아니라 "이 회원만 제외됐다"를 확인한다.
+        val activeMember = persistMember()
+        val activePass =
+            persistSessionPass(
+                member = activeMember,
+                remaining = "5.0",
+                endDate = registeredAt.toLocalDate().plusDays(400),
+                createdAt = registeredAt,
+            )
+
+        setClock(registeredAt.plusDays(200))
+        runOnce(BatchTrigger.MANUAL, admin.id)
+
+        assertThat(remainingOf(inactivePass.id!!)).isEqualByComparingTo(BigDecimal("5.0"))
+        assertThat(remainingOf(activePass.id!!)).isLessThan(BigDecimal("5.0"))
+        assertLedgerInvariant(inactivePass.id!!)
+        assertLedgerInvariant(activePass.id!!)
+    }
+
+    /**
+     * WR-06 / D-147 — `INACTIVE`에서 복귀하면 **전환일이 기준일 후보 ③**이 되어 2주 유예가 새로
+     * 시작된다(D-105 규칙 재사용). 이것이 없으면 복귀 즉시 비활성 기간 전체가 부족분으로 계산돼
+     * 관리자가 되살린 회원의 잔여가 그 자리에서 몰수된다.
+     */
+    @Test
+    fun `INACTIVE에서 복귀한 회원은 복귀 13일 뒤 배치에서 소급 차감되지 않는다`() {
+        val registeredAt = OffsetDateTime.parse("2025-06-01T09:00:00+09:00")
+        val reactivatedAt = registeredAt.plusDays(200)
+        val admin = persistAdmin()
+
+        val member = persistMember()
+        val pass =
+            persistSessionPass(
+                member = member,
+                remaining = "5.0",
+                endDate = registeredAt.toLocalDate().plusDays(400),
+                createdAt = registeredAt,
+            )
+        setClock(registeredAt)
+        adminMemberService.changeStatus(member.id!!, MemberStatus.INACTIVE)
+        setClock(reactivatedAt)
+        adminMemberService.changeStatus(member.id!!, MemberStatus.ACTIVE)
+
+        setClock(reactivatedAt.plusDays(13))
+        runOnce(BatchTrigger.MANUAL, admin.id)
+
+        assertThat(remainingOf(pass.id!!)).isEqualByComparingTo(BigDecimal("5.0"))
+        assertLedgerInvariant(pass.id!!)
+    }
+
+    /** 위 테스트의 짝 — 복귀 15일째에는 새 유예가 만료돼 **정확히 1회만** 차감된다(캐치업 아님). */
+    @Test
+    fun `INACTIVE에서 복귀한 회원은 복귀 15일째에 정확히 1회만 차감된다`() {
+        val registeredAt = OffsetDateTime.parse("2025-06-01T09:00:00+09:00")
+        val reactivatedAt = registeredAt.plusDays(200)
+        val admin = persistAdmin()
+
+        val member = persistMember()
+        val pass =
+            persistSessionPass(
+                member = member,
+                remaining = "5.0",
+                endDate = registeredAt.toLocalDate().plusDays(400),
+                createdAt = registeredAt,
+            )
+        setClock(registeredAt)
+        adminMemberService.changeStatus(member.id!!, MemberStatus.INACTIVE)
+        setClock(reactivatedAt)
+        adminMemberService.changeStatus(member.id!!, MemberStatus.ACTIVE)
+
+        setClock(reactivatedAt.plusDays(15))
+        val result = runOnce(BatchTrigger.MANUAL, admin.id)
+
+        assertThat(result.deductedCount).isEqualTo(1)
+        assertThat(remainingOf(pass.id!!)).isEqualByComparingTo(BigDecimal("4.0"))
+        assertLedgerInvariant(pass.id!!)
     }
 
     // ── fixtures ──────────────────────────────────────────────────────────

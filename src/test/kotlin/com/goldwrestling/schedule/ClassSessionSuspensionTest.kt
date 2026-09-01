@@ -25,6 +25,7 @@ import com.goldwrestling.reservation.ReservationStatus
 import com.goldwrestling.schedule.dto.SuspendClassSessionRequest
 import com.goldwrestling.support.MutableTestClock
 import com.goldwrestling.support.TestClockConfiguration
+import jakarta.persistence.EntityManager
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
@@ -34,6 +35,7 @@ import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers
 import org.mockito.ArgumentMatchers.anyBoolean
 import org.mockito.ArgumentMatchers.eq
+import org.mockito.BDDMockito.willAnswer
 import org.mockito.BDDMockito.willReturn
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -48,6 +50,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 import java.time.Clock
@@ -103,11 +106,20 @@ class ClassSessionSuspensionTest {
     private lateinit var classSessionRepository: ClassSessionRepository
 
     /**
-     * 스파이인 이유는 `휴강 도중 회원이 먼저 취소한 건은 취소 건수에서 제외된다` 하나뿐이다 —
-     * 그 테스트가 재현하려는 경합(스냅샷 조회와 취소 UPDATE 사이에 회원이 자가 취소)은 실제
-     * 스레드로는 창이 너무 좁아 결정론적으로 만들 수 없어서, `cancelByAdminIfActive`가 0을
-     * 반환하는 상황만 특정 예약 1건에 대해 주입한다. 나머지 테스트는 전부 실제 구현으로 위임된다.
+     * 스파이인 이유는 두 테스트 때문이다 — 둘 다 재현하려는 경합의 창이 마이크로초 단위라 실제
+     * 스레드로는 결정론적으로 만들 수 없어, `cancelByAdminIfActive` 호출에 개입해 t1~t4 순서를
+     * 강제한다. 나머지 테스트는 전부 실제 구현으로 위임된다.
+     * ① `휴강 도중 회원이 먼저 취소한 건은 취소 건수에서 제외된다` — 스냅샷 조회와 취소 UPDATE
+     * 사이에 회원이 자가 취소한 상황을 재현하기 위해 `cancelByAdminIfActive`가 0을 반환하는
+     * 상황만 특정 예약 1건에 대해 주입한다.
+     * ② `휴강 도중 대상 이용권이 등록취소되면 그 건만 복구를 건너뛰고 휴강은 성공한다`(D-145,
+     * 이슈 #12/WR-02) — `cancelByAdminIfActive`가 실제로 취소를 반영하기 **직전**에 별도
+     * `REQUIRES_NEW` 트랜잭션으로 대상 이용권의 등록취소를 먼저 커밋시켜, 스냅샷(④)이 뜬 뒤부터
+     * 복구(⑤)를 반영하기 전까지의 경합 창을 결정적으로 재현한다.
      */
+    @Autowired
+    private lateinit var entityManager: EntityManager
+
     @MockitoSpyBean
     private lateinit var reservationRepository: ReservationRepository
 
@@ -395,6 +407,96 @@ class ClassSessionSuspensionTest {
                 it.pass.id == canceledPass.id && it.reason == TransactionReason.CLASS_CANCELED_REFUND
             }
         assertThat(canceledPassTransactions).isEmpty()
+    }
+
+    @Test
+    fun `휴강 도중 대상 이용권이 등록취소되면 그 건만 복구를 건너뛰고 휴강은 성공한다`() {
+        val admin = persistAdmin()
+        val schedule = findSchedule(DayOfWeek.TUESDAY, ClassType.SESSION, LocalTime.of(11, 0))
+        val classDate = nextClassDate(DayOfWeek.TUESDAY)
+        val session = persistSession(schedule, classDate, reservedCount = 2)
+        val racedMember = persistMember()
+        val racedPass = persistPass(racedMember, admin, PassType.SESSION_PASS, "1.5", PassStatus.ACTIVE)
+        val racedReservation = persistReservation(racedMember, session, schedule, classDate, racedPass)
+        val normalMember = persistMember()
+        val normalPass = persistPass(normalMember, admin, PassType.SESSION_PASS, "1.5", PassStatus.ACTIVE)
+        val normalReservation = persistReservation(normalMember, session, schedule, classDate, normalPass)
+
+        // 스냅샷(④)은 이미 뜬 뒤이고 복구(⑤)는 아직인 상태에서, 무관한 관리자가 racedPass를
+        // 별도(REQUIRES_NEW) 트랜잭션으로 등록취소하고 커밋한다 — 그 다음에야 실제 예약 취소를
+        // 반영한다. 서비스 계층(AdminPassService.cancel)이 아니라 리포지토리를 직접 부르는 이유는
+        // Task 2의 이중 검사가 활성 예약을 이유로 그 경로를 막기 때문이다.
+        //
+        // `invocation.callRealMethod()`는 쓰지 않는다 — `reservationRepository`는 Spring Data
+        // JPA가 인터페이스만으로 생성한 프록시라 구현 클래스가 없고, `@MockitoSpyBean`으로 스파이한
+        // 뒤 그 프록시에 `callRealMethod()`를 호출하면 "추상 메서드는 real method 호출이 불가능하다"
+        // (MockitoException)로 실패한다. 대신 같은 조건부 UPDATE와 동등한 SQL을 `JdbcClient`로 직접
+        // 반영해 반환 행 수(1)를 그대로 흉내 낸다 — 검증 대상은 `cancelByAdminIfActive`가 아니라
+        // `restorePassAfterSuspension`의 재판정이므로, 취소 반영 방식이 JPQL이든 SQL이든 결과(행
+        // 반영)만 같으면 충분하다.
+        willAnswer {
+            TransactionTemplate(transactionManager)
+                .apply { propagationBehavior = TransactionDefinition.PROPAGATION_REQUIRES_NEW }
+                .executeWithoutResult {
+                    passRepository.cancelIfNotCanceled(
+                        racedPass.id!!,
+                        "휴강과 동시 발생한 등록취소",
+                        admin,
+                        OffsetDateTime.now(clock),
+                    )
+                }
+            val updatedRows =
+                jdbcClient
+                    .sql(
+                        "update reservation set status = 'CANCELED', canceled_at = :canceledAt, " +
+                            "canceled_by_admin_id = :adminId, refunded = true " +
+                            "where id = :id and status = 'ACTIVE'",
+                    ).param("canceledAt", OffsetDateTime.now(clock))
+                    .param("adminId", admin.id)
+                    .param("id", racedReservation.id)
+                    .update()
+            // 실제 `cancelByAdminIfActive`는 `@Modifying(clearAutomatically = true)`라 실행 직후 영속성
+            // 컨텍스트를 비운다 — 그 효과를 그대로 흉내 낸다. 이걸 빼면 ④의 fetch join이 1차 캐시에 남긴
+            // ACTIVE Pass를 재조회가 그대로 돌려줘 프로덕션과 다른 경로(0행 → WARN 스킵)로 빠진다.
+            // 이 테스트는 프로덕션과 같은 "재조회가 CANCELED를 읽어 조기 반환" 경로를 고정하고,
+            // 0행 스킵 경로는 ReservationLedgerRestoreTest가 실제 행 잠금 대기로 별도 고정한다.
+            entityManager.clear()
+            updatedRows
+        }.given(reservationRepository).cancelByAdminIfActive(eq(racedReservation.id!!), anyArg(), anyBoolean(), anyArg())
+
+        val response =
+            adminScheduleService.suspend(
+                admin.id!!,
+                SuspendClassSessionRequest(schedule.id!!, classDate, "공휴일 휴관"),
+            )
+
+        // 500 없음 — 휴강은 성공하고 두 예약 모두 취소된다.
+        assertThat(response.status).isEqualTo(ClassSessionStatus.CANCELED)
+        assertThat(response.canceledReservationCount).isEqualTo(2)
+
+        val refreshedRacedReservation = reservationRepository.findById(racedReservation.id!!).get()
+        assertThat(refreshedRacedReservation.status).isEqualTo(ReservationStatus.CANCELED)
+        // 등록취소된 이용권은 잔여가 변하지 않는다 — 등록취소가 이미 REGISTRATION_CANCELED로
+        // 상쇄했으므로 여기서 복구하면 D-059의 취소 의미가 깨진다.
+        val refreshedRacedPass = passRepository.findById(racedPass.id!!).get()
+        assertThat(refreshedRacedPass.status).isEqualTo(PassStatus.CANCELED)
+        assertThat(refreshedRacedPass.remainingCount).isEqualByComparingTo(BigDecimal("1.5"))
+        val racedPassRefundTransactions =
+            passTransactionRepository.findAll().filter {
+                it.pass.id == racedPass.id && it.reason == TransactionReason.CLASS_CANCELED_REFUND
+            }
+        assertThat(racedPassRefundTransactions).isEmpty()
+
+        // 같은 휴강의 다른 정상 이용권은 그대로 +1.0 복구되고 이력 1건이 남는다.
+        val refreshedNormalReservation = reservationRepository.findById(normalReservation.id!!).get()
+        assertThat(refreshedNormalReservation.status).isEqualTo(ReservationStatus.CANCELED)
+        val refreshedNormalPass = passRepository.findById(normalPass.id!!).get()
+        assertThat(refreshedNormalPass.remainingCount).isEqualByComparingTo(BigDecimal("2.5"))
+        val normalPassRefundTransactions =
+            passTransactionRepository.findAll().filter {
+                it.pass.id == normalPass.id && it.reason == TransactionReason.CLASS_CANCELED_REFUND
+            }
+        assertThat(normalPassRefundTransactions).hasSize(1)
     }
 
     @Test

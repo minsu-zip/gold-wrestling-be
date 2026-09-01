@@ -121,13 +121,18 @@ class AdminMemberService(
      * PENDING으로 되돌리는 것)가 이 메서드로만 가능하다. `UpdateMemberStatusRequest`가 요구사항
      * 문구(ACTIVE/ON_LEAVE/INACTIVE 3종)를 넘어 PENDING까지 허용하는 이유이기도 하다.
      *
-     * **휴회 복귀 시각은 "`ON_LEAVE`에서 벗어났을 때" 기록된다** — `ACTIVE`로 돌아왔을 때만이
-     * 아니다. 이 값은 2주 미사용 차감의 기준일 후보 ③이며(D-105), 휴회가 끝난 시각이 곧 2주 유예가
-     * 다시 시작되는 시점이다. `ON_LEAVE → INACTIVE → ACTIVE`처럼 `ACTIVE`를 거치지 않고 우회하는
-     * 실제 운영 경로가 있어, 조건을 "`ACTIVE`로 전이할 때"가 아니라 "`ON_LEAVE`를 벗어날 때"로 잡아야
-     * `ON_LEAVE→INACTIVE` 시점에 값이 채워지고 그 뒤의 `INACTIVE→ACTIVE`에서도 기준일이 살아
-     * 있는다. 이 조건으로 좁혀 두지 않으면(예: `ON_LEAVE→ACTIVE` 직행에서만 기록) 우회 경로에서
-     * 기준일이 휴회 시작 이전으로 되돌아가 휴회 기간 전체가 소급 차감된다(CR-04, D-111 정정).
+     * **차감 제외 상태에서 벗어난 시각은 "제외 집합을 실제로 빠져나올 때" 기록된다**(D-147, WR-06).
+     * 이 값은 2주 미사용 차감의 기준일 후보 ③이며(D-105), 제외가 끝난 시각이 곧 2주 유예가 다시
+     * 시작되는 시점이다. 제외 집합은 policies §4.3의 차감 예외 상태, 즉
+     * [MemberStatus.ON_LEAVE]·[MemberStatus.INACTIVE] 두 개다.
+     *
+     * 조건을 "`ACTIVE`로 전이할 때"가 아니라 "제외 집합을 벗어날 때"로 잡는 이유는
+     * `ON_LEAVE → INACTIVE → ACTIVE`처럼 `ACTIVE`를 거치지 않고 우회하는 실제 운영 경로가 있기
+     * 때문이다(CR-04, D-111 정정). 반대로 **제외 집합 안에서의 이동(`ON_LEAVE→INACTIVE`)은 기록하지
+     * 않는다** — 그 시점에는 아직 차감이 재개되지 않으므로 유예를 다시 시작할 이유가 없고, 기록해
+     * 두면 `INACTIVE`로 오래 머문 회원이 복귀했을 때 기준일이 그 오래전 시각으로 남아 복귀 즉시
+     * 소급 차감된다(WR-06이 지적한 바로 그 문제). 종전 규칙(`ON_LEAVE`만 제외 상태)에서는
+     * `ON_LEAVE→INACTIVE`가 곧 제외 집합 이탈이었으므로 이 변경은 규칙의 확장이지 방향 전환이 아니다.
      */
     @Transactional
     fun changeStatus(
@@ -140,8 +145,8 @@ class AdminMemberService(
         }
         val previousStatus = member.status
         member.status = newStatus
-        if (previousStatus == MemberStatus.ON_LEAVE && newStatus != MemberStatus.ON_LEAVE) {
-            member.returnedFromLeaveAt = OffsetDateTime.now(clock)
+        if (previousStatus in MemberStatus.DEDUCTION_EXCLUDED && newStatus !in MemberStatus.DEDUCTION_EXCLUDED) {
+            member.deductionExclusionExitedAt = OffsetDateTime.now(clock)
         }
         if (newStatus == MemberStatus.PENDING) {
             member.rejectionReason = null

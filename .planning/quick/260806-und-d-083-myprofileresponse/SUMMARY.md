@@ -1,5 +1,6 @@
 ---
 quick_id: 260806-und
+status: complete
 phase: quick/260806-und
 plan: 01
 subsystem: auth/member

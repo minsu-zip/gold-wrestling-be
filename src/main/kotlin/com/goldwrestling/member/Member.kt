@@ -27,15 +27,22 @@ import java.time.OffsetDateTime
  * [kakaoNickname]·[kakaoProfileImageUrl]은 카카오가 준 **표시용 보조 정보**이지 운영 기준 신원이
  * 아니다(D-083). 매 로그인마다 [applyKakaoProfile]로 갱신되며, 동의가 없으면 값이 없는 것이 정상이다.
  *
- * [returnedFromLeaveAt]은 **`ON_LEAVE`에서 벗어나는 모든 전이**에서 갱신한다 — `→ACTIVE`뿐 아니라
- * `→INACTIVE`·`→PENDING`도 포함한다(D-105 기준일 후보 ③, D-111 정정). `ON_LEAVE`가 아닌 상태에서
- * 출발하는 전이는 이 값을 건드리지 않는다. `Reservation.canceledAt`과 같은 단일 목적 시각 컬럼이다.
+ * [deductionExclusionExitedAt]은 **차감 제외 상태(`ON_LEAVE`·`INACTIVE`)를 벗어나는 전이**에서
+ * 갱신한다(D-105 기준일 후보 ③, D-111·D-147 정정). 제외 상태 **안에서의 이동**
+ * (`ON_LEAVE→INACTIVE`, `INACTIVE→ON_LEAVE`)은 아직 벗어난 것이 아니므로 값을 건드리지 않고,
+ * 제외 상태가 아닌 곳에서 출발하는 전이도 건드리지 않는다. `Reservation.canceledAt`과 같은 단일
+ * 목적 시각 컬럼이다.
  *
- * **`→ACTIVE`로 좁히지 말 것**(05-REVIEW.md CR-04). 관리자가 장기 휴회자를 `INACTIVE`로 내렸다가
- * 되살리는 `ON_LEAVE→INACTIVE→ACTIVE` 경로에서 값이 비면, 미사용 차감의 기준일이 휴회 전 등록일로
- * 되돌아가 **휴회 기간 전체가 소급 차감된다**(6개월 휴회 복귀 시 최대 12회). 휴회가 끝난 시각이 곧
- * 유예가 다시 시작되는 시점이므로 "벗어날 때 기록"이 의미상으로도 정확하다.
+ * **"`→ACTIVE`일 때"로 좁히지 말 것**(05-REVIEW.md CR-04). 관리자가 장기 휴회자를 `INACTIVE`로
+ * 내렸다가 되살리는 `ON_LEAVE→INACTIVE→ACTIVE` 경로에서 값이 비면, 미사용 차감의 기준일이 휴회 전
+ * 등록일로 되돌아가 **제외 기간 전체가 소급 차감된다**(6개월 휴회 복귀 시 최대 12회). 제외가 끝난
+ * 시각이 곧 유예가 다시 시작되는 시점이므로 "벗어날 때 기록"이 의미상으로도 정확하다.
  * 판정은 `AdminMemberService.changeStatus`가 하고, `InactivityLeaveReturnTest`가 우회 경로를 고정한다.
+ *
+ * **이름이 `returnedFromLeaveAt`이 아닌 이유**(D-147, WR-06): policies §4.3의 차감 예외에 `INACTIVE`가
+ * 더해지면서 이 값은 "휴회 복귀 시각"이 아니라 "차감 제외 상태에서 벗어난 시각"이 됐다. 탈퇴·장기
+ * 미이용(`INACTIVE`) 회원도 차감되지 않으므로, 그 상태에서 돌아온 시각 역시 유예가 다시 시작되는
+ * 시점이다.
  */
 @Entity
 @Table(name = "member")
@@ -60,8 +67,8 @@ class Member(
     var kakaoNickname: String? = null,
     @Column(name = "kakao_profile_image_url", length = MAX_KAKAO_PROFILE_IMAGE_URL_LENGTH)
     var kakaoProfileImageUrl: String? = null,
-    @Column(name = "returned_from_leave_at")
-    var returnedFromLeaveAt: OffsetDateTime? = null,
+    @Column(name = "deduction_exclusion_exited_at")
+    var deductionExclusionExitedAt: OffsetDateTime? = null,
 ) {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
