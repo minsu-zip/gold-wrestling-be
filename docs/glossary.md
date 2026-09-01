@@ -76,7 +76,7 @@
 | 정책 시행일            | `policyEffectiveDate`    | 2주 미사용 차감이 "존재하기 시작한 날"(기본 `2026-09-01`). 이 날짜 이전의 미사용은 차감 부채로 치지 않는다 — 배포 후 첫 실행이 과거 전체를 소급 차감하는 것을 막는 유일한 장치다(D-119) |
 | 1회 실행 상한          | `maxDeductionsPerRun`    | 배치 1회 실행에서 회원 1명당 차감할 수 있는 최대 횟수(기본 `1`). 잘린 주기는 다음 실행들이 이어받으므로 캐치업의 속도만 늦추고 총량은 바꾸지 않는다(D-119) |
 | 부족분                 | `shortfall`              | `floor(기준일→오늘 경과일 / 14)` − 기준일 이후 `INACTIVITY` 이력 건수(D-106)                                     |
-| 휴회 복귀 시각         | `returnedFromLeaveAt`    | DB `member.returned_from_leave_at` — `ON_LEAVE`에서 벗어난 전이의 시각(대상 상태 무관). 그 외 상태 전이에서는 기록하지 않는다(D-105 기준일 후보 ③ 전용, D-111 CR-04 정정) |
+| 차감 제외 이탈 시각     | `deductionExclusionExitedAt` | DB `member.deduction_exclusion_exited_at` — 차감 제외 상태(`ON_LEAVE`·`INACTIVE`, `MemberStatus.DEDUCTION_EXCLUDED`)를 **벗어난** 전이의 시각. 제외 상태 안에서의 이동(`ON_LEAVE→INACTIVE`)과 그 외 전이에서는 기록하지 않는다(D-105 기준일 후보 ③ 전용, D-111 CR-04 정정, D-147 확장·리네임) |
 
 ## 운영 (Phase 6)
 

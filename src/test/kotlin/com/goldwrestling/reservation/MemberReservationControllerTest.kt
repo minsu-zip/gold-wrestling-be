@@ -486,6 +486,99 @@ class MemberReservationControllerTest {
             .andExpect(jsonPath("$.content.length()").value(1))
     }
 
+    /**
+     * BE-REQ-004 / D-150 — 지난 예약도 계속 `ACTIVE`로 남고 정렬이 `classDate` 오름차순이라,
+     * 기간 필터가 없으면 시간이 지날수록 "다가오는 예약"이 뒤 페이지로 밀린다. `from`/`to`는
+     * 수업 날짜 기준이며 **양끝을 포함**한다.
+     */
+    @Test
+    fun `from-to로 수업 날짜 범위를 좁혀 조회할 수 있고 경계일이 포함된다`() {
+        val member = persistMember(MemberStatus.ACTIVE)
+        val (token, monday) = tokenAtThisWeekMonday(member)
+        persistPass(member, PassType.SESSION_PASS, "5.0")
+        val tuesdaySchedule = findSchedule(DayOfWeek.TUESDAY, ClassType.SESSION, LocalTime.of(11, 0))
+        val fridaySchedule = findSchedule(DayOfWeek.FRIDAY, ClassType.SESSION, LocalTime.of(11, 0))
+        val tuesday = monday.plusDays(DayOfWeek.TUESDAY.value - 1L)
+        val friday = monday.plusDays(DayOfWeek.FRIDAY.value - 1L)
+        val tuesdayReservationId = createReservation(token, tuesdaySchedule.id!!, tuesday)
+        val fridayReservationId = createReservation(token, fridaySchedule.id!!, friday)
+
+        // from = 금요일 → 금요일 예약만 (경계일 포함)
+        mockMvc
+            .perform(
+                get("/api/members/me/reservations")
+                    .param("from", friday.toString())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token"),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.totalElements").value(1))
+            .andExpect(jsonPath("$.content[0].id").value(fridayReservationId))
+
+        // to = 화요일 → 화요일 예약만 (경계일 포함)
+        mockMvc
+            .perform(
+                get("/api/members/me/reservations")
+                    .param("to", tuesday.toString())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token"),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.totalElements").value(1))
+            .andExpect(jsonPath("$.content[0].id").value(tuesdayReservationId))
+
+        // from~to 양끝 모두 지정 → 둘 다
+        mockMvc
+            .perform(
+                get("/api/members/me/reservations")
+                    .param("from", tuesday.toString())
+                    .param("to", friday.toString())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token"),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.totalElements").value(2))
+    }
+
+    /** 하위 호환 — 파라미터를 주지 않으면 종전과 같이 전체를 반환한다(FE 기존 호출이 그대로 동작). */
+    @Test
+    fun `from-to를 생략하면 기간 조건 없이 전체 활성 예약이 온다`() {
+        val member = persistMember(MemberStatus.ACTIVE)
+        val (token, monday) = tokenAtThisWeekMonday(member)
+        persistPass(member, PassType.SESSION_PASS, "5.0")
+        val tuesdaySchedule = findSchedule(DayOfWeek.TUESDAY, ClassType.SESSION, LocalTime.of(11, 0))
+        val fridaySchedule = findSchedule(DayOfWeek.FRIDAY, ClassType.SESSION, LocalTime.of(11, 0))
+        createReservation(token, tuesdaySchedule.id!!, monday.plusDays(DayOfWeek.TUESDAY.value - 1L))
+        createReservation(token, fridaySchedule.id!!, monday.plusDays(DayOfWeek.FRIDAY.value - 1L))
+
+        mockMvc
+            .perform(get("/api/members/me/reservations").header(HttpHeaders.AUTHORIZATION, "Bearer $token"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.totalElements").value(2))
+    }
+
+    /** 범위 밖만 지정하면 빈 페이지 — 뒤집힌 범위(from > to)도 같은 결과이고 예외를 던지지 않는다. */
+    @Test
+    fun `수업 날짜가 범위 밖이면 빈 페이지가 온다`() {
+        val member = persistMember(MemberStatus.ACTIVE)
+        val (token, monday) = tokenAtThisWeekMonday(member)
+        persistPass(member, PassType.SESSION_PASS, "3.0")
+        val schedule = findSchedule(DayOfWeek.TUESDAY, ClassType.SESSION, LocalTime.of(11, 0))
+        val tuesday = monday.plusDays(DayOfWeek.TUESDAY.value - 1L)
+        createReservation(token, schedule.id!!, tuesday)
+
+        mockMvc
+            .perform(
+                get("/api/members/me/reservations")
+                    .param("from", tuesday.plusDays(1).toString())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token"),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.totalElements").value(0))
+
+        mockMvc
+            .perform(
+                get("/api/members/me/reservations")
+                    .param("from", tuesday.plusDays(1).toString())
+                    .param("to", tuesday.minusDays(1).toString())
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer $token"),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.totalElements").value(0))
+    }
+
     /** 예약 생성 후 응답에서 id만 뽑아 이후 취소·변경 호출의 경로 변수로 쓴다. */
     private fun createReservation(
         token: String,

@@ -237,7 +237,7 @@ class InactivityBatchFailureIsolationTest {
         persistDeductiblePass(member)
         willThrow(IllegalStateException(LEAKY_MESSAGE))
             .given(memberRepository)
-            .findReturnedFromLeaveTimestamps(anyCollection())
+            .findDeductionExclusionExitTimestamps(anyCollection())
 
         assertThatThrownBy { inactivityBatchRunner.run(BatchTrigger.SCHEDULED, null) }
             .isInstanceOf(IllegalStateException::class.java)
@@ -257,7 +257,7 @@ class InactivityBatchFailureIsolationTest {
         val pass = persistDeductiblePass(member)
         willThrow(IllegalStateException(LEAKY_MESSAGE))
             .given(memberRepository)
-            .findReturnedFromLeaveTimestamps(anyCollection())
+            .findDeductionExclusionExitTimestamps(anyCollection())
 
         assertThatThrownBy { inactivityBatchRunner.run(BatchTrigger.SCHEDULED, null) }
             .isInstanceOf(IllegalStateException::class.java)

@@ -261,7 +261,7 @@ class InactivityBatchRunnerTest {
     fun `20일 전 등록에 3일 전 휴회 복귀가 있으면 복귀일이 기준일이라 차감되지 않는다`() {
         val member = persistMember()
         val pass = persistSessionPass(member, remaining = "2.0", endDate = today.plusDays(30), createdAt = today.minusDays(20).atTime9am())
-        member.returnedFromLeaveAt = today.minusDays(3).atTime9am()
+        member.deductionExclusionExitedAt = today.minusDays(3).atTime9am()
         memberRepository.saveAndFlush(member)
 
         inactivityBatchRunner.run(BatchTrigger.SCHEDULED, null).let { createdBatchExecutionIds += it.id!! }

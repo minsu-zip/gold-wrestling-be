@@ -59,6 +59,11 @@ class AttendanceService(
      * 특정 시간표·날짜의 출석 명단을 조회한다(D-132) — 관리자가 타임별 참여자 명단을 출석 상태와
      * 함께 한 번에 볼 수 있게 한다(policies §6).
      *
+     * 각 항목의 `phoneNumber`는 동명이인 구분용이다(BE-REQ-005, D-148). 두 분기 모두 회원을
+     * **fetch join으로 이미 가져오는 조회**(`findAllByClassSessionIdWithMember`·
+     * `findAllByClassSessionIdInAndStatusWithMember`)를 쓰므로 추가 쿼리가 발생하지 않는다 —
+     * 여기서 회원별로 다시 조회하면 명단 20명이 곧 N+1이 된다.
+     *
      * [ClassSessionService.findExisting]만 쓰고 `getOrCreate`를 쓰지 않는다 — 조회가 세션 행을
      * 만들면 관리자가 화면을 열기만 해도 빈 세션이 쌓인다(`ScheduleService`가 조회 경로에서
      * `findExisting`을 쓰는 것과 같은 이유). 세션이 없으면 [classScheduleId]가 가리키는 시간표에서
@@ -94,6 +99,7 @@ class AttendanceService(
                     AttendanceRosterEntryResponse(
                         memberId = requireMemberId(attendance),
                         memberName = requireMemberName(attendance.member.id, attendance.member.name),
+                        phoneNumber = attendance.member.phoneNumber,
                         reservationId = null,
                         attendanceId = attendance.id,
                         status = attendance.status,
@@ -111,6 +117,7 @@ class AttendanceService(
                     AttendanceRosterEntryResponse(
                         memberId = requireNotNull(reservation.member.id) { "저장되지 않은 Member를 참조하는 Reservation은 명단에 담을 수 없습니다." },
                         memberName = requireMemberName(reservation.member.id, reservation.member.name),
+                        phoneNumber = reservation.member.phoneNumber,
                         reservationId = reservation.id,
                         attendanceId = attendance?.id,
                         status = attendance?.status,
