@@ -51,6 +51,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.OffsetDateTime
+import java.time.temporal.TemporalAdjusters
 
 /**
  * 출석 관리자 API 4종의 HTTP 계약(ATTEND-01·02, D-132)을 검증한다: 명단 조회·예약제/1:1 체크·
@@ -161,7 +162,7 @@ class AdminAttendanceControllerTest {
         val admin = persistAdmin()
         val token = adminAccessToken(admin)
         val schedule = sessionSchedule()
-        val classDate = nextClassDate()
+        val classDate = nextClassDate(schedule)
         val session = persistSession(schedule, classDate)
         val member = persistMember()
         val pass = persistSessionPass(member, "5.0", classDate.plusYears(1))
@@ -184,7 +185,7 @@ class AdminAttendanceControllerTest {
         val admin = persistAdmin()
         val token = adminAccessToken(admin)
         val schedule = sessionSchedule()
-        val classDate = nextClassDate()
+        val classDate = nextClassDate(schedule)
         val session = persistSession(schedule, classDate)
         val member = persistMember()
         val pass = persistSessionPass(member, "5.0", classDate.plusYears(1))
@@ -208,7 +209,7 @@ class AdminAttendanceControllerTest {
         val admin = persistAdmin()
         val token = adminAccessToken(admin)
         val schedule = eveningSchedule()
-        val classDate = nextClassDate()
+        val classDate = nextClassDate(schedule)
         val member = persistMember()
         persistSessionPass(member, "2.0", classDate.plusYears(1))
 
@@ -231,7 +232,7 @@ class AdminAttendanceControllerTest {
         val admin = persistAdmin()
         val token = adminAccessToken(admin)
         val schedule = eveningSchedule()
-        val classDate = nextClassDate()
+        val classDate = nextClassDate(schedule)
         val member = persistMember()
         persistSessionPass(member, "2.0", classDate.plusYears(1))
 
@@ -259,7 +260,7 @@ class AdminAttendanceControllerTest {
         val admin = persistAdmin()
         val token = adminAccessToken(admin)
         val schedule = sessionSchedule()
-        val classDate = nextClassDate()
+        val classDate = nextClassDate(schedule)
         val nonReservedMember = persistMember()
 
         mockMvc
@@ -280,7 +281,7 @@ class AdminAttendanceControllerTest {
         val admin = persistAdmin()
         val token = adminAccessToken(admin)
         val schedule = eveningSchedule()
-        val classDate = nextClassDate()
+        val classDate = nextClassDate(schedule)
         val member = persistMember()
 
         mockMvc
@@ -300,7 +301,7 @@ class AdminAttendanceControllerTest {
         val admin = persistAdmin()
         val token = adminAccessToken(admin)
         val schedule = eveningSchedule()
-        val classDate = nextClassDate()
+        val classDate = nextClassDate(schedule)
         val member = persistMember()
         persistSessionPass(member, "0.0", classDate.plusYears(1))
 
@@ -333,7 +334,7 @@ class AdminAttendanceControllerTest {
         val member = persistMember()
         val memberToken = tokenService.issueTokenPair(PrincipalType.MEMBER, member.id!!).accessToken
         val schedule = sessionSchedule()
-        val classDate = nextClassDate()
+        val classDate = nextClassDate(schedule)
 
         mockMvc
             .perform(
@@ -462,8 +463,15 @@ class AdminAttendanceControllerTest {
             ),
         )
 
-    /** 매 호출마다 서로 다른 [LocalDate]를 써서 `uq_class_session`(class_schedule_id, class_date)을 피한다. */
-    private fun nextClassDate(): LocalDate = BASE_SESSION_DATE.plusDays(sessionDateCounter++)
+    /**
+     * 매 호출마다 서로 다른 [LocalDate]를 쓰되, **항상 [schedule]의 요일에 맞춘 날짜만 반환한다**
+     * (D-146, policies §2) — 요일이 어긋난 조합은 `ClassSessionService.getOrCreate`가 404로
+     * 거부한다. 하루씩이 아니라 1주씩 더해 같은 요일을 유지하면서 날짜 유일성도 함께 얻는다.
+     */
+    private fun nextClassDate(schedule: ClassSchedule): LocalDate =
+        BASE_SESSION_DATE
+            .with(TemporalAdjusters.nextOrSame(schedule.dayOfWeek))
+            .plusWeeks(sessionDateCounter++)
 
     private fun trackSession(sessionId: Long?) {
         if (sessionId != null) createdSessionIds += sessionId

@@ -46,7 +46,7 @@
 
 | 코드 | HTTP 상태 | 의미 | 발생 지점 |
 |---|---|---|---|
-| `CLASS_SCHEDULE_NOT_FOUND` | 404 | 요청한 정기 시간표 행이 없음 | `AdminScheduleService`, `MemberReservationService`, `AdminReservationService` |
+| `CLASS_SCHEDULE_NOT_FOUND` | 404 | 요청한 정기 시간표 행이 없음, **또는 시간표 요일과 수업 날짜의 요일이 어긋난 조합**(D-146 — 존재하지 않는 (시간표, 날짜) 조합. 존재 여부를 흘리지 않으려 403이 아니라 404로 통일) | `ClassSessionService`(요일 검증 — 전 쓰기 경로 공통), `AdminScheduleService`, `MemberReservationService`, `AdminReservationService`, `AttendanceService` |
 | `CLASS_SESSION_NOT_FOUND` | 404 | 요청한 날짜별 수업(ClassSession) 행이 없음 (휴강 해제 대상 조회, RESV-09) | `AdminScheduleService` |
 | `CLASS_SESSION_CANCELED` | 409 | 휴강된 수업에 예약·변경 시도, 또는 이미 휴강인 수업에 재휴강 시도 (policies §7) | `ClassSession`(판정), `AdminScheduleService`(휴강 처리 CAS 경쟁 패배) |
 | `CLASS_SESSION_NOT_CANCELED` | 409 | 휴강 상태가 아닌 수업에 휴강 해제 시도 | `ClassSession`(판정), `AdminScheduleService`(휴강 해제 CAS 경쟁 패배) |

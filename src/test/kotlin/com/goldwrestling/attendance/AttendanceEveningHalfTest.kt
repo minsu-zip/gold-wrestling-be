@@ -30,6 +30,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.simple.JdbcClient
 import java.math.BigDecimal
 import java.time.LocalDate
+import java.time.temporal.TemporalAdjusters
 
 /**
  * 저녁반 0.5회 차감(`AttendanceService.addEveningAttendance`/`delete`, ATTEND-02, policies §4.2,
@@ -118,7 +119,7 @@ class AttendanceEveningHalfTest {
     @Test
     fun `유효한 저녁반 회비가 있으면 차감하지 않는다`() {
         val schedule = songpaEveningSchedule()
-        val classDate = nextClassDate()
+        val classDate = nextClassDate(schedule)
         val member = persistMember()
         val admin = persistAdmin()
         persistEveningMembership(member, startDate = classDate.minusMonths(1), endDate = classDate.plusMonths(1))
@@ -140,7 +141,7 @@ class AttendanceEveningHalfTest {
     @Test
     fun `회비가 없으면 만료가 가장 임박한 횟수권에서 0-5회를 차감한다`() {
         val schedule = songpaEveningSchedule()
-        val classDate = nextClassDate()
+        val classDate = nextClassDate(schedule)
         val member = persistMember()
         val admin = persistAdmin()
         val soonerPass = persistSessionPass(member, remaining = "2.0", endDate = classDate.plusMonths(1))
@@ -165,7 +166,7 @@ class AttendanceEveningHalfTest {
     @Test
     fun `잔여 0-5회면 저녁반 0-5회 참여만 가능하다`() {
         val schedule = songpaEveningSchedule()
-        val classDate = nextClassDate()
+        val classDate = nextClassDate(schedule)
         val member = persistMember()
         val admin = persistAdmin()
         val pass = persistSessionPass(member, remaining = "0.5", endDate = classDate.plusYears(1))
@@ -184,7 +185,7 @@ class AttendanceEveningHalfTest {
     @Test
     fun `회비도 없고 잔여가 0-5회 미만이면 저녁반 출석을 기록할 수 없다`() {
         val schedule = songpaEveningSchedule()
-        val classDate = nextClassDate()
+        val classDate = nextClassDate(schedule)
         val member = persistMember()
         val admin = persistAdmin()
         val pass = persistSessionPass(member, remaining = "0.0", endDate = classDate.plusYears(1))
@@ -203,7 +204,7 @@ class AttendanceEveningHalfTest {
     @Test
     fun `저녁반 출석을 삭제하면 0-5회가 복구된다`() {
         val schedule = songpaEveningSchedule()
-        val classDate = nextClassDate()
+        val classDate = nextClassDate(schedule)
         val member = persistMember()
         val admin = persistAdmin()
         val pass = persistSessionPass(member, remaining = "2.0", endDate = classDate.plusYears(1))
@@ -231,7 +232,8 @@ class AttendanceEveningHalfTest {
     fun `유효기간 판정 기준일은 오늘이 아니라 수업날이다`() {
         val schedule = songpaEveningSchedule()
         // 오늘(FIXED_TODAY = 2026-08-02) 기준으로는 이미 만료됐지만, 수업날(과거) 기준으로는 유효한 이용권.
-        val classDate = LocalDate.of(2026, 6, 1)
+        // 시간표 요일에 맞춘 6월 첫 주의 날짜를 쓴다(D-146) — 아래 이용권 종료일(6/15)보다 앞선다.
+        val classDate = LocalDate.of(2026, 6, 1).with(TemporalAdjusters.nextOrSame(schedule.dayOfWeek))
         val member = persistMember()
         val admin = persistAdmin()
         val pass = persistSessionPass(member, remaining = "1.0", endDate = LocalDate.of(2026, 6, 15))
@@ -250,7 +252,7 @@ class AttendanceEveningHalfTest {
     @Test
     fun `같은 회원을 같은 저녁반 수업에 두 번 추가할 수 없다`() {
         val schedule = songpaEveningSchedule()
-        val classDate = nextClassDate()
+        val classDate = nextClassDate(schedule)
         val member = persistMember()
         val admin = persistAdmin()
         val pass = persistSessionPass(member, remaining = "2.0", endDate = classDate.plusYears(1))
@@ -277,7 +279,7 @@ class AttendanceEveningHalfTest {
     @Test
     fun `타 지점 회원은 저녁반 출석으로 차감할 수 없다`() {
         val schedule = songpaEveningSchedule()
-        val classDate = nextClassDate()
+        val classDate = nextClassDate(schedule)
         val member = persistOtherBranchMember()
         val admin = persistAdmin()
         val pass = persistSessionPass(member, remaining = "2.0", endDate = classDate.plusYears(1))
@@ -290,6 +292,32 @@ class AttendanceEveningHalfTest {
         assertThat(attendanceRepository.findAll().none { it.member.id == member.id }).isTrue()
         // 지점 검증이 getOrCreate보다 앞서므로 빈 세션도 만들어지지 않는다(T-06-18과 같은 이유).
         assertThat(classSessionRepository.findByClassScheduleIdAndClassDate(schedule.id!!, classDate)).isNull()
+    }
+
+    /**
+     * D-146(D-136 미해결 항목 마감) — 보강 수업은 v1에서 허용하지 않으므로, 시간표 요일과 어긋난
+     * 날짜로는 저녁반 출석을 추가할 수 없다. 이 검사가 없으면 관리자가 "열리지 않은 요일"에도
+     * 세션을 만들어 회원 이용권에서 0.5회를 차감할 수 있었다(policies §2).
+     */
+    @Test
+    fun `시간표 요일과 다른 날짜로는 저녁반 출석을 추가할 수 없다`() {
+        val schedule = songpaEveningSchedule()
+        val mismatchedDate = nextClassDate(schedule).plusDays(1)
+        val member = persistMember()
+        val admin = persistAdmin()
+        val pass = persistSessionPass(member, remaining = "2.0", endDate = mismatchedDate.plusYears(1))
+
+        assertThatThrownBy {
+            attendanceService.addEveningAttendance(
+                admin.id!!,
+                AddEveningAttendanceRequest(schedule.id!!, mismatchedDate, member.id!!),
+            )
+        }.isInstanceOf(ClassScheduleNotFoundException::class.java)
+
+        assertThat(passRepository.findById(pass.id!!).get().remainingCount).isEqualByComparingTo(BigDecimal("2.0"))
+        assertThat(attendanceRepository.findAll().none { it.member.id == member.id }).isTrue()
+        // 거부가 세션 실체화보다 앞서므로 빈 세션도 남지 않는다.
+        assertThat(classSessionRepository.findByClassScheduleIdAndClassDate(schedule.id!!, mismatchedDate)).isNull()
     }
 
     // ── fixtures ──────────────────────────────────────────────────────────
@@ -357,8 +385,20 @@ class AttendanceEveningHalfTest {
             ),
         )
 
-    /** 매 호출마다 서로 다른 [LocalDate]를 써서 `uq_class_session`(class_schedule_id, class_date)을 피한다. */
-    private fun nextClassDate(): LocalDate = BASE_SESSION_DATE.plusDays(sessionDateCounter++)
+    /**
+     * 매 호출마다 서로 다른 [LocalDate]를 써서 `uq_class_session`(class_schedule_id, class_date)을
+     * 피하되, **항상 [schedule]의 요일에 맞춘 날짜만 반환한다**(D-146, policies §2).
+     *
+     * 종전에는 `BASE_SESSION_DATE.plusDays(n)`으로 연속된 날짜를 썼는데, 그러면 대부분의 케이스가
+     * "월요일 저녁반 시간표 + 화요일 날짜" 같은 **요일이 어긋난 조합**이 된다. 그 조합으로도 세션이
+     * 만들어지던 것이 D-136이 미해결로 남겨 둔 항목이고, 이제 `ClassSessionService.getOrCreate`가
+     * 그런 조합을 404로 거부하므로 픽스처를 정렬한다. 하루씩이 아니라 **1주씩** 더해 같은 요일을
+     * 유지하면서 날짜 유일성도 함께 얻는다.
+     */
+    private fun nextClassDate(schedule: ClassSchedule): LocalDate =
+        BASE_SESSION_DATE
+            .with(TemporalAdjusters.nextOrSame(schedule.dayOfWeek))
+            .plusWeeks(sessionDateCounter++)
 
     private fun trackSession(sessionId: Long?) {
         if (sessionId != null) createdSessionIds += sessionId

@@ -17,6 +17,7 @@ import com.goldwrestling.reservation.Reservation
 import com.goldwrestling.reservation.ReservationRepository
 import com.goldwrestling.reservation.ReservationStatus
 import com.goldwrestling.schedule.ClassSchedule
+import com.goldwrestling.schedule.ClassScheduleNotFoundException
 import com.goldwrestling.schedule.ClassScheduleRepository
 import com.goldwrestling.schedule.ClassSession
 import com.goldwrestling.schedule.ClassSessionRepository
@@ -34,6 +35,7 @@ import org.springframework.jdbc.core.simple.JdbcClient
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.OffsetDateTime
+import java.time.temporal.TemporalAdjusters
 
 /**
  * `AttendanceService`의 예약제/1:1 경로(명단 프리로드·건별 upsert)를 실제 PostgreSQL
@@ -125,7 +127,7 @@ class AttendanceServiceTest {
     @Test
     fun `세션이 없으면 명단은 비어 있고 세션을 만들지 않는다`() {
         val schedule = songpaSessionSchedule()
-        val classDate = nextClassDate()
+        val classDate = nextClassDate(schedule)
 
         val roster = attendanceService.getRoster(schedule.id!!, classDate)
 
@@ -137,7 +139,7 @@ class AttendanceServiceTest {
     @Test
     fun `예약제 수업 명단에는 활성 예약자가 전원 나오고 체크 전에는 상태가 비어 있다`() {
         val schedule = songpaSessionSchedule()
-        val classDate = nextClassDate()
+        val classDate = nextClassDate(schedule)
         val session = persistClassSession(schedule, classDate)
         val member = persistMember()
         val pass = persistSessionPass(member, remaining = "3.0", endDate = classDate.plusYears(1))
@@ -157,7 +159,7 @@ class AttendanceServiceTest {
     @Test
     fun `취소된 예약자는 명단에 나오지 않는다`() {
         val schedule = songpaSessionSchedule()
-        val classDate = nextClassDate()
+        val classDate = nextClassDate(schedule)
         val session = persistClassSession(schedule, classDate)
         val activeMember = persistMember()
         val activePass = persistSessionPass(activeMember, remaining = "3.0", endDate = classDate.plusYears(1))
@@ -180,7 +182,7 @@ class AttendanceServiceTest {
     @Test
     fun `불참으로 체크했다가 출석으로 정정할 수 있다`() {
         val schedule = songpaSessionSchedule()
-        val classDate = nextClassDate()
+        val classDate = nextClassDate(schedule)
         val session = persistClassSession(schedule, classDate)
         val member = persistMember()
         val pass = persistSessionPass(member, remaining = "3.0", endDate = classDate.plusYears(1))
@@ -198,7 +200,7 @@ class AttendanceServiceTest {
     @Test
     fun `예약자가 아닌 회원은 출석 체크할 수 없다`() {
         val schedule = songpaSessionSchedule()
-        val classDate = nextClassDate()
+        val classDate = nextClassDate(schedule)
         persistClassSession(schedule, classDate)
         val member = persistMember()
         val admin = persistAdmin()
@@ -208,10 +210,33 @@ class AttendanceServiceTest {
         }.isInstanceOf(AttendanceMemberNotReservedException::class.java)
     }
 
+    /**
+     * D-146(D-136 미해결 항목 마감) — 보강 수업은 v1에서 허용하지 않으므로, 출석 체크 경로도 요일이
+     * 어긋난 `(시간표, 날짜)` 조합으로는 세션을 만들지 않는다(policies §2). 예약 경로가 이미
+     * 강제하던 불변식을 `ClassSessionService.getOrCreate`로 내려 전 쓰기 경로에 적용한 결과다.
+     */
+    @Test
+    fun `시간표 요일과 다른 날짜로는 출석을 체크할 수 없다`() {
+        val schedule = songpaSessionSchedule()
+        val mismatchedDate = nextClassDate(schedule).plusDays(1)
+        val member = persistMember()
+        val admin = persistAdmin()
+
+        assertThatThrownBy {
+            attendanceService.check(
+                admin.id!!,
+                CheckAttendanceRequest(schedule.id!!, mismatchedDate, member.id!!, AttendanceStatus.ATTENDED),
+            )
+        }.isInstanceOf(ClassScheduleNotFoundException::class.java)
+
+        // 거부가 세션 실체화보다 앞서므로 빈 세션도 남지 않는다.
+        assertThat(sessionCount(schedule.id!!, mismatchedDate)).isZero()
+    }
+
     @Test
     fun `저녁반 수업에는 예약자 출석 체크 경로를 쓸 수 없다`() {
         val schedule = songpaEveningSchedule()
-        val classDate = nextClassDate()
+        val classDate = nextClassDate(schedule)
         val member = persistMember()
         val admin = persistAdmin()
 
@@ -223,7 +248,7 @@ class AttendanceServiceTest {
     @Test
     fun `출석 기록은 차감과 무관한 참고용 데이터라 잔여와 이력이 변하지 않는다`() {
         val schedule = songpaSessionSchedule()
-        val classDate = nextClassDate()
+        val classDate = nextClassDate(schedule)
         val session = persistClassSession(schedule, classDate)
         val member = persistMember()
         val pass = persistSessionPass(member, remaining = "3.0", endDate = classDate.plusYears(1))
@@ -275,8 +300,16 @@ class AttendanceServiceTest {
             ),
         )
 
-    /** 매 호출마다 서로 다른 [LocalDate]를 써서 `uq_class_session`(class_schedule_id, class_date)을 피한다. */
-    private fun nextClassDate(): LocalDate = BASE_SESSION_DATE.plusDays(sessionDateCounter++)
+    /**
+     * 매 호출마다 서로 다른 [LocalDate]를 써서 `uq_class_session`(class_schedule_id, class_date)을
+     * 피하되, **항상 [schedule]의 요일에 맞춘 날짜만 반환한다**(D-146, policies §2) — 요일이 어긋난
+     * 조합은 `ClassSessionService.getOrCreate`가 404로 거부한다. 하루씩이 아니라 1주씩 더해 같은
+     * 요일을 유지하면서 날짜 유일성도 함께 얻는다.
+     */
+    private fun nextClassDate(schedule: ClassSchedule): LocalDate =
+        BASE_SESSION_DATE
+            .with(TemporalAdjusters.nextOrSame(schedule.dayOfWeek))
+            .plusWeeks(sessionDateCounter++)
 
     private fun persistClassSession(
         schedule: ClassSchedule,
