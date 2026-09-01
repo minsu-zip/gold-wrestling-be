@@ -214,14 +214,32 @@ None yet.
 | 260806-und | D-083 카카오 프로필(닉네임·프로필 이미지) 수집·저장 및 MyProfileResponse 노출 | 2026-08-06 | 7f363a9 | [260806-und-d-083-myprofileresponse](./quick/260806-und-d-083-myprofileresponse/) |
 | 260820-cp1 | D-01 공지 목록 2경로(admin·member) page/size 검증 추가 — 500→400, NoticeSearchCondition 신설 | 2026-08-20 | 46cd949 | [260820-cp1-api-page-size](./quick/260820-cp1-api-page-size/) |
 | 260828-g4o | 이슈 #12(WR-02) 휴강 캐스케이드 × 등록취소 경합 시 500 → 현재 상태 재판정 + 0행 스킵, 등록취소 이중 검사 (D-145) | 2026-08-28 | (미커밋 — 사용자 확인 대기) | [260828-g4o-issue-12-suspend-cancel-race](./quick/260828-g4o-issue-12-suspend-cancel-race/) |
+| 260831-v1f | v1 마감: 정책 결정 3건(D-146 요일검증 불허·D-147 INACTIVE 차감예외·D-151 cron 방침) + BE-REQ 3건(005 phoneNumber·003 관리자 이력조회·004 기간필터), BE-REQ-001/002/006 v1.1 백로그 이관 | 2026-08-31 | (미커밋 — 사용자 확인 대기) | [260831-v1f-v1-closeout](./quick/260831-v1f-v1-closeout/) |
 
 ## Deferred Items
 
 Items acknowledged and carried forward from previous milestone close:
 
+### v1.1 백로그 — FE 계약 변경 요청 3건 (2026-08-31 v1 마감 시 명시 이관)
+
+출처: `../gold-wrestling-fe/.planning/BE-CHANGE-REQUESTS.md`. 같은 문서의 6건 중 **3건은 v1에서
+처리**했고(BE-REQ-003 → D-149, BE-REQ-004 → D-150, BE-REQ-005 → D-148), 아래 3건은 **FE 우회가
+안전하게 동작 중이라** v1 마감을 막지 않는다고 판단해 이관한다. 해소 시 FE가 되돌릴 코드는
+BE-CHANGE-REQUESTS.md의 "해소되면 할 일" 열에 항목별로 적혀 있다.
+
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| *(none)* | | | |
+| 계약(FE 요청) | **BE-REQ-001** — `openapi.yaml`에 4xx/5xx `ProblemDetail` 응답 스키마 선언. 현재 전 operation이 `200`만 선언해 FE가 `code`에 타입으로 도달할 수 없다(값은 오지만 타입이 없다) | v1.1 백로그 — FE는 `src/api/errors.ts` 런타임 타입가드로 우회 중 | 2026-08-31 (v1 마감) |
+| 계약(FE 요청) | **BE-REQ-002** — `GET /api/admin/me`(관리자 신원 조회). 새로고침 후 세션에서 관리자 신원을 재확인할 수단이 없다 | v1.1 백로그 — FE `RequireAdmin`은 토큰 존재만 판정(UX 라우팅이며 인가가 아니다 — 실제 인가는 BE `hasRole("ADMIN")`가 강제하므로 보안 구멍은 아니다) | 2026-08-31 (v1 마감) |
+| 계약(FE 요청) | **BE-REQ-006** — `GET /api/admin/reservations/{reservationId}`(예약 단건 조회). 대리 변경 모드에서 다른 주로 이동하면 대상 `classType`을 알 수 없어 차단 사유 문구가 실제 원인과 다르게 표시된다 | v1.1 백로그 — 같은 주 안의 변경(대다수 사용)에는 영향 없어 FE가 현 동작 유지 | 2026-08-31 (v1 마감) |
+
+### 운영 결정 대기
+
+| Category | Item | Status | Deferred At |
+|----------|------|--------|-------------|
+| 운영 | 미사용 차감 cron 활성화 — CR-03이 Phase 6에서 닫혀 켤 수 있는 상태가 됐다. 기본값은 `false` 유지(D-151) | 운영 배포 후 D-130 3단계 절차로 활성화 판단 | 2026-08-31 (v1 마감) |
+| 관측 | CR-03 배선의 운영 데이터 대조 — 로컬 DB에 "출석 유무로 결과가 갈리는 회원"이 없어 자동화 테스트로만 실증됨(`06-VERIFICATION.md` §2) | 배포 후 관찰 항목 (phase 완료 조건 아님) | 2026-08-20 |
+| 보안(Info) | WR-02 — 관리자 로그인 타이밍 부채널(`02-VERIFICATION.md`) | 사용자가 인지하고 의도적으로 범위 제외 | 2026-08-08 |
 
 ## Session Continuity
 
