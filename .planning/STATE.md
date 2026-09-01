@@ -1,11 +1,11 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-milestone_name: milestone
-status: milestone_complete
-stopped_at: Milestone complete (Phase 06 was final phase)
-last_updated: 2026-08-20T00:38:40.329Z
-last_activity: 2026-08-28
+milestone_name: M1~M6
+status: milestone_archived
+stopped_at: v1.0 archived 2026-09-01 — next milestone not started
+last_updated: 2026-09-01
+last_activity: 2026-09-01
 progress:
   total_phases: 6
   completed_phases: 6
@@ -25,11 +25,12 @@ See: .planning/PROJECT.md (updated 2026-07-30)
 
 ## Current Position
 
-Phase: 06
+Phase: — (v1.0 archived)
 Plan: Not started
-Status: Milestone complete
-  사용자가 승인했다(항목 10 CR-03 배선은 코드·테스트로 실증한 '부분 확인'). v1(M1~M6) 로드맵 전체 마감.
-Last activity: 2026-08-28 - Completed quick task 260828-g4o: 이슈 #12(WR-02) 휴강 캐스케이드 × 등록취소 경합 해결 (미커밋)
+Status: **v1.0 마일스톤 아카이브 완료 (2026-09-01)** — 다음 마일스톤 미시작.
+  아카이브: .planning/MILESTONES.md, .planning/milestones/v1.0-ROADMAP.md, v1.0-REQUIREMENTS.md.
+  다음 단계: /gsd:new-milestone (후보는 ROADMAP.md Backlog).
+Last activity: 2026-09-01 - v1.0 마일스톤 아카이브 (quick 260831-v1f는 PR #27로 dev 머지 완료)
 
 Progress: [██████████] 100%
 
@@ -213,8 +214,8 @@ None yet.
 |---|-------------|------|--------|-----------|
 | 260806-und | D-083 카카오 프로필(닉네임·프로필 이미지) 수집·저장 및 MyProfileResponse 노출 | 2026-08-06 | 7f363a9 | [260806-und-d-083-myprofileresponse](./quick/260806-und-d-083-myprofileresponse/) |
 | 260820-cp1 | D-01 공지 목록 2경로(admin·member) page/size 검증 추가 — 500→400, NoticeSearchCondition 신설 | 2026-08-20 | 46cd949 | [260820-cp1-api-page-size](./quick/260820-cp1-api-page-size/) |
-| 260828-g4o | 이슈 #12(WR-02) 휴강 캐스케이드 × 등록취소 경합 시 500 → 현재 상태 재판정 + 0행 스킵, 등록취소 이중 검사 (D-145) | 2026-08-28 | (미커밋 — 사용자 확인 대기) | [260828-g4o-issue-12-suspend-cancel-race](./quick/260828-g4o-issue-12-suspend-cancel-race/) |
-| 260831-v1f | v1 마감: 정책 결정 3건(D-146 요일검증 불허·D-147 INACTIVE 차감예외·D-151 cron 방침) + BE-REQ 3건(005 phoneNumber·003 관리자 이력조회·004 기간필터), BE-REQ-001/002/006 v1.1 백로그 이관 | 2026-08-31 | (미커밋 — 사용자 확인 대기) | [260831-v1f-v1-closeout](./quick/260831-v1f-v1-closeout/) |
+| 260828-g4o | 이슈 #12(WR-02) 휴강 캐스케이드 × 등록취소 경합 시 500 → 현재 상태 재판정 + 0행 스킵, 등록취소 이중 검사 (D-145) | 2026-08-28 | PR #26 (dev 머지) | [260828-g4o-issue-12-suspend-cancel-race](./quick/260828-g4o-issue-12-suspend-cancel-race/) |
+| 260831-v1f | v1 마감: 정책 결정 3건(D-146 요일검증 불허·D-147 INACTIVE 차감예외·D-151 cron 방침) + BE-REQ 3건(005 phoneNumber·003 관리자 이력조회·004 기간필터), BE-REQ-001/002/006 v1.1 백로그 이관 | 2026-08-31 | PR #27 (dev 머지 2026-09-01) | [260831-v1f-v1-closeout](./quick/260831-v1f-v1-closeout/) |
 
 ## Deferred Items
 
