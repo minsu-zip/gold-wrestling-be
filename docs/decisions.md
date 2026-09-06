@@ -1641,3 +1641,17 @@
 - 기각 대안: 기본값을 `true`로 복원(D-121이 철회한 사고 경로 재개방), 배포와 동시에 자동 활성화
   (수동 실행 1회 검증 단계가 사라져 저녁반 전용 회원 부당 차감을 운영에서 최초로 발견하게 된다),
   스테이징에서도 켜기(스테이징 데이터로는 ②의 대조가 성립하지 않는다 — 06-VERIFICATION 참조).
+
+## D-152. 테스트 CI는 단일 job `CI / build`로, FE와 같은 트리거 설계(PR+push, paths-ignore 없음)를 쓴다
+
+- 2026-09-01 / `.github/workflows/ci.yml` 신설 — `pull_request`(dev·main) + `push`(dev·main)에서
+  `./gradlew ktlintCheck build`를 단일 job(`build`)으로 돌린다. Testcontainers 통합 테스트는
+  ubuntu-latest 러너에 기본 탑재된 Docker를 그대로 쓰고, 테스트 전제값은 build.gradle.kts의
+  `systemProperty`가 주입하므로 서비스 컨테이너·`.env`·시크릿이 CI에 필요 없다.
+  main 브랜치 보호 required status check 등록 절차는 README "CI · 브랜치 보호" 섹션이 정본.
+- 이유: 레포 public 전환으로 main 보호가 다시 강제된다 — required check가 될 워크플로는
+  경로 필터로 스킵되면 "Expected — waiting for status"로 머지가 영영 막히므로 paths-ignore를
+  걸지 않는다(FE D-08과 동일 설계). push 트리거는 dev 직접 커밋이 검사를 빠져나가는 구멍을 막는다.
+- 기각 대안: job을 lint·test로 분리(러너 2대 비용 대비 이득 없음 — `build`가 이미 ktlintCheck 포함,
+  실패 원인도 로그로 구분 가능), Postgres 서비스 컨테이너(Testcontainers가 자급하므로 이중 설정),
+  `generateApiDocs` CI 검증(로컬 Postgres 전제 태스크라 별도 설계 필요 — 필요해지면 그때 결정).
