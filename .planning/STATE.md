@@ -30,7 +30,7 @@ Plan: Not started
 Status: **v1.0 마일스톤 아카이브 완료 (2026-09-01)** — 다음 마일스톤 미시작.
   아카이브: .planning/MILESTONES.md, .planning/milestones/v1.0-ROADMAP.md, v1.0-REQUIREMENTS.md.
   다음 단계: /gsd:new-milestone (후보는 ROADMAP.md Backlog).
-Last activity: 2026-09-01 - v1.0 마일스톤 아카이브 (quick 260831-v1f는 PR #27로 dev 머지 완료)
+Last activity: 2026-09-01 - Completed quick task 260901-tkv: CI 워크플로 추가 및 main 보호 required check 절차 문서화
 
 Progress: [██████████] 100%
 
@@ -216,6 +216,7 @@ None yet.
 | 260820-cp1 | D-01 공지 목록 2경로(admin·member) page/size 검증 추가 — 500→400, NoticeSearchCondition 신설 | 2026-08-20 | 46cd949 | [260820-cp1-api-page-size](./quick/260820-cp1-api-page-size/) |
 | 260828-g4o | 이슈 #12(WR-02) 휴강 캐스케이드 × 등록취소 경합 시 500 → 현재 상태 재판정 + 0행 스킵, 등록취소 이중 검사 (D-145) | 2026-08-28 | PR #26 (dev 머지) | [260828-g4o-issue-12-suspend-cancel-race](./quick/260828-g4o-issue-12-suspend-cancel-race/) |
 | 260831-v1f | v1 마감: 정책 결정 3건(D-146 요일검증 불허·D-147 INACTIVE 차감예외·D-151 cron 방침) + BE-REQ 3건(005 phoneNumber·003 관리자 이력조회·004 기간필터), BE-REQ-001/002/006 v1.1 백로그 이관 | 2026-08-31 | PR #27 (dev 머지 2026-09-01) | [260831-v1f-v1-closeout](./quick/260831-v1f-v1-closeout/) |
+| 260901-tkv | CI 워크플로(ci.yml) 신설 + main 보호 required check 등록 절차 README 문서화 (D-152) | 2026-09-01 | 9cdd42e | [260901-tkv-ci-main-required-check](./quick/260901-tkv-ci-main-required-check/) |
 
 ## Deferred Items
 
