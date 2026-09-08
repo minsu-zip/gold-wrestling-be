@@ -2032,3 +2032,15 @@
 - 기각 대안: ① compose `entrypoint`/`command`의 `find` 우회(07-03이 임시 적용했다가 제거) — 실행 계약이 이미지 밖으로 샌다.
   ② `build.gradle.kts`의 `bootJar { archiveFileName = "application.jar" }` — 동작하지만 CI 아티팩트·로컬 `build/libs` 이름까지
   바뀌고 D-17("07-02는 build.gradle.kts 무변경")과 어긋난다. 이름 고정은 이미지 빌드 단계에서만 필요하므로 Dockerfile에 둔다.
+
+## D-177. Caddy에 넘기는 `DOMAIN`·`ACME_EMAIL`은 compose의 `${VAR:?메시지}`로 `up` 시점에 필수 검사한다
+
+- 2026-09-09 / 운영 compose의 caddy 서비스에 `DOMAIN: ${DOMAIN:?...}`, `ACME_EMAIL: ${ACME_EMAIL:?...}`를 둔다.
+  Caddyfile의 `{$DOMAIN:localhost}` 콜론 기본값은 변수가 "아예 없을 때"만 적용되고, `.env`에 `DOMAIN=`처럼
+  빈 문자열로 설정되면 적용되지 않아 빈 사이트 블록 파싱 오류가 난다. `email {$ACME_EMAIL}`은 기본값조차 없어
+  빈 값이면 `wrong argument count`로 실패한다(둘 다 `caddy validate`로 실측). 두 경우 모두 Caddy가 재시작 루프에 빠진다.
+- 이유: compose의 `${VAR:?}`는 unset과 빈 문자열을 모두 잡아 컨테이너가 뜨기 전에 사람이 읽을 메시지로 멈춘다.
+  Caddyfile에는 조건문이 없어 파일 안에서 막을 방법이 없고, 가짜 이메일 기본값을 두면 Let's Encrypt 만료 알림이
+  아무에게도 가지 않는 상태로 조용히 배포된다.
+- 기각 대안: ① `{$ACME_EMAIL:admin@example.invalid}` 기본값 — 빈 문자열은 여전히 통과 못 하고 알림 유실 위험.
+  ② 로컬 오버라이드에서만 값 주입(07-03 초안) — 운영 `.env`가 비어 있는 경로가 검증되지 않은 채 남는다.

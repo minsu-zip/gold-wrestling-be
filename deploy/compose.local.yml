@@ -1,8 +1,10 @@
 # ============================================================================
-# 로컬 검증용 최소 오버라이드 (D-05) — 실서버 없이 운영 compose(compose.prod.yml)를 그대로 띄워
+# 로컬 검증용 최소 오버라이드 (07-CONTEXT D-05) — 실서버 없이 운영 compose(compose.prod.yml)를 그대로 띄워
 # healthcheck 게이트·actuator 차단·볼륨 영속을 로컬에서 실증한다. 오버라이드는 작을수록 좋다.
 #
-# 실행: 1) cp -n .env.example deploy/.env (최초 1회, 다른 값은 그대로 둬도 된다)
+# 실행: 1) cp -n .env.example deploy/.env (최초 1회) 후 DOMAIN=localhost, ACME_EMAIL=dev@example.invalid,
+#          DB_PASSWORD·JWT_SECRET 등 임시값을 채운다 — DOMAIN/ACME_EMAIL 이 비어 있으면 compose.prod.yml 의
+#          ${VAR:?} 가드(D-177)가 up 을 거부한다
 #       2) docker compose -f deploy/compose.prod.yml -f deploy/compose.local.yml --env-file deploy/.env up -d
 #
 # deploy/.env 인 이유: 서비스 env_file: 은 project directory(첫 -f 파일이 있는 deploy/) 기준으로 해석된다.
@@ -10,19 +12,9 @@
 
 services:
   app:
-    # GHCR에 아직 이미지가 없어(D-02/D-03) 07-02가 로컬 빌드한 이미지로 치환한다.
+    # GHCR에 아직 이미지가 없어(07-CONTEXT D-02, D-175) 07-02가 로컬 빌드한 이미지로 치환한다.
     image: gw-be:test
     # 운영에는 없는 설정 — 로컬에서 앱을 직접 찔러볼 수 있도록 호스트 포트 하나만 노출한다.
     ports:
       - "18080:8080"
 
-  caddy:
-    environment:
-      # Caddyfile의 {$DOMAIN:localhost} 콜론 기본값은 env var가 "아예 설정되지 않았을 때"만 적용된다 —
-      # docker compose의 env_file은 .env.example의 빈 줄(DOMAIN=)도 "빈 문자열로 설정됨"으로 만들기 때문에
-      # 기본값이 적용되지 않고 빈 사이트 주소 블록이 생겨 Caddyfile 파싱이 깨진다(실측: Task 3에서 발견).
-      # local_certs 전역 옵션을 별도로 주입할 필요는 없다 — Caddy는 사이트 주소가 "localhost"처럼
-      # 공인 도메인이 아님을 자동으로 감지해 내부 CA로 자체 서명 인증서를 스스로 발급한다(실측 확인됨).
-      # deploy/Caddyfile 본문은 전혀 건드리지 않고, env 값만 여기서 채워 로컬에서도 그대로 동작하게 한다.
-      DOMAIN: localhost
-      ACME_EMAIL: dev@example.invalid

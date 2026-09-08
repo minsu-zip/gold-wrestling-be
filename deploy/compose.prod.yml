@@ -1,17 +1,18 @@
 # ============================================================================
 # 운영 오케스트레이션 (INFRA-03/04/05) — 07-03-PLAN.md
+# 표기: D-1xx = docs/decisions.md 전역 결정 / 07-CONTEXT D-xx = .planning/phases/07-container-server-setup/07-CONTEXT.md 로컬 결정(실행 맥락, 스펙 아님)
 #
-# 서버 배치 경로: /opt/gold-wrestling/compose.prod.yml (D-18, 서버에는 git 없이 파일만 scp)
+# 서버 배치 경로: /opt/gold-wrestling/compose.prod.yml (07-CONTEXT D-18, 서버에는 git 없이 파일만 scp)
 # 서버 실행:      docker compose -f compose.prod.yml --env-file .env up -d
-# 로컬 사전 검증(D-05, 실서버 없이): 이 파일에 deploy/compose.local.yml 을 얹어 GHCR 대신
+# 로컬 사전 검증(07-CONTEXT D-05, 실서버 없이): 이 파일에 deploy/compose.local.yml 을 얹어 GHCR 대신
 #   로컬 빌드 이미지(gw-be:test)로 3컨테이너를 띄운다.
 #   docker compose -f deploy/compose.prod.yml -f deploy/compose.local.yml --env-file deploy/.env up -d
 #
-# 로컬 개발용 docker-compose.yml(레포 루트)은 이 파일과 무관하며 무변경이다 (D-17).
+# 로컬 개발용 docker-compose.yml(레포 루트)은 이 파일과 무관하며 무변경이다 (07-CONTEXT D-17).
 #   - 로컬 docker-compose.yml: postgres 1개만, 호스트 포트 5432 노출, 로컬 학습·개발용
 #   - 이 파일:                 app+postgres+caddy 3개, postgres/app 호스트 포트 미노출(Caddy만 노출)
 #
-# 메모리 예산 전제 (INFRA-05, D-06/D-173): 세 컨테이너 limit 합계는 app 550M + postgres 300M + caddy 50M = 900M이다.
+# 메모리 예산 전제 (INFRA-05, 07-CONTEXT D-06, D-173): 세 컨테이너 limit 합계는 app 550M + postgres 300M + caddy 50M = 900M이다.
 #   t3.micro RAM 1GB(실제 가용 약 950MB)에서 OS·dockerd·sshd 몫이 100MB 남짓뿐이라 **스왑 2GB가 켜져 있는 것을
 #   전제**로 한다(스왑은 7b의 deploy/server-setup.sh가 만든다). limit은 "한 컨테이너의 폭주가 나머지를 끌고 내려가지 않게 하는
 #   상한"이지 상시 점유량이 아니다 — 로컬 실측 RSS는 app 약 365MiB / postgres 약 34MiB / caddy 약 19MiB(합 약 420MiB)였다.
@@ -22,7 +23,7 @@ services:
   postgres:
     image: postgres:18.4-alpine
     # 로컬 dev용 docker-compose.yml의 컨테이너 이름(gold-wrestling-postgres)과 충돌하지 않도록
-    # 운영 compose는 별도 접두사를 쓴다 — 로컬에서 두 compose를 동시에 띄워 검증할 수 있어야 한다(D-05).
+    # 운영 compose는 별도 접두사를 쓴다 — 로컬에서 두 compose를 동시에 띄워 검증할 수 있어야 한다(07-CONTEXT D-05).
     container_name: gw-prod-postgres
     restart: unless-stopped
     environment:
@@ -32,8 +33,8 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       TZ: Asia/Seoul
       PGTZ: Asia/Seoul
-    # 300M 메모리 예산 안에서 동작하도록 축소한 파라미터 (D-11).
-    # max_connections=20 근거: Hikari maximum-pool-size=5(D-08/D-170) + 배치 REQUIRES_NEW가
+    # 300M 메모리 예산 안에서 동작하도록 축소한 파라미터 (07-CONTEXT D-11).
+    # max_connections=20 근거: Hikari maximum-pool-size=5(D-170) + 배치 REQUIRES_NEW가
     # 한 흐름에서 커넥션을 최대 2개 쓰는 패턴 + 운영/점검용 여유분. 실제 부하테스트(Phase 10)에서 재조정 대상.
     command: >
       postgres
@@ -68,7 +69,7 @@ services:
     # 로컬 검증에서는 deploy/.env 가 있어야 하고, 서버에서는 compose와 .env 가 같은 디렉토리에 있어 그대로 맞는다.
     env_file: .env
     environment:
-      # 힙 상한을 이미지가 아니라 여기서 주입해 재빌드 없이 조정 가능하게 한다 (D-07/D-173).
+      # 힙 상한을 이미지가 아니라 여기서 주입해 재빌드 없이 조정 가능하게 한다 (D-173).
       # .env 의 JAVA_TOOL_OPTIONS 로 통째 덮어쓸 수 있도록 기본값 치환 형태를 쓴다.
       #   -XX:MaxRAMPercentage=60.0   : 550M 컨테이너 중 힙 약 330M / 비힙(메타스페이스·스레드·코드캐시) 약 220M 배분
       #   -XX:+UseSerialGC            : t3.micro 1 vCPU 환경에서 병렬 GC 스레드는 컨텍스트 스위칭 오버헤드만 늘린다
@@ -93,7 +94,9 @@ services:
 
   caddy:
     # Debian 계열(-alpine 아님). 선택 이유와 -alpine 장시간 메모리 증가 커뮤니티 보고는 07-04 운영 문서에서 다룬다.
-    image: caddy:2
+    # 메이저만 고정한 caddy:2 는 배급사가 마이너를 조용히 올린다 — D-172(짧은 태그 금지)와 같은 원칙으로 마이너까지 고정한다.
+    # 2026-09-09 기준 caddy:2 = v2.11.4. 마이너 상향은 의도적 커밋으로만 한다.
+    image: caddy:2.11
     container_name: gw-prod-caddy
     restart: unless-stopped
     # 세 서비스 중 유일하게 호스트 포트를 노출한다 — 유일한 외부 진입점.
@@ -106,6 +109,13 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     env_file: .env
+    environment:
+      # Caddyfile 의 {$DOMAIN:localhost}/{$ACME_EMAIL} 은 값이 "빈 문자열로 설정"돼도 기본값이 적용되지 않고 파싱 실패로
+      # 재시작 루프에 빠진다(07-03 실측: DOMAIN= / ACME_EMAIL= 모두 caddy validate 실패). compose 의 ${VAR:?msg} 는
+      # unset 과 빈 문자열을 모두 잡아 `up` 시점에 이 메시지와 함께 멈춘다 — 죽은 컨테이너 로그를 뒤지지 않게 한다 (D-177).
+      # 로컬 검증은 deploy/.env 에 DOMAIN=localhost, ACME_EMAIL=dev@example.invalid 를 채운다 (compose.local.yml 참조).
+      DOMAIN: ${DOMAIN:?DOMAIN 필수 — .env 에 실도메인(로컬 검증은 localhost)을 채우세요}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL 필수 — Let's Encrypt 만료 알림 이메일을 .env 에 채우세요 (로컬 검증은 dev@example.invalid)}
     depends_on:
       # 기동 순서만 보장한다 — healthcheck 조건은 불필요, Caddy는 업스트림이 늦게 떠도 재시도한다.
       - app
