@@ -6,12 +6,12 @@
 > 서버 실측(메모리 RSS·`docker pull` 실전 소요 시간)은 이 문서가 아니라 `docs/operations.md`의
 > 메모리 예산표가 담당한다(Phase 7 07-06, 수동 배포 시 작성 예정).
 
-## 1. 이미지 빌드 전략 절감 수치 (D-14)
+## 1. 이미지 빌드 전략 절감 수치 (07-CONTEXT D-14)
 
 **측정 일자:** 2026-09-08
 **측정 환경:** 로컬 Mac (Apple Silicon, `linux/arm64` 네이티브), Docker Desktop 28.5.1, buildx v0.29.1-desktop.1, BuildKit v0.25.1(단일 플랫폼 로컬 빌드는 `default`/`desktop-linux` 빌더 사용)
 **측정 방법:** 동일 소스(`build.gradle.kts`·`src/`)에서 두 Dockerfile을 각각 빌드해 비교했다.
-- **레이어드**: 레포 루트 `Dockerfile` (D-13, Boot `tools` jarmode `extract --layers`로 dependencies/spring-boot-loader/snapshot-dependencies/application 4개 레이어 분리)
+- **레이어드**: 레포 루트 `Dockerfile` (07-CONTEXT D-13, Boot `tools` jarmode `extract --layers`로 dependencies/spring-boot-loader/snapshot-dependencies/application 4개 레이어 분리)
 - **fat jar**: 비교 전용 임시 Dockerfile(레포에 커밋되지 않음, 스캐폴드 삭제 완료) — 베이스 이미지·비루트 사용자·`ENTRYPOINT`는 레이어드 쪽과 동일하게 맞추고 `COPY --from=builder .../*.jar application.jar` 한 줄로 끝나는 단일 레이어 런타임만 다르게 구성해 변수를 통제했다.
 
 | 항목 | fat jar 단일 레이어 | 레이어 추출 | 차이 |
