@@ -193,3 +193,8 @@ None - 이 플랜은 외부 서비스 설정이 필요 없다. 로컬 검증용 
 ---
 *Phase: 07-container-server-setup*
 *Completed: 2026-09-08*
+
+## Self-Check: PASSED
+
+- 생성 파일 4건 전부 존재 확인 (`deploy/compose.prod.yml`, `deploy/Caddyfile`, `deploy/compose.local.yml`, 이 SUMMARY 파일)
+- 커밋 4건(`bf3fe68`, `23aa8e5`, `889306d`, `528aeb0`) 전부 `git log`에서 확인
