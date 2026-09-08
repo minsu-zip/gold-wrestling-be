@@ -87,6 +87,33 @@
 `build` 는 포맷 위반이 있으면 실패하므로, 실패하면 `ktlintFormat` 을 돌리고 다시 빌드한다.
 IntelliJ / VS Code 도 같은 `.editorconfig` 를 읽으므로 에디터 포맷과 ktlint 결과가 어긋나지 않는다.
 
+## CI · 브랜치 보호 (운영)
+
+PR(dev·main 대상)과 dev/main push마다 [.github/workflows/ci.yml](.github/workflows/ci.yml)이
+`./gradlew ktlintCheck build`(포맷 검사 + 컴파일 + Testcontainers 통합 테스트 포함 전체 테스트)를 돌린다.
+러너의 Docker를 그대로 쓰므로 별도 DB 서비스·`.env` 설정이 없고, 트리거 설계(PR+push,
+paths-ignore 없음)는 FE 레포 ci.yml과 정합한다 — required check 대상 워크플로가 경로 필터로
+스킵되면 체크가 보고되지 않아 문서 전용 PR이 "Expected — waiting for status"에서 머지 불가로 멈춘다.
+
+### main 브랜치 보호 required status check 등록 절차
+
+레포 public 전환으로 브랜치 보호가 다시 강제된다. 아래는 레포 설정이라 코드가 아니며,
+**사용자가 GitHub 설정에서 직접 수행한다.**
+
+1. 이 워크플로(`ci.yml`)를 dev에 머지한다.
+2. PR을 하나 열어 워크플로가 **최소 1회 실행**되게 한다.
+   required status check는 그 이름의 체크가 한 번이라도 보고된 뒤에야
+   브랜치 보호 설정 UI의 선택지로 뜬다. 이 순서를 건너뛰면 "선택지에 없다"에서 막힌다.
+3. 그 PR의 Checks 탭에 표시되는 문자열을 그대로 복사한다.
+   예상 형태는 `CI / build`이지만, **실제 표시 문자열이 정본이다.**
+4. GitHub → Settings → Branches → main 보호 규칙에서
+   *Require status checks to pass before merging*을 켜고 복사한 이름을 등록한다.
+   dev 브랜치 보호는 재량이며, 하지 않으면 백로그로 남긴다.
+
+**경고:** `ci.yml`의 job 이름(`build`)을 바꾸거나 매트릭스를 도입해 체크 이름이 갈라지면,
+등록해 둔 이름은 영원히 "Expected — waiting for status"에서 멈추고 머지가 막힌다.
+이름을 바꿔야 한다면 브랜치 보호 규칙의 등록 항목을 같은 시점에 함께 고친다.
+
 ## API 문서 생성 (FE 계약)
 
 `docs/api/openapi.yaml`이 FE·BE 간 유일한 API 계약이다. **API를 변경하면 반드시 재생성해 커밋한다.**

@@ -40,6 +40,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.OffsetDateTime
+import java.time.temporal.ChronoUnit
 
 /**
  * 관리자 알림 폴링·확인 처리 API 2종의 HTTP 계약을 검증한다(NOTIF-02, D-129): 목록 조회(미확인
@@ -208,7 +209,10 @@ class AdminNotificationControllerTest {
         val admin = persistAdmin()
         val token = adminAccessToken(admin)
         val session = persistSession()
-        val alreadyReadAt = OffsetDateTime.now(clock).minusDays(1)
+        // Postgres timestamptz는 마이크로초까지만 저장한다. Linux JDK의 Instant.now()는 나노초
+        // 정밀도라, 절단 없이 저장-재조회하면 나노초 꼬리가 잘려 isEqualTo 비교가 CI에서만 깨진다
+        // (macOS JDK는 마이크로초 정밀도라 로컬에서는 재현되지 않는다).
+        val alreadyReadAt = OffsetDateTime.now(clock).minusDays(1).truncatedTo(ChronoUnit.MICROS)
         val alreadyRead = persistNotification(session, isRead = true, readAt = alreadyReadAt)
         persistNotification(session, isRead = false)
 
