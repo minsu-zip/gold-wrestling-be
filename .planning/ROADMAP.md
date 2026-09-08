@@ -48,7 +48,7 @@ phase 상세(Goal·Success Criteria·플랜 목록·충족 근거)는 [아카이
 **Depends on**: Phase 7 (배포 대상 이미지 정의·compose·서버 세팅 스크립트가 존재해야 배포 워크플로가 그 위에서 동작한다)
 **Requirements**: DEPLOY-01, DEPLOY-02, DEPLOY-03, DEPLOY-04, DEPLOY-05, DEPLOY-06, DEPLOY-07
 **Open Questions to settle** (discuss-phase에서 확정):
-  - Q1 — private GHCR pull 인증: SSH 세션 안에서 `GITHUB_TOKEN`으로 단기 `docker login` vs 서버에 `read:packages` PAT 장기 보관 (초기 추천: 단기 토큰, 서버에 시크릿 안 남김)
+  - ~~Q1 — private GHCR pull 인증~~ **해소(Phase 7, 2026-09-08)**: GHCR 이미지 public → 서버 pull 인증 없음. 워크플로는 push 인증(`GITHUB_TOKEN` write:packages)만. Phase 7 전제 추가: 서버에 git이 없으므로 compose·Caddyfile 변경분은 워크플로가 scp로 전달한다(`07-CONTEXT.md` D-18)
   - Q2 — CI→배포 연결 방식: `workflow_run`(ci.yml 완료 후 트리거) vs 배포 워크플로가 빌드·테스트를 자체 job으로 포함 (초기 추천: plan-phase 리서치 후 결정)
 **Touches decisions**: D-152 (CI 워크플로 ktlintCheck build — 이 게이트를 배포 트리거 조건으로 재사용), D-038 (관리자 시드 — `ADMIN_SEED_*` 최초 1회성 규칙을 배포 절차에 반영)
 **Success Criteria** (what must be TRUE):
@@ -66,13 +66,13 @@ phase 상세(Goal·Success Criteria·플랜 목록·충족 근거)는 [아카이
 **Requirements**: OPS-01, OPS-02, OPS-03, OPS-04, OPS-05, OPS-06
 **Open Questions to settle** (discuss-phase에서 확정):
   - Q4 — S3 인증: 인스턴스 프로파일(IAM Role) vs 액세스 키 (초기 추천: 인스턴스 프로파일, 액세스 키를 서버에 두지 않음)
-**Touches decisions**: application.yml Actuator 노출 설정(`show-details: never` 유지 + Caddy 라우팅으로 `/actuator/health`만 통과) — OPS-05 결정은 이 phase에서 docs/decisions.md에 신규 기록된다
+**Touches decisions**: application.yml Actuator **내부** 노출 설정(`management.endpoints.web.exposure`, `show-details: never` 유지) — Caddy 외부 차단(`/actuator/health`만 통과)은 Phase 7이 구현·기록했다(`07-CONTEXT.md` D-20). OPS-05는 내부 범위 확정 + 실서버 차단 확인 + docs/decisions.md 기록
 **Success Criteria** (what must be TRUE):
   1. 매일 1회(Asia/Seoul 새벽) `pg_dump` 결과가 S3 버킷에 업로드되고 보관 정책(예: 30일)이 적용되며, 실패 시 종료 코드와 로그로 판별할 수 있다
   2. S3 버킷·IAM 권한(인스턴스 프로파일 우선) 생성 절차가 문서화되어 운영자가 AWS 콘솔에서 직접 만들 수 있다
   3. 복구 절차 문서를 따라 S3의 dump로 빈 DB에 복원 → 앱 기동 → 데이터 일치 확인까지 리허설 1회를 실제로 수행하고 결과를 기록한다
   4. 서버 이전 절차(신규 서버 초기 세팅 → dump → restore → `.env` 복제 → DNS 전환 → 구서버 정지, 각 단계 확인 지점 포함)가 문서화된다
-  5. Caddy를 통해서는 `/actuator/health`만 응답하고 나머지 actuator endpoint는 차단되며, 이 노출 범위 결정이 `docs/decisions.md`에 기록되고, 세 컨테이너 로그가 `max-size`/`max-file` 설정으로 로테이션되어 디스크가 무한 증가하지 않는다
+  5. Phase 7이 넣은 Caddy 차단이 실서버에서 확인되고(`/actuator/health`만 응답, 나머지 actuator endpoint 차단), 앱 내부 노출 범위 결정이 `docs/decisions.md`에 기록되고, 세 컨테이너 로그가 `max-size`/`max-file` 설정으로 로테이션되어 디스크가 무한 증가하지 않는다
 **Plans**: TBD
 
 ### Phase 10: 검증·활성화

@@ -31,7 +31,7 @@
 
 - [ ] **DEPLOY-01**: main push 시 CI(`ktlintCheck build`)가 통과한 뒤에만 배포가 시작된다 — CI 실패 시 이미지 빌드·배포가 실행되지 않는다
 - [ ] **DEPLOY-02**: 배포 워크플로가 멀티 아키텍처 이미지를 GHCR에 커밋 SHA 태그 + `latest` 태그로 푸시한다
-- [ ] **DEPLOY-03**: 배포 워크플로가 SSH로 서버에 접속해 compose pull → up으로 새 이미지로 교체한다(재시작 허용) — private GHCR pull 인증 방식 포함. 서버에 장기 토큰을 남기지 않는 방식을 우선 검토
+- [ ] **DEPLOY-03**: 배포 워크플로가 SSH로 서버에 접속해 compose pull → up으로 새 이미지로 교체한다(재시작 허용). GHCR 이미지는 **public**이라 서버 pull 인증이 없다(Phase 7 결정, `07-CONTEXT.md` D-03) — 워크플로는 push 인증(`GITHUB_TOKEN` write:packages)만 다룬다
 - [ ] **DEPLOY-04**: 배포 후 `https://api.goldwrestling.com/actuator/health`가 `UP`을 반환할 때까지 폴링하고, 제한 시간 내 실패하면 워크플로가 실패(빨간불)한다
 - [ ] **DEPLOY-05**: 필요한 GitHub Actions Secrets/Variables 목록과 등록 절차가 README에 정리되어 운영자가 직접 등록할 수 있다 — SSH 키·호스트·사용자 등 키 이름만, 실값 없음
 - [ ] **DEPLOY-06**: 최초 배포·롤백 절차가 문서화된다 — `ADMIN_SEED_*`는 최초 기동 1회만 유효(관리자 생성 후 `.env`에서 제거 권장), 초기 배포 체크리스트(DNS·`.env`·Flyway V1~V12 적용 확인), 롤백은 이전 SHA 태그로 재배포
@@ -43,7 +43,7 @@
 - [ ] **OPS-02**: S3 버킷·IAM 권한 생성 절차가 문서화되어 운영자가 콘솔에서 직접 만들 수 있다 — EC2 인스턴스 프로파일(IAM Role) 우선 검토(액세스 키를 서버에 두지 않음)
 - [ ] **OPS-03**: 복구 절차가 문서화되고 리허설 1회를 수행·기록한다 — S3의 dump로 빈 DB에 복원 → 앱 기동 → 데이터 일치 확인
 - [ ] **OPS-04**: 서버 이전 절차가 문서화된다 — 새 서버 초기 세팅(INFRA-06) → dump → restore → `.env` 복제 → DNS 전환 → 구서버 정지, 각 단계의 확인 지점 포함
-- [ ] **OPS-05**: Actuator 외부 노출 범위가 확정된다 — Caddy를 통해서는 `/actuator/health`만 응답, 나머지 endpoint 차단, `show-details: never` 유지. 결정을 `docs/decisions.md`에 기록
+- [ ] **OPS-05**: Actuator 노출 범위가 확정된다 — **Caddy 외부 차단(`/actuator/health`만 통과)은 Phase 7이 구현·기록한다**(`07-CONTEXT.md` D-20). 이 요구사항은 앱 내부 노출 범위(`management.endpoints.web.exposure`, `show-details: never` 유지) 확정 + 실서버에서 차단 동작 확인 + `docs/decisions.md` 기록을 맡는다
 - [ ] **OPS-06**: 세 컨테이너 로그가 로테이션된다(docker logging driver `max-size`/`max-file`) — 디스크 무한 증가 방지
 
 ### 검증·활성화 — VERIFY
@@ -57,7 +57,7 @@
 
 | # | 질문 | 관련 | 초기 추천 |
 |---|---|---|---|
-| Q1 | private GHCR pull 인증 — 워크플로가 SSH 세션 안에서 `GITHUB_TOKEN`으로 `docker login`(단기) vs 서버에 read:packages PAT 보관(장기) | DEPLOY-03 | 단기 토큰(서버에 시크릿 안 남김) |
+| Q1 | ~~private GHCR pull 인증 — 단기 `docker login` vs 서버 PAT 보관~~ **해소(Phase 7 discuss, 2026-09-08)**: GHCR 이미지를 public으로 두어 pull 인증 자체가 없다. 코드 노출은 소유자가 감수 | DEPLOY-03 | — |
 | Q2 | CI → 배포 연결 방식 — `workflow_run`(ci.yml 완료 후 트리거) vs 배포 워크플로가 빌드·테스트를 자체 job으로 포함 | DEPLOY-01 | plan-phase 리서치 후 결정 |
 | Q3 | k6 대상 환경 — 런칭 전 운영 서버(실 스펙 수치, 이후 DB 초기화) vs 로컬 운영 compose 스택 | VERIFY-01 | 런칭 전 운영 서버 + 테스트 데이터 정리 |
 | Q4 | S3 인증 — 인스턴스 프로파일(IAM Role) vs 액세스 키 | OPS-02 | 인스턴스 프로파일 |
