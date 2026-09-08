@@ -139,3 +139,8 @@ None - Docker Desktop은 이미 실행 중이었다(사전 전제 D-02 충족 �
 ---
 *Phase: 07-container-server-setup*
 *Completed: 2026-09-08*
+
+## Self-Check: PASSED
+
+- 생성 파일 4건 전부 존재 확인 (`Dockerfile`, `.dockerignore`, `docs/metrics.md`, 이 SUMMARY 파일)
+- 커밋 3건(`1d75445`, `b3df893`, `ba426ec`) 전부 `git log`에서 확인
