@@ -1,38 +1,33 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: M1~M6
-status: milestone_archived
-stopped_at: v1.0 archived 2026-09-01 — next milestone not started
-last_updated: 2026-09-01
-last_activity: 2026-09-01
+milestone: v1.1
+milestone_name: 배포·운영
+status: planning
+last_updated: "2026-09-08T07:45:30.993Z"
+last_activity: 2026-09-08
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 71
-  completed_plans: 71
-  percent: 100
+  total_phases: 4
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-07-30)
+See: .planning/PROJECT.md (updated 2026-09-08)
 
 **Core value:** 회원이 보는 잔여 횟수는 항상 실제 사용 가능 횟수와 일치한다 (즉시 차감/복구 + 전 이력 + 초과 예약 0건)
-**Current focus:** Milestone complete
+**Current focus:** v1.1 배포·운영 — 요구사항 정의 중
 
 ## Current Position
 
-Phase: — (v1.0 archived)
-Plan: Not started
-Status: **v1.0 마일스톤 아카이브 완료 (2026-09-01)** — 다음 마일스톤 미시작.
-  아카이브: .planning/MILESTONES.md, .planning/milestones/v1.0-ROADMAP.md, v1.0-REQUIREMENTS.md.
-  다음 단계: /gsd:new-milestone (후보는 ROADMAP.md Backlog).
-Last activity: 2026-09-01 - Completed quick task 260901-tkv: CI 워크플로 추가 및 main 보호 required check 절차 문서화
-
-Progress: [██████████] 100%
+Phase: 7 - 컨테이너화·서버 구성 (not started)
+Plan: —
+Status: Roadmap created (Phase 7-10) — ready for /gsd-discuss-phase 7
+Last activity: 2026-09-08 — v1.1 로드맵 작성 완료 (요구사항 24/24 매핑)
 
 ## Performance Metrics
 

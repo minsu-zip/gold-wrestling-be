@@ -18,13 +18,36 @@ v1.0(M1~M6, Phase 1~6)이 dev에 머지 완료됐다 — 요구사항 44/44, 테
 프로덕션 12,113 LOC + 테스트 27,178 LOC(Kotlin), Flyway V1~V12, openapi 41경로.
 상세는 `.planning/MILESTONES.md`와 `.planning/milestones/v1.0-*.md` 아카이브 참조.
 
-**운영 반영(dev→main 배포)은 별도 절차로 남아 있다** — 배포 전 체크: ① 요일 정합 SQL 1회
-(D-146 아카이브·PR #27 참조) ② cron은 꺼진 채 배포, 활성화는 README·D-130 절차(D-151).
+main은 2026-09-08 PR #29로 dev와 동일해졌다(v1.0 + CI 워크플로). **그러나 운영 서버에는 아직
+아무것도 배포되지 않았다** — Dockerfile·배포 워크플로가 없고, EC2는 SSH 접속만 확인된 빈 상태다.
+v1.0 마감 때 적어 둔 "요일 정합 SQL 1회"(D-146)는 운영 DB가 빈 상태에서 시작하므로 해당 없음으로
+정리한다. cron은 꺼진 채 배포하고 활성화는 README·D-130 절차를 따른다(D-151).
 
-## Next Milestone Goals
+## Current Milestone: v1.1 배포·운영
 
-미정 — `/gsd:new-milestone`으로 정의한다. 후보는 `.planning/ROADMAP.md` Backlog
-(FE 계약 요청 잔여 3건, 배포 파이프라인 정식화, v2 후보 8건).
+**Goal:** 송파점 실운영 시작 가능한 상태 — v1.0 백엔드를 EC2(`api.goldwrestling.com`)에 자동
+배포하고, 백업·복구·부하 검증·cron 활성화까지 운영 절차를 갖춘다.
+
+**Target features (Phase 7~10 — v1.0이 Phase 6에서 끝났으므로 번호를 이어간다):**
+- **컨테이너화·서버 구성** — 멀티스테이지 Dockerfile(JDK 21, amd64+arm64 — 추후 서버 이전 대비),
+  운영 compose(app+postgres+Caddy), Caddyfile(자동 HTTPS), RAM 1GB 전제 JVM 힙 상한 + 스왑 2GB,
+  멱등 서버 초기 세팅 스크립트(Docker 설치·스왑·타임존 Asia/Seoul·배포 디렉토리). 운영 `.env`는 서버에만 둔다
+- **배포 파이프라인** — main push → CI 통과 → 이미지 빌드·GHCR 푸시 → SSH로 compose pull·up →
+  Actuator health 확인(실패 시 워크플로 실패). Actions Secrets 목록 안내, `ADMIN_SEED_*`는 최초 기동 1회만 유효함을 운영 절차에 명시
+- **운영 안전장치** — pg_dump 일 1회 → S3 백업(버킷 생성 안내) + 복구 절차 문서·리허설 1회 +
+  서버 이전 절차 문서(dump→restore→DNS 전환), Actuator 노출 범위 확정, 컨테이너 로그 로테이션
+- **검증·활성화** — k6 부하테스트(정원 경쟁·1:1 슬롯 동시 요청, 초과 예약 0건 수치를 `docs/metrics.md`에
+  기록, D-098 해소), D-151/D-130 절차로 미사용 차감 cron 활성화(D-119 시행일 2026-09-01 유의),
+  CR-03 운영 데이터 대조를 관찰 항목으로 등록
+
+**사전 준비 완료(이 값들을 전제로 계획한다, 2026-09-08 기준):**
+- 도메인 `goldwrestling.com` / BE `api.goldwrestling.com` (Route53 A 레코드 → Elastic IP 연결 완료),
+  FE는 `app.goldwrestling.com`(FE 레포 담당)
+- 서버 EC2 t3.micro(서울, Ubuntu 24.04, RAM 1GB), Elastic IP `15.164.17.113`, 보안그룹 22(내 IP)/80/443,
+  접속 `ubuntu@` + `~/.ssh/goldwrestling-server.pem`. 내부는 빈 상태(SSH 접속만 확인)
+- 카카오 콘솔에 운영 리다이렉트 URI `https://app.goldwrestling.com/login/callback` 등록 완료
+- 레포는 **PRIVATE**(GHCR 이미지도 private → 서버 pull 인증 방식은 Phase 8에서 결정),
+  `origin/HEAD`는 `origin/dev`로 교정된 상태
 
 ## 스펙의 단일 진실 공급원 (SSOT)
 
@@ -59,14 +82,19 @@ v1.0(M1~M6, Phase 1~6)이 dev에 머지 완료됐다 — 요구사항 44/44, 테
 
 ### Active
 
-<!-- v1.0 전 항목 Validated로 이동. 다음 마일스톤은 /gsd:new-milestone에서 정의 -->
+<!-- v1.1 배포·운영. 상세 REQ-ID는 .planning/REQUIREMENTS.md -->
 
-- (없음 — v1.1 후보는 ROADMAP.md Backlog: BE-REQ-001·002·006, 배포 파이프라인 정식화, v2 후보 8건)
+- 컨테이너화·서버 구성 (INFRA) — Dockerfile·운영 compose·Caddy·JVM/스왑·서버 초기 세팅 스크립트
+- 배포 파이프라인 (DEPLOY) — main push → CI → GHCR → SSH compose → health 게이트, Secrets 안내
+- 운영 안전장치 (OPS) — S3 백업·복구 리허설·서버 이전 절차·Actuator 범위·로그 로테이션
+- 검증·활성화 (VERIFY) — k6 초과 예약 0건 실증(`docs/metrics.md`)·cron 활성화·CR-03 관찰 등록
 
 ### Out of Scope
 
-- 프론트엔드 — 별도 레포 `gold-wrestling-fe` 담당 (D-003 멀티레포)
-- 배포 파이프라인 (GitHub Actions → EC2) — 이번 로드맵 M1~M6에 미포함, 별도 작업으로 진행
+- 프론트엔드 — 별도 레포 `gold-wrestling-fe` 담당 (D-003 멀티레포). **FE 배포(app.goldwrestling.com)도 FE 레포 범위**
+- 모니터링 대시보드(Grafana·Prometheus 등) — v1.1은 health 게이트 + 로그 로테이션까지. 운영 시작 후 필요가 드러나면 다음 마일스톤
+- 무중단 배포 — 배포 시 재시작(수십 초 다운) 허용. 체육관 1개·소규모 트래픽에서 블루/그린의 복잡도가 이득보다 크다
+- BE-REQ-001(ProblemDetail 응답 스키마 선언)·BE-REQ-002(`GET /api/admin/me`)·BE-REQ-006(관리자 예약 단건 조회) — **v1.2로 이관.** FE 우회가 안전하게 동작 중이고, v1.1은 운영 시작을 최우선으로 한다
 - 지점 간 연동 (교차 예약·교차 관리자 권한) — MVP는 송파점 1개. 단 `branch_id`·`AdminBranch` 매핑으로 확장 여지는 설계에 반영
 - 온라인 결제(PG) — 전 결제 오프라인, 관리자 수기 등록
 - 웹 푸시 알림 (PWA + FCM) — v2 후보. MVP 알림은 폴링 30초
@@ -76,7 +104,8 @@ v1.0(M1~M6, Phase 1~6)이 dev에 머지 완료됐다 — 요구사항 44/44, 테
 ## Context
 
 - **코드베이스**: v1.0 기준 프로덕션 12,113 LOC + 테스트 27,178 LOC(Kotlin), 기능별 패키지 9개(member/pass/reservation/schedule/attendance/notice/notification/batch/auth), Flyway V1~V12, 테스트 883건
-- **미결(운영)**: dev→main 배포 미실행(= 아직 운영 미반영), cron 기본 꺼짐(D-151), FE 계약 요청 잔여 3건은 v1.1 백로그(STATE.md Deferred Items)
+- **미결(운영)**: 운영 서버 미배포(main은 최신이나 Dockerfile·배포 워크플로 부재 — v1.1 대상), cron 기본 꺼짐(D-151), FE 계약 요청 잔여 3건(BE-REQ-001·002·006)은 v1.2로 이관
+- **운영 인프라 제약(v1.1)**: t3.micro RAM 1GB 위에 app+postgres+Caddy 세 컨테이너 — JVM 힙 상한과 스왑 2GB 없이는 OOM으로 기동 자체가 실패할 수 있다. 무중단 배포는 하지 않는다(재시작 허용)
 - **학습 겸용**: 소유자는 백엔드가 처음. 복잡한 결정은 대안 비교 제시, 완료 보고에 "이번에 쓴 기술" 섹션 필수 (CLAUDE.md 학습 모드)
 - **API 계약**: springdoc이 생성하는 `docs/api/openapi.yaml`이 FE·BE 간 유일한 진실. API 변경 시 재생성·커밋이 각 마일스톤 완료 조건
 - **테스트 방침**: 도메인 로직 = 단위 테스트, DB 로직 = Testcontainers 통합 테스트, M4 동시성 = 동시성 테스트 필수 (conventions.md §10.0 표 기준)
@@ -101,8 +130,10 @@ v1.0(M1~M6, Phase 1~6)이 dev에 머지 완료됐다 — 요구사항 44/44, 테
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | 로드맵은 사용자 지정 M1~M6 마일스톤 구조를 따른다 | 기반→인증→이용권→예약→배치→운영 순으로 의존성이 자연스럽게 쌓인다 (예약은 이용권을, 이용권은 회원을 전제) | ✓ Good — 순서 재조정 0회로 v1.0 완주 |
-| 배포 파이프라인은 이번 로드맵에서 제외 | M1~M6에 미포함, 사용자 지정 범위 | ⚠️ Revisit — v1.0이 dev까지 왔으므로 dev→main 배포 정식화가 다음 병목 |
+| 배포 파이프라인은 이번 로드맵에서 제외 | M1~M6에 미포함, 사용자 지정 범위 | ✓ Revisit 해소 — v1.1(Phase 7~10)이 배포·운영 전체를 담는다 |
 | 코드베이스 매핑·도메인 리서치 생략 | 뼈대 12파일 + docs/가 이미 스펙·기술결정 SSOT. 리서치가 확정 결정과 모순될 위험이 이득보다 크다 | ✓ Good — docs/ 우선순위 규칙이 6개 phase 내내 유효 |
+| v1.1은 사용자 지정 4-phase 구조(컨테이너화→파이프라인→안전장치→검증·활성화)를 따르고 마일스톤 리서치는 생략 | 사전 준비 값(도메인·서버·카카오 URI)이 확정돼 있고 로드맵이 구체적이다. phase별 리서치는 plan-phase에서 어차피 돈다(`workflow.research=true`) | — (2026-09-08 시작) |
+| BE-REQ-001·002·006은 v1.2로 이관 | FE 우회가 안전하게 동작 중. v1.1은 운영 시작을 최우선으로 하며 API 표면 변경을 섞지 않는다 | — |
 
 마일스톤 기간 중 도메인·기술 결정 127건(D-025~D-151)은 전부 `docs/decisions.md`에 있다 —
 phase별 핵심 요약은 `.planning/milestones/v1.0-ROADMAP.md` Milestone Summary 참조.
@@ -125,4 +156,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-01 after v1.0 milestone completion*
+*Last updated: 2026-09-08 — v1.1 배포·운영 마일스톤 시작*
