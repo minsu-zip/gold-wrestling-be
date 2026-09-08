@@ -1,0 +1,111 @@
+# ============================================================================
+# 운영 오케스트레이션 (INFRA-03/04/05) — 07-03-PLAN.md
+#
+# 서버 배치 경로: /opt/gold-wrestling/compose.prod.yml (D-18, 서버에는 git 없이 파일만 scp)
+# 서버 실행:      docker compose -f compose.prod.yml --env-file .env up -d
+# 로컬 사전 검증(D-05, 실서버 없이): 이 파일에 deploy/compose.local.yml 을 얹어 GHCR 대신
+#   로컬 빌드 이미지(gw-be:test)로 3컨테이너를 띄운다.
+#   docker compose -f deploy/compose.prod.yml -f deploy/compose.local.yml --env-file deploy/.env up -d
+#
+# 로컬 개발용 docker-compose.yml(레포 루트)은 이 파일과 무관하며 무변경이다 (D-17).
+#   - 로컬 docker-compose.yml: postgres 1개만, 호스트 포트 5432 노출, 로컬 학습·개발용
+#   - 이 파일:                 app+postgres+caddy 3개, postgres/app 호스트 포트 미노출(Caddy만 노출)
+# ============================================================================
+
+services:
+  postgres:
+    image: postgres:18.4-alpine
+    container_name: gold-wrestling-postgres
+    restart: unless-stopped
+    environment:
+      # 값은 .env (project directory = 이 compose 파일이 있는 디렉토리 기준, 서버에서는 /opt/gold-wrestling/.env) 에서 주입된다
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      TZ: Asia/Seoul
+      PGTZ: Asia/Seoul
+    # 300M 메모리 예산 안에서 동작하도록 축소한 파라미터 (D-11).
+    # max_connections=20 근거: Hikari maximum-pool-size=5(D-08/D-170) + 배치 REQUIRES_NEW가
+    # 한 흐름에서 커넥션을 최대 2개 쓰는 패턴 + 운영/점검용 여유분. 실제 부하테스트(Phase 10)에서 재조정 대상.
+    command: >
+      postgres
+      -c shared_buffers=64MB
+      -c work_mem=4MB
+      -c maintenance_work_mem=32MB
+      -c effective_cache_size=192MB
+      -c max_connections=20
+    volumes:
+      # Postgres 18+ 이미지는 데이터 디렉터리를 메이저 버전별 하위 폴더로 관리한다.
+      # /var/lib/postgresql/data 에 마운트하면 기동 자체가 실패하므로 /var/lib/postgresql 에 마운트한다.
+      - postgres-data:/var/lib/postgresql
+    # 호스트 포트 미노출 (로컬 docker-compose.yml과 다른 유일한 지점) — compose 내부 네트워크로만 app이 접근한다.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 300M
+
+  app:
+    # Phase 8이 커밋 SHA 태그로 덮어쓸 수 있게 ${APP_IMAGE} 로 감싼다. 비우면 :latest.
+    image: ${APP_IMAGE:-ghcr.io/minsu-zip/gold-wrestling-be:latest}
+    container_name: gold-wrestling-app
+    restart: unless-stopped
+    # 서비스 레벨 env_file: 은 CLI 실행 위치가 아니라 project directory(첫 -f 파일이 있는 디렉토리,
+    # 즉 이 파일이 있는 deploy/ 또는 서버의 /opt/gold-wrestling/) 기준으로 해석된다.
+    # 로컬 검증에서는 deploy/.env 가 있어야 하고, 서버에서는 compose와 .env 가 같은 디렉토리에 있어 그대로 맞는다.
+    env_file: .env
+    environment:
+      # 힙 상한을 이미지가 아니라 여기서 주입해 재빌드 없이 조정 가능하게 한다 (D-07/D-173).
+      # .env 의 JAVA_TOOL_OPTIONS 로 통째 덮어쓸 수 있도록 기본값 치환 형태를 쓴다.
+      #   -XX:MaxRAMPercentage=60.0   : 550M 컨테이너 중 힙 약 330M / 비힙(메타스페이스·스레드·코드캐시) 약 220M 배분
+      #   -XX:+UseSerialGC            : t3.micro 1 vCPU 환경에서 병렬 GC 스레드는 컨텍스트 스위칭 오버헤드만 늘린다
+      #   -XX:ActiveProcessorCount=1  : t3.micro 실제 vCPU 수와 JVM이 감지하는 CPU 수를 맞춘다
+      #   -XX:+ExitOnOutOfMemoryError : OOM 시 크래시 덤프 없이 깨끗이 종료 → 아래 restart 정책이 재기동시킨다
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=60.0 -XX:+UseSerialGC -XX:ActiveProcessorCount=1 -XX:+ExitOnOutOfMemoryError}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # 호스트 포트 미노출 — 외부 진입점은 Caddy뿐이다.
+    healthcheck:
+      # noble 런타임 베이스(eclipse-temurin:21-jre-noble)에 curl이 이미 포함돼 있어 추가 설치가 필요 없다.
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 550M
+
+  caddy:
+    # Debian 계열(-alpine 아님). 선택 이유와 -alpine 장시간 메모리 증가 커뮤니티 보고는 07-04 운영 문서에서 다룬다.
+    image: caddy:2
+    container_name: gold-wrestling-caddy
+    restart: unless-stopped
+    # 세 서비스 중 유일하게 호스트 포트를 노출한다 — 유일한 외부 진입점.
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # caddy_data 가 인증서 저장소다 — named volume 이어야 컨테이너 재시작이 재발급을 유발하지 않는다 (INFRA-04).
+      - caddy_data:/data
+      - caddy_config:/config
+    env_file: .env
+    depends_on:
+      # 기동 순서만 보장한다 — healthcheck 조건은 불필요, Caddy는 업스트림이 늦게 떠도 재시도한다.
+      - app
+    deploy:
+      resources:
+        limits:
+          memory: 50M
+
+volumes:
+  postgres-data:
+  caddy_data:
+  caddy_config:
