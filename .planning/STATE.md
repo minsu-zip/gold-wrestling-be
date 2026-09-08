@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 배포·운영
 status: executing
-stopped_at: Completed 07-01-PLAN.md
-last_updated: "2026-09-08T14:00:40.029Z"
+stopped_at: Completed 07-02-PLAN.md
+last_updated: "2026-09-08T14:15:33.004Z"
 last_activity: 2026-09-08
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 6
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-08)
 ## Current Position
 
 Phase: 07 (container-server-setup) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 Last activity: 2026-09-08
 
@@ -96,6 +96,7 @@ Last activity: 2026-09-08
 | Phase 06-operations P10 | ~20min | 3 tasks | 7 files |
 | Phase 06-operations P11 | ~35min | 3 tasks | 3 files |
 | Phase 07-container-server-setup P01 | 45min | 3 tasks | 4 files |
+| Phase 07 P02 | 45min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -195,6 +196,8 @@ Recent decisions affecting current work:
 - [Phase 06-10]: AdminNotificationController 클래스 매핑을 /api/admin/notifications에서 /api/admin으로 넓히고 기존 두 메서드에 /notifications, /notifications/read-all 하위 경로를 붙였다 — 알림과 피드는 같은 테이블의 다른 뷰지만 FE 화면이 달라 하위 경로로 두면 오해된다(AdminScheduleController 선례). 노출 경로 문자열은 06-09 값과 동일하게 유지해 FE 계약을 깨지 않았다
 - [Phase 06-11]: CR-03 배선 확인은 로컬 DB에 출석 유무로 결과가 갈리는 회원이 없어 InactivityBatchRunner.kt의 코드 경로 + InactivityBatchRunnerTest 대조 테스트로 실증하고 실기동은 '부분 확인'으로 기록, 사용자가 이 상태로 승인
 - [Phase 07-01]: D-169~D-175: 운영 프로필 미신설, Hikari/Tomcat 축소, springdoc enabled 토글로 Swagger 운영 비활성(SecurityConfig 불변), 런타임 베이스 이미지 noble 고정, JVM MaxRAMPercentage=60 시작값, Caddy actuator 외부 차단, GHCR public 이미지
+- [Phase 07]: 가정 A1(빌더가 amd64+arm64 두 플랫폼에서 1회만 컴파일한다)을 최초 빌드와 --no-cache-filter=builder 강제 재캐시 두 방식으로 실측 검증 — TRUE 확인 (docs/metrics.md §2)
+- [Phase 07]: 레이어드 이미지의 이득은 전체 크기(fat jar와 동일 563MB)가 아니라 코드 변경 시 재전송 바이트에서 발생함을 실측으로 확정 (72.2MB → 606kB, 약 119배, docs/metrics.md §1)
 
 ### Pending Todos
 
@@ -243,6 +246,6 @@ BE-CHANGE-REQUESTS.md의 "해소되면 할 일" 열에 항목별로 적혀 있�
 
 ## Session Continuity
 
-Last session: 2026-09-08T14:00:40.023Z
-Stopped at: Completed 07-01-PLAN.md
+Last session: 2026-09-08T14:15:32.998Z
+Stopped at: Completed 07-02-PLAN.md
 Resume file: None
