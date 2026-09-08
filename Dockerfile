@@ -1,0 +1,44 @@
+# syntax=docker/dockerfile:1
+# 위 지시문이 있어야 --mount=type=cache 캐시 마운트 구문이 안전하게 파싱된다 (가정 A4, 07-RESEARCH.md).
+
+# --- 빌더 스테이지 ---
+# $BUILDPLATFORM(빌드를 실행하는 호스트의 아키텍처, 예: linux/arm64 on Apple Silicon Mac)으로 고정한다.
+# JVM 바이트코드는 아키텍처 독립적이므로 --platform=$TARGETPLATFORM(amd64/arm64 각각)으로 빌드할 필요가 없다.
+# 빌더를 호스트 아키텍처 하나로 고정하면 QEMU 에뮬레이션 없이 네이티브로 1회만 컴파일하고,
+# 그 결과 jar를 두 런타임 스테이지가 그대로 나눠 COPY해 쓴다 (INFRA-02, D-16, D-173).
+FROM --platform=$BUILDPLATFORM eclipse-temurin:21-jdk-noble AS builder
+WORKDIR /builder
+COPY . .
+# 테스트는 CI(ci.yml)가 이미 담당하므로 이미지 빌드에서는 -x test로 건너뛴다 (INFRA-01 명시).
+# --mount=type=cache로 Gradle 의존성 캐시를 빌드 간에 재사용해 반복 빌드 속도를 높인다.
+RUN --mount=type=cache,target=/root/.gradle \
+    ./gradlew bootJar -x test --no-daemon
+
+# Boot 4.1은 layertools jarmode가 tools jarmode로 통합됐다 (D-13, verify-boot4-api로 확인된 공식 명령).
+# bootJar가 layers.idx를 기본 포함하므로 build.gradle.kts에 layered {} 블록 없이도 추출이 된다 (가정 A5).
+RUN java -Djarmode=tools -jar build/libs/*.jar extract --layers --destination extracted
+
+# --- 런타임 스테이지 ---
+# eclipse-temurin:21-jre(접미사 없음)는 현재 noble이 아니라 resolute로 롤링돼 있다 (Pitfall 1).
+# D-12/D-172가 noble 계열을 못박았으므로 반드시 -noble 접미사를 명시한다.
+FROM eclipse-temurin:21-jre-noble
+WORKDIR /application
+
+# 베이스 이미지는 비루트 사용자를 기본 제공하지 않는다 (Pitfall 2) — 직접 만들어 USER로 전환한다.
+# --no-create-home: 애플리케이션 실행 전용 시스템 계정이라 홈 디렉토리가 필요 없다.
+RUN groupadd --system app && useradd --system --gid app --no-create-home app
+
+# 레이어 COPY 순서 고정: dependencies(가장 안 바뀜) → spring-boot-loader → snapshot-dependencies → application(가장 자주 바뀜).
+# 코드만 바뀐 재배포는 application 레이어(수 MB)만 새로 전송하면 되고, 나머지 레이어는 캐시를 그대로 쓴다 (D-14).
+COPY --from=builder /builder/extracted/dependencies/ ./
+COPY --from=builder /builder/extracted/spring-boot-loader/ ./
+COPY --from=builder /builder/extracted/snapshot-dependencies/ ./
+COPY --from=builder /builder/extracted/application/ ./
+
+USER app
+EXPOSE 8080
+# --launcher가 extract 기본 옵션에 포함돼 JarLauncher가 이미 들어있다 — java -jar로 바로 실행 가능.
+ENTRYPOINT ["java", "-jar", "application.jar"]
+
+# CDS/AppCDS 관련 클래스 아카이브 생성·훈련 실행 단계는 이 이미지에 넣지 않는다 — v1.2 후보로 미뤘다 (D-15).
+# HEALTHCHECK 지시어도 넣지 않는다 — 운영 헬스체크는 compose(07-03)가 소유해 간격 조정 시 재빌드가 필요 없게 한다.
