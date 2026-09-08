@@ -134,3 +134,8 @@ None - 이 플랜은 외부 서비스 설정이 필요 없다. `.env.example`에
 ---
 *Phase: 07-container-server-setup*
 *Completed: 2026-09-08*
+
+## Self-Check: PASSED
+
+- 생성/수정 파일 5건 전부 존재 확인 (`application.yml`, `.env.example`, `SwaggerDisabledTest.kt`, `docs/decisions.md`, 이 SUMMARY 파일)
+- 커밋 4건(`198a4bf`, `9e69a63`, `4fbabc9`, `e078216`) 전부 `git log`에서 확인
