@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 배포·운영
 status: executing
-stopped_at: Completed 07-02-PLAN.md
-last_updated: "2026-09-08T14:15:33.004Z"
+stopped_at: Completed 07-03-PLAN.md
+last_updated: "2026-09-08T14:33:33.892Z"
 last_activity: 2026-09-08
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 6
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-08)
 ## Current Position
 
 Phase: 07 (container-server-setup) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 Status: Ready to execute
 Last activity: 2026-09-08
 
@@ -97,6 +97,7 @@ Last activity: 2026-09-08
 | Phase 06-operations P11 | ~35min | 3 tasks | 3 files |
 | Phase 07-container-server-setup P01 | 45min | 3 tasks | 4 files |
 | Phase 07 P02 | 45min | 3 tasks | 3 files |
+| Phase 07 P03 | 60min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -198,6 +199,9 @@ Recent decisions affecting current work:
 - [Phase 07-01]: D-169~D-175: 운영 프로필 미신설, Hikari/Tomcat 축소, springdoc enabled 토글로 Swagger 운영 비활성(SecurityConfig 불변), 런타임 베이스 이미지 noble 고정, JVM MaxRAMPercentage=60 시작값, Caddy actuator 외부 차단, GHCR public 이미지
 - [Phase 07]: 가정 A1(빌더가 amd64+arm64 두 플랫폼에서 1회만 컴파일한다)을 최초 빌드와 --no-cache-filter=builder 강제 재캐시 두 방식으로 실측 검증 — TRUE 확인 (docs/metrics.md §2)
 - [Phase 07]: 레이어드 이미지의 이득은 전체 크기(fat jar와 동일 563MB)가 아니라 코드 변경 시 재전송 바이트에서 발생함을 실측으로 확정 (72.2MB → 606kB, 약 119배, docs/metrics.md §1)
+- [Phase 07]: 운영 compose container_name을 gw-prod-*로 분리해 로컬 dev docker-compose.yml과 이름 충돌 없이 동시 검증 가능하게 함
+- [Phase 07]: compose.local.yml에서 local_certs 전역 옵션 주입을 포기 — Caddy가 localhost를 비공인 도메인으로 자동 인식해 내부 CA 인증서를 스스로 발급함을 실측 확인
+- [Phase 07]: Dockerfile ENTRYPOINT(java -jar application.jar)가 실제 산출물 파일명과 불일치하는 버그 발견 — compose entrypoint/command로 우회, Dockerfile 자체 수정은 후속 필요
 
 ### Pending Todos
 
@@ -208,6 +212,7 @@ None yet.
 - REQUIREMENTS.md 문서 상단의 "v1 requirements: 36 total" 표기가 실제 v1 목록(FOUND~NOTIF, 42건)과 불일치했음. 로드맵 작성 시 실제 목록 42건 전부를 매핑하고 Coverage 섹션을 42로 정정함 — 원 문서(docs/)와의 스펙 차이가 아니라 REQUIREMENTS.md 자체의 집계 오류로 판단.
 - ~~STATE.md의 'Plan: X of 9' 표시값 드리프트~~ **해소(2026-08-15)** — 원인은 청크 실행 시 오케스트레이터가 매번 호출하는 `state.begin-phase`가 Plan 카운터를 1로 리셋하는 것. `advance-plan`은 상대 증분만 하므로 리셋된 값에서 다시 세어 어긋났다. 실제 완료 수(5/9)로 수동 정정했고, 청크 단위 실행(D-084)에서는 wave 시작마다 `begin-phase`가 재호출되므로 다음 청크에서도 같은 드리프트가 재발할 수 있다 — 표시 전용 필드이며 SUMMARY 존재 여부가 실제 진행의 근거다
 - ~~05-16-PLAN.md Task 2(로컬 실기동 확인) 사용자 승인 대기~~ **해소(2026-08-16)** — 오케스트레이터가 실제 앱·실제 DB로 실행해 결과를 사용자에게 제시했다: 202+Location, Location 폴링 SUCCESS, 동시 POST 10건×2회 → 매번 202 1건/409 9건(ProblemDetail `BATCH_ALREADY_RUNNING`), 종료 후 `RUNNING` 0건, 총 20건 요청 후에도 `pass_transaction` 35건·`INACTIVITY` 1건 불변(실 DB 이중 차감 0건), `limit` 0/-1/101 → 400. 보존 데이터 무손실
+- Dockerfile ENTRYPOINT(java -jar application.jar)가 실제 bootJar 산출물 파일명(gold-wrestling-be-0.0.1-SNAPSHOT.jar)과 불일치 — 07-03이 deploy/compose.prod.yml에서 우회했으나 Dockerfile 자체 수정 또는 archiveFileName 고정이 후속 필요(07-04 이전 사용자 확인 권장)
 
 ### Quick Tasks Completed
 
@@ -246,6 +251,6 @@ BE-CHANGE-REQUESTS.md의 "해소되면 할 일" 열에 항목별로 적혀 있�
 
 ## Session Continuity
 
-Last session: 2026-09-08T14:15:32.998Z
-Stopped at: Completed 07-02-PLAN.md
+Last session: 2026-09-08T14:33:27.173Z
+Stopped at: Completed 07-03-PLAN.md
 Resume file: None

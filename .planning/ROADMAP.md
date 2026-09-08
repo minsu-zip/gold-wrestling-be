@@ -43,7 +43,7 @@ phase 상세(Goal·Success Criteria·플랜 목록·충족 근거)는 [아카이
 **Plans**: 6 plans (4 waves · 청크 7a=wave 1~2, 7b=wave 3~4)
 - [x] 07-01-PLAN.md — 앱 운영 설정 확장(Hikari 5·Tomcat 50·Swagger 토글) + SwaggerDisabledTest + decisions D-169~D-175 [wave 1]
 - [x] 07-02-PLAN.md — 멀티스테이지 Dockerfile·.dockerignore + 멀티아키 빌드 실측 + fat jar 대비 절감 수치(docs/metrics.md) [wave 1]
-- [ ] 07-03-PLAN.md — deploy/compose.prod.yml·Caddyfile·로컬 오버라이드 + 로컬 3컨테이너 기동 검증 [wave 2]
+- [x] 07-03-PLAN.md — deploy/compose.prod.yml·Caddyfile·로컬 오버라이드 + 로컬 3컨테이너 기동 검증 [wave 2]
 - [ ] 07-04-PLAN.md — deploy/server-setup.sh(멱등) + docs/operations.md(env 키표·메모리 예산표·수동 배포 runbook) [wave 3]
 - [ ] 07-05-PLAN.md — GHCR 멀티아키 이미지 게시 + 패키지 public 전환·무인증 pull 확인 (human-action) [wave 3]
 - [ ] 07-06-PLAN.md — 실 EC2 수동 배포: 멱등성 2회 실행·실도메인 HTTPS·인증서 영속·1GB 메모리 실측 (human-verify) [wave 4]
@@ -112,7 +112,7 @@ phase 상세(Goal·Success Criteria·플랜 목록·충족 근거)는 [아카이
 | 4. 시간표·예약 | v1.0 | 15/15 | Complete | 2026-08-08 |
 | 5. 배치 | v1.0 | 16/16 | Complete | 2026-08-16 |
 | 6. 운영 | v1.0 | 11/11 | Complete | 2026-08-19 |
-| 7. 컨테이너화·서버 구성 | v1.1 | 2/6 | In Progress|  |
+| 7. 컨테이너화·서버 구성 | v1.1 | 3/6 | In Progress|  |
 | 8. 배포 파이프라인 | v1.1 | 0/? | Not started | - |
 | 9. 운영 안전장치 | v1.1 | 0/? | Not started | - |
 | 10. 검증·활성화 | v1.1 | 0/? | Not started | - |
