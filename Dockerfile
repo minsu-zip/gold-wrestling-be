@@ -9,7 +9,10 @@
 FROM --platform=$BUILDPLATFORM eclipse-temurin:21-jdk-noble AS builder
 WORKDIR /builder
 COPY . .
-# 테스트는 CI(ci.yml)가 이미 담당하므로 이미지 빌드에서는 -x test로 건너뛴다 (INFRA-01 명시).
+# 테스트는 CI(ci.yml)가 담당하고 이미지 빌드에서는 돌리지 않는다 (INFRA-01 명시).
+# bootJar의 태스크 그래프에는 원래 test가 없어(`./gradlew bootJar --dry-run`으로 확인: compileKotlin → bootJar 뿐)
+# -x test는 지금 아무것도 건너뛰지 않는 no-op이다. 그래도 남겨 두는 이유는 "이미지 빌드에서 테스트를 돌리지 않는다"는
+# 의도를 명시하고, 이후 build.gradle.kts가 bootJar를 check/test에 의존시키도록 바뀌어도 이 가드가 그대로 막게 하려는 것이다.
 # --mount=type=cache로 Gradle 의존성 캐시를 빌드 간에 재사용해 반복 빌드 속도를 높인다.
 RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew bootJar -x test --no-daemon
