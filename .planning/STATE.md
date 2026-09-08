@@ -212,7 +212,7 @@ None yet.
 - REQUIREMENTS.md 문서 상단의 "v1 requirements: 36 total" 표기가 실제 v1 목록(FOUND~NOTIF, 42건)과 불일치했음. 로드맵 작성 시 실제 목록 42건 전부를 매핑하고 Coverage 섹션을 42로 정정함 — 원 문서(docs/)와의 스펙 차이가 아니라 REQUIREMENTS.md 자체의 집계 오류로 판단.
 - ~~STATE.md의 'Plan: X of 9' 표시값 드리프트~~ **해소(2026-08-15)** — 원인은 청크 실행 시 오케스트레이터가 매번 호출하는 `state.begin-phase`가 Plan 카운터를 1로 리셋하는 것. `advance-plan`은 상대 증분만 하므로 리셋된 값에서 다시 세어 어긋났다. 실제 완료 수(5/9)로 수동 정정했고, 청크 단위 실행(D-084)에서는 wave 시작마다 `begin-phase`가 재호출되므로 다음 청크에서도 같은 드리프트가 재발할 수 있다 — 표시 전용 필드이며 SUMMARY 존재 여부가 실제 진행의 근거다
 - ~~05-16-PLAN.md Task 2(로컬 실기동 확인) 사용자 승인 대기~~ **해소(2026-08-16)** — 오케스트레이터가 실제 앱·실제 DB로 실행해 결과를 사용자에게 제시했다: 202+Location, Location 폴링 SUCCESS, 동시 POST 10건×2회 → 매번 202 1건/409 9건(ProblemDetail `BATCH_ALREADY_RUNNING`), 종료 후 `RUNNING` 0건, 총 20건 요청 후에도 `pass_transaction` 35건·`INACTIVITY` 1건 불변(실 DB 이중 차감 0건), `limit` 0/-1/101 → 400. 보존 데이터 무손실
-- Dockerfile ENTRYPOINT(java -jar application.jar)가 실제 bootJar 산출물 파일명(gold-wrestling-be-0.0.1-SNAPSHOT.jar)과 불일치 — 07-03이 deploy/compose.prod.yml에서 우회했으나 Dockerfile 자체 수정 또는 archiveFileName 고정이 후속 필요(07-04 이전 사용자 확인 권장)
+- ~~Dockerfile ENTRYPOINT(java -jar application.jar)가 실제 bootJar 산출물 파일명과 불일치~~ **해소(2026-09-08, D-176)** — 07-03의 compose `find` 우회를 제거하고 Dockerfile 빌더 스테이지에서 jar를 `application.jar`로 복사한 뒤 extract하도록 고쳤다(공식 Boot 4.1 형태). 재빌드 이미지로 로컬 3컨테이너 재기동 검증 완료. 07-05 GHCR push는 이 수정본 기준
 
 ### Quick Tasks Completed
 

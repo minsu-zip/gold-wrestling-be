@@ -60,7 +60,8 @@ completed: 2026-09-08
 
 - 레포 루트 `Dockerfile` 신설 — `eclipse-temurin:21-jdk-noble` 빌더(`--platform=$BUILDPLATFORM`) → `java -Djarmode=tools ... extract --layers` → `eclipse-temurin:21-jre-noble` 런타임에 `dependencies`/`spring-boot-loader`/`snapshot-dependencies`/`application` 4개 레이어를 순서대로 COPY. 비루트 `app` 사용자로 `USER app` 전환.
 - `.dockerignore` 신설 — `.env`·키 파일·`build/`·`.git/`·`.planning/`·`docs/` 등 제외. 이미지 안에 `.env`가 존재하지 않음을 `docker run --entrypoint sh ... ls -a /application`로 실증.
-- `docker build -t gw-be:test .` 단일 플랫폼 빌드 성공, 비루트(`uid=999`) 실행 확인, `application.jar`+`lib` 레이어 추출 확인.
+- `docker build -t gw-be:test .` 단일 플랫폼 빌드 성공, 비루트(`uid=999`) 실행 확인, `lib` 레이어 추출 확인.
+  - **정정(오케스트레이터, 07-03 실기동 후):** 이 시점의 이미지에는 `application.jar`가 없었다 — extract를 `build/libs/*.jar`에 바로 돌려 application 레이어 파일명이 `gold-wrestling-be-0.0.1-SNAPSHOT.jar`로 남았고, 위 acceptance criteria의 "`application.jar`와 `lib` 또는 `BOOT-INF`" 검사는 `lib`만으로 통과해 버그를 놓쳤다. Dockerfile에 `cp build/libs/*.jar application.jar` 단계를 넣어 공식 형태로 고쳤고(D-176), 재빌드 후 `ls /application`에 `application.jar`·`lib`가 있음을 확인했다. 레이어 크기·절감 수치(`docs/metrics.md`)는 파일 이름만 바뀐 것이라 변하지 않는다.
 - `gw-builder`(`docker-container` 드라이버) buildx 빌더 신규 생성 후 `linux/amd64,linux/arm64` 두 플랫폼을 `--output=type=cacheonly`로 빌드 성공. `--progress=plain` 로그에서 `gradlew bootJar` 실행 라인을 최초 빌드·`--no-cache-filter=builder` 강제 재캐시 두 방식 모두에서 **정확히 1회**로 확인 — 07-RESEARCH.md 가정 A1(빌더 1회 컴파일)이 TRUE로 검증됨.
 - 비교 전용 임시 fat jar Dockerfile(스캐치패드, 커밋 대상 아님)을 빌드해 레이어드 이미지와 변수를 통제해 비교. 전체 이미지 크기는 동일(563MB — `tools extract`는 재배치일 뿐 바이트 증감 없음)하지만, 소스 1줄(주석) 변경 후 재빌드 시 다시 전송해야 하는 애플리케이션 레이어가 fat jar 72.2MB 대 레이어드 606kB로 약 119배 차이남을 실측.
 - `docs/metrics.md` 신설(D-14) — 위 두 실측(이미지 크기·재전송 바이트, 멀티 아키텍처 빌더 컴파일 횟수)을 표+해설로 기록.

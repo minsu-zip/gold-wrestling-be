@@ -15,7 +15,7 @@ provides:
   - "deploy/Caddyfile — {$DOMAIN:localhost} 자동 HTTPS + /actuator/* 외부 차단(D-20, /actuator/health만 예외)"
   - "deploy/compose.local.yml — 실서버 없이 로컬에서 운영 compose를 그대로 실증하는 최소 오버라이드(D-05)"
   - "로컬 실기동 실측값(메모리 바이트·actuator 차단 이중 관측·Flyway 최초/재기동 로그)"
-  - "Dockerfile ENTRYPOINT 버그(application.jar 미존재) 발견 — 07-04/후속 커밋에서 Dockerfile 자체를 고쳐야 함"
+  - "Dockerfile ENTRYPOINT 버그(application.jar 미존재) 발견 — 오케스트레이터가 같은 청크에서 Dockerfile을 공식 형태로 고쳐 해소(D-176), compose 우회 제거"
 affects: [07-04, 07-05, 07-06, 08-deploy-pipeline]
 
 # Tech tracking
@@ -37,7 +37,7 @@ key-files:
 key-decisions:
   - "container_name을 gold-wrestling-*(로컬 dev docker-compose.yml과 동일)에서 gw-prod-*로 변경 — 로컬에서 두 compose를 동시에 띄워 검증 가능하게 함"
   - "compose.local.yml에서 local_certs 전역 옵션 주입을 포기 — Caddy가 사이트 주소 'localhost'를 비공인 도메인으로 자동 인식해 내부 CA 자체 서명 인증서를 스스로 발급함을 실측 확인, deploy/Caddyfile 무변경으로 단순화"
-  - "app 서비스에 entrypoint/command 오버라이드 추가 — Dockerfile ENTRYPOINT(java -jar application.jar)가 실제 산출물 파일명(gold-wrestling-be-0.0.1-SNAPSHOT.jar)과 불일치하는 버그를 compose 레벨에서 우회. Dockerfile 자체 수정은 이 플랜 범위 밖(hard constraint)이라 후속 필요"
+  - "app 서비스에 entrypoint/command 오버라이드를 임시 추가했다가 제거 — Dockerfile ENTRYPOINT(java -jar application.jar)가 실제 산출물 파일명과 불일치하는 버그를 compose에서 우회했으나, 오케스트레이터가 Dockerfile 자체를 고쳐(D-176) 우회를 걷어냈다. compose는 이미지 ENTRYPOINT를 그대로 쓴다"
 
 patterns-established:
   - "compose.local.yml 오버라이드는 이미지 치환 + 호스트 포트 노출 + (필요시) env 값 명시로 최소화하고, deploy/Caddyfile·compose.prod.yml 본문은 절대 로컬 전용으로 오염시키지 않는다"
@@ -106,6 +106,7 @@ _TDD 아님 — 인프라 오케스트레이션 아티팩트(compose·Caddyfile)
 - **Fix:** `deploy/compose.prod.yml`의 app 서비스에 `entrypoint: ["sh", "-c"]` + `command: ['exec java -jar "$(find /application -maxdepth 1 -name "*.jar" | head -1)"']`를 추가해 실제 jar 파일을 런타임에 탐색해 실행하도록 우회. **`Dockerfile` 자체는 이번 실행의 hard constraint로 수정 금지 범위**라 근본 수정(ENTRYPOINT를 실제 파일명에 맞추거나 `archiveFileName = "application.jar"`로 고정)은 이 플랜에서 하지 않았다 — 후속 커밋 필요.
 - **Files modified:** `deploy/compose.prod.yml`
 - **Verification:** 우회 적용 후 `up -d --wait`에서 app이 `healthy`로 전환, actuator 200 확인
+- **후속 해소(오케스트레이터, 같은 청크):** Dockerfile 빌더 스테이지에 `cp build/libs/*.jar application.jar` 후 extract하도록 고쳐(공식 Boot 4.1 파셜 Dockerfile 형태, D-176) 이미지 안에 `application.jar`가 생기게 했고, compose의 `entrypoint`/`command` 우회는 제거했다. 재빌드한 `gw-be:test`로 3컨테이너를 다시 띄워 `docker inspect .Path/.Args`가 `java [-jar application.jar]`임을 확인했고, health 200 / info 404(Caddy) / info 200(앱 내부) / 80→443 308 / 메모리 limit 576716800·314572800·52428800 / Flyway 최초 적용·재기동 up-to-date가 모두 그대로 재현됐다. `docker stats` 관측: app 364.5MiB / postgres 34.1MiB / caddy 18.7MiB.
 - **Committed in:** `889306d`
 
 **2. [Rule 1 - Bug] Caddy가 "server block without any key is global configuration, and if used, it must be first" 에러로 재시작 루프**
@@ -185,7 +186,7 @@ None - 이 플랜은 외부 서비스 설정이 필요 없다. 로컬 검증용 
 
 ## Next Phase Readiness
 
-- **Dockerfile 근본 버그가 남아 있다.** `ENTRYPOINT ["java", "-jar", "application.jar"]`는 실제 산출물 파일명(`gold-wrestling-be-0.0.1-SNAPSHOT.jar`)과 불일치한다. 이번 플랜은 hard constraint로 `Dockerfile`을 수정할 수 없어 `deploy/compose.prod.yml`의 `entrypoint`/`command`로 우회했지만, 이 우회가 없으면 **실서버 배포(07-06)도 동일하게 실패한다.** 07-04 또는 그 이전에 `Dockerfile`의 `ENTRYPOINT`를 고치거나(`build.gradle.kts`에 `archiveFileName = "application.jar"` 고정 후 재빌드) compose 우회를 영구 채택할지 결정이 필요하다 — 사용자 확인 권장.
+- ~~**Dockerfile 근본 버그가 남아 있다.**~~ **해소(같은 청크, D-176)** — Dockerfile이 추출 전 jar를 `application.jar`로 고정하도록 고쳐졌고 compose 우회는 제거됐다. 07-05가 GHCR에 push할 이미지는 이 수정본으로 빌드해야 한다(`gw-be:test`는 이미 재빌드됨).
 - (1) 메모리 실측 3값, (2) actuator 이중 관측, (3) `local_certs` 미주입 사유, (4) §10.0 면제 사유는 모두 위 "로컬 실기동 관측값" 절에 기록 완료 — 07-04 `docs/operations.md`·07-06 실서버 대조가 그대로 인용 가능하다.
 - `deploy/` 3개 파일(`compose.prod.yml`, `Caddyfile`, `compose.local.yml`)이 Phase 8 배포 워크플로가 scp로 전달할 파일 세트로 확정됐다(D-18).
 - 로컬 `docker-compose.yml`·`src/`·`application.yml`·`SecurityConfig.kt`에 diff 0건으로 D-17·hard constraint 준수 확인됨(`git status --porcelain` 클린).
