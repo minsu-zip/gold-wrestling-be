@@ -2019,3 +2019,16 @@
   이미지 안에는 시크릿이 없다(전량 env 주입, D-169). 바이트코드 디컴파일로 도메인 로직·마이그레이션·
   API 표면이 노출되는 것은 소유자가 감수하기로 확정했다.
 - 기각 대안: private 패키지 + 서버 상주 PAT.
+
+## D-176. 레이어 추출 전에 jar를 `application.jar`로 이름 고정한다 — ENTRYPOINT 불일치의 근본 수정은 Dockerfile이 맡는다
+
+- 2026-09-08 / Boot `tools extract --layers`는 application 레이어 안의 jar 파일명을 **입력 jar 이름 그대로** 남긴다.
+  07-02가 `build/libs/*.jar`에 바로 extract를 돌려 레이어 안 파일이 `gold-wrestling-be-0.0.1-SNAPSHOT.jar`가 됐고,
+  `ENTRYPOINT ["java","-jar","application.jar"]`가 기동 시 `Unable to access jarfile`로 실패했다(07-03 로컬 실기동에서 발견).
+  공식 Boot 4.1 파셜 Dockerfile과 같이 빌더 스테이지에서 `cp build/libs/*.jar application.jar` 후 extract하는 형태로 고쳤다.
+- 이유: 실행 명령(ENTRYPOINT)은 이미지의 책임이다. compose가 `find`로 jar를 탐색하는 우회는 Phase 8 배포 워크플로·
+  `docker run` 단독 실행·공식 패턴 모두와 어긋나고, 이미지만 보고는 실행 방법을 알 수 없게 만든다. `cp`는 jar가 둘 이상이면
+  실패하므로 조용히 하나를 고르는 일도 없다.
+- 기각 대안: ① compose `entrypoint`/`command`의 `find` 우회(07-03이 임시 적용했다가 제거) — 실행 계약이 이미지 밖으로 샌다.
+  ② `build.gradle.kts`의 `bootJar { archiveFileName = "application.jar" }` — 동작하지만 CI 아티팩트·로컬 `build/libs` 이름까지
+  바뀌고 D-17("07-02는 build.gradle.kts 무변경")과 어긋난다. 이름 고정은 이미지 빌드 단계에서만 필요하므로 Dockerfile에 둔다.

@@ -16,7 +16,13 @@ RUN --mount=type=cache,target=/root/.gradle \
 
 # Boot 4.1은 layertools jarmode가 tools jarmode로 통합됐다 (D-13, verify-boot4-api로 확인된 공식 명령).
 # bootJar가 layers.idx를 기본 포함하므로 build.gradle.kts에 layered {} 블록 없이도 추출이 된다 (가정 A5).
-RUN java -Djarmode=tools -jar build/libs/*.jar extract --layers --destination extracted
+#
+# 추출 전에 jar를 application.jar로 이름을 고정한다 (공식 Boot 4.1 파셜 Dockerfile과 동일한 형태, D-176).
+# extract는 application 레이어 안의 jar 파일명을 "입력 jar 이름 그대로" 유지하므로, 원본 이름
+# (gold-wrestling-be-0.0.1-SNAPSHOT.jar)으로 추출하면 아래 ENTRYPOINT의 application.jar가 존재하지 않는다.
+# bootJar만 실행했으므로 build/libs/에는 jar가 하나뿐이다 — 둘 이상이면 cp가 실패해 빌드가 멈춘다(조용히 하나를 고르지 않는다).
+RUN cp build/libs/*.jar application.jar \
+    && java -Djarmode=tools -jar application.jar extract --layers --destination extracted
 
 # --- 런타임 스테이지 ---
 # eclipse-temurin:21-jre(접미사 없음)는 현재 noble이 아니라 resolute로 롤링돼 있다 (Pitfall 1).

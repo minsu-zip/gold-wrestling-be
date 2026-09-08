@@ -56,14 +56,7 @@ services:
     image: ${APP_IMAGE:-ghcr.io/minsu-zip/gold-wrestling-be:latest}
     container_name: gw-prod-app
     restart: unless-stopped
-    # Dockerfile ENTRYPOINT는 java -jar application.jar 이지만, build.gradle.kts가 bootJar
-    # archiveFileName을 재정의하지 않아 실제 산출물 파일명은 gold-wrestling-be-0.0.1-SNAPSHOT.jar다
-    # (Task 3 로컬 기동 중 발견 — "Unable to access jarfile application.jar"). 이 플랜은 Dockerfile을
-    # 수정할 수 없는 범위라 compose 레벨에서 실제 jar 파일을 찾아 실행하도록 우회한다.
-    # 근본 수정(Dockerfile ENTRYPOINT 또는 bootJar archiveFileName 고정)은 별도 커밋으로 후속 필요.
-    entrypoint: ["sh", "-c"]
-    command:
-      - 'exec java -jar "$(find /application -maxdepth 1 -name "*.jar" | head -1)"'
+    # 실행 명령은 이미지의 ENTRYPOINT(java -jar application.jar)를 그대로 쓴다 — compose가 jar 이름을 알 필요가 없다 (D-176).
     # 서비스 레벨 env_file: 은 CLI 실행 위치가 아니라 project directory(첫 -f 파일이 있는 디렉토리,
     # 즉 이 파일이 있는 deploy/ 또는 서버의 /opt/gold-wrestling/) 기준으로 해석된다.
     # 로컬 검증에서는 deploy/.env 가 있어야 하고, 서버에서는 compose와 .env 가 같은 디렉토리에 있어 그대로 맞는다.
