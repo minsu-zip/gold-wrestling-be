@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 배포·운영
 status: executing
-stopped_at: Phase 7 context gathered
-last_updated: "2026-09-08T13:29:54.244Z"
-last_activity: 2026-09-08 -- Phase 7 planning complete
+stopped_at: Completed 07-01-PLAN.md
+last_updated: "2026-09-08T14:00:40.029Z"
+last_activity: 2026-09-08
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 6
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-08)
 
 **Core value:** 회원이 보는 잔여 횟수는 항상 실제 사용 가능 횟수와 일치한다 (즉시 차감/복구 + 전 이력 + 초과 예약 0건)
-**Current focus:** v1.1 배포·운영 — 요구사항 정의 중
+**Current focus:** Phase 07 — container-server-setup
 
 ## Current Position
 
-Phase: 7 - 컨테이너화·서버 구성 (not started)
-Plan: —
+Phase: 07 (container-server-setup) — EXECUTING
+Plan: 2 of 6
 Status: Ready to execute
-Last activity: 2026-09-08 -- Phase 7 planning complete
+Last activity: 2026-09-08
 
 ## Performance Metrics
 
@@ -95,6 +95,7 @@ Last activity: 2026-09-08 -- Phase 7 planning complete
 | Phase 06-operations P09 | ~30min | 3 tasks | 6 files |
 | Phase 06-operations P10 | ~20min | 3 tasks | 7 files |
 | Phase 06-operations P11 | ~35min | 3 tasks | 3 files |
+| Phase 07-container-server-setup P01 | 45min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -193,6 +194,7 @@ Recent decisions affecting current work:
 - [Phase 06-10]: 활동 피드 범위 역전(from > to)은 새 에러코드를 만들지 않고 Specification AND 조합이 자연히 빈 목록을 반환하도록 둔다 — 예약 조회 전용인 INVALID_RESERVATION_SEARCH_RANGE를 재사용하지 않았다
 - [Phase 06-10]: AdminNotificationController 클래스 매핑을 /api/admin/notifications에서 /api/admin으로 넓히고 기존 두 메서드에 /notifications, /notifications/read-all 하위 경로를 붙였다 — 알림과 피드는 같은 테이블의 다른 뷰지만 FE 화면이 달라 하위 경로로 두면 오해된다(AdminScheduleController 선례). 노출 경로 문자열은 06-09 값과 동일하게 유지해 FE 계약을 깨지 않았다
 - [Phase 06-11]: CR-03 배선 확인은 로컬 DB에 출석 유무로 결과가 갈리는 회원이 없어 InactivityBatchRunner.kt의 코드 경로 + InactivityBatchRunnerTest 대조 테스트로 실증하고 실기동은 '부분 확인'으로 기록, 사용자가 이 상태로 승인
+- [Phase 07-01]: D-169~D-175: 운영 프로필 미신설, Hikari/Tomcat 축소, springdoc enabled 토글로 Swagger 운영 비활성(SecurityConfig 불변), 런타임 베이스 이미지 noble 고정, JVM MaxRAMPercentage=60 시작값, Caddy actuator 외부 차단, GHCR public 이미지
 
 ### Pending Todos
 
@@ -241,6 +243,6 @@ BE-CHANGE-REQUESTS.md의 "해소되면 할 일" 열에 항목별로 적혀 있�
 
 ## Session Continuity
 
-Last session: 2026-09-08T12:27:37.048Z
-Stopped at: Phase 7 context gathered
-Resume file: .planning/phases/07-container-server-setup/07-CONTEXT.md
+Last session: 2026-09-08T14:00:40.023Z
+Stopped at: Completed 07-01-PLAN.md
+Resume file: None

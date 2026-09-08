@@ -41,7 +41,7 @@ phase 상세(Goal·Success Criteria·플랜 목록·충족 근거)는 [아카이
   4. RAM 1GB 서버에서 세 컨테이너가 기동·부하 중 OOM kill 없이 동작한다 — JVM 힙 상한·컨테이너별 메모리 제한·스왑 2GB 전제가 문서의 메모리 예산표로 뒷받침된다
   5. 운영자가 빈 Ubuntu 서버에 멱등 초기 세팅 스크립트(Docker+compose 플러그인 설치, 스왑 2GB, 타임존 Asia/Seoul, 배포 디렉토리·`.env` 자리 생성)를 두 번 실행해도 두 번째 실행이 실패하지 않고 같은 결과를 내며, 운영 환경변수(`KAKAO_REDIRECT_URI`, `CORS_ALLOWED_ORIGINS`, `ADMIN_SEED_*`, JWT 등) 키 목록·의미·예시가 실값 없이 레포에 문서화된다
 **Plans**: 6 plans (4 waves · 청크 7a=wave 1~2, 7b=wave 3~4)
-- [ ] 07-01-PLAN.md — 앱 운영 설정 확장(Hikari 5·Tomcat 50·Swagger 토글) + SwaggerDisabledTest + decisions D-169~D-175 [wave 1]
+- [x] 07-01-PLAN.md — 앱 운영 설정 확장(Hikari 5·Tomcat 50·Swagger 토글) + SwaggerDisabledTest + decisions D-169~D-175 [wave 1]
 - [ ] 07-02-PLAN.md — 멀티스테이지 Dockerfile·.dockerignore + 멀티아키 빌드 실측 + fat jar 대비 절감 수치(docs/metrics.md) [wave 1]
 - [ ] 07-03-PLAN.md — deploy/compose.prod.yml·Caddyfile·로컬 오버라이드 + 로컬 3컨테이너 기동 검증 [wave 2]
 - [ ] 07-04-PLAN.md — deploy/server-setup.sh(멱등) + docs/operations.md(env 키표·메모리 예산표·수동 배포 runbook) [wave 3]
@@ -112,7 +112,7 @@ phase 상세(Goal·Success Criteria·플랜 목록·충족 근거)는 [아카이
 | 4. 시간표·예약 | v1.0 | 15/15 | Complete | 2026-08-08 |
 | 5. 배치 | v1.0 | 16/16 | Complete | 2026-08-16 |
 | 6. 운영 | v1.0 | 11/11 | Complete | 2026-08-19 |
-| 7. 컨테이너화·서버 구성 | v1.1 | 0/? | Not started | - |
+| 7. 컨테이너화·서버 구성 | v1.1 | 1/6 | In Progress|  |
 | 8. 배포 파이프라인 | v1.1 | 0/? | Not started | - |
 | 9. 운영 안전장치 | v1.1 | 0/? | Not started | - |
 | 10. 검증·활성화 | v1.1 | 0/? | Not started | - |
