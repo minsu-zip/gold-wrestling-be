@@ -25,8 +25,8 @@
 | `JWT_REFRESH_TOKEN_EXPIRY_DAYS` | 리프레시 토큰 만료(일) | 배포된 기본값 그대로 | — |
 | `KAKAO_REST_API_KEY` | 카카오 REST API 키 | 카카오 개발자 콘솔에서 발급 | 실값 절대 커밋 금지 |
 | `KAKAO_CLIENT_SECRET` | 카카오 클라이언트 시크릿 | 카카오 개발자 콘솔에서 발급 | 실값 절대 커밋 금지 |
-| `KAKAO_REDIRECT_URI` | 카카오 로그인 콜백 URI | `https://app.goldwrestling.com/login/callback` | **운영에서 값이 다르다** — REQUIREMENTS.md INFRA-07 명시값. 카카오 콘솔에 등록 완료(PROJECT.md) |
-| `CORS_ALLOWED_ORIGINS` | 허용 프론트엔드 오리진(쉼표 구분) | `https://app.goldwrestling.com` | **운영에서 값이 다르다** — REQUIREMENTS.md INFRA-07 명시값. 로컬은 `http://localhost:5180,http://localhost:5181`(D-012) |
+| `KAKAO_REDIRECT_URI` | 카카오 로그인 콜백 URI | `https://<fe-domain>/login/callback` | **운영에서 값이 다르다** — 실값은 `.planning/REQUIREMENTS.md` INFRA-07 사전 준비값(FE 도메인)을 쓰고, 카카오 개발자 콘솔에 등록한 리다이렉트 URI와 문자열까지 일치해야 한다 |
+| `CORS_ALLOWED_ORIGINS` | 허용 프론트엔드 오리진(쉼표 구분) | `https://<fe-domain>` | **운영에서 값이 다르다** — 실값은 `.planning/REQUIREMENTS.md` INFRA-07 사전 준비값(FE 도메인). 로컬은 `http://localhost:5180,http://localhost:5181`(D-012) |
 | `ADMIN_SEED_LOGIN_ID` | 관리자 시드 로그인 ID | 최초 배포 1회만 채움 | D-038 — 채운 상태로 기동하면 없을 때만 멱등 생성, 이후 비운다(§4 참조) |
 | `ADMIN_SEED_PASSWORD` | 관리자 시드 비밀번호 | 최초 배포 1회만 채움 | D-038 — 생성 확인 후 서버 `.env`에서 비운다 |
 | `ADMIN_SEED_NAME` | 관리자 시드 이름 | 최초 배포 1회만 채움 | D-038 |
