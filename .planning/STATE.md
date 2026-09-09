@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 배포·운영
 status: executing
-stopped_at: Completed 07-03-PLAN.md
-last_updated: "2026-09-08T14:33:33.892Z"
-last_activity: 2026-09-08
+stopped_at: Completed 07-04-PLAN.md
+last_updated: "2026-09-09T00:48:55.404Z"
+last_activity: 2026-09-09
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 6
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-09-08)
 ## Current Position
 
 Phase: 07 (container-server-setup) — EXECUTING
-Plan: 4 of 6
+Plan: 2 of 6
 Status: Ready to execute
-Last activity: 2026-09-08
+Last activity: 2026-09-09
 
 ## Performance Metrics
 
@@ -98,6 +98,7 @@ Last activity: 2026-09-08
 | Phase 07-container-server-setup P01 | 45min | 3 tasks | 4 files |
 | Phase 07 P02 | 45min | 3 tasks | 3 files |
 | Phase 07 P03 | 60min | 3 tasks | 3 files |
+| Phase 07 P04 | 40min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -202,6 +203,8 @@ Recent decisions affecting current work:
 - [Phase 07]: 운영 compose container_name을 gw-prod-*로 분리해 로컬 dev docker-compose.yml과 이름 충돌 없이 동시 검증 가능하게 함
 - [Phase 07]: compose.local.yml에서 local_certs 전역 옵션 주입을 포기 — Caddy가 localhost를 비공인 도메인으로 자동 인식해 내부 CA 인증서를 스스로 발급함을 실측 확인
 - [Phase 07]: Dockerfile ENTRYPOINT(java -jar application.jar)가 실제 산출물 파일명과 불일치하는 버그 발견 — compose entrypoint/command로 우회, Dockerfile 자체 수정은 후속 필요
+- [Phase 07-04]: docs/operations.md의 env 키 표는 .env.example 29개 키 전수를 grep 루프로 대조해 1:1 동기화를 강제한다
+- [Phase 07-04]: DOMAIN·ACME_EMAIL은 REQUIREMENTS.md INFRA-07이 명시한 KAKAO_REDIRECT_URI/CORS_ALLOWED_ORIGINS와 달리 실도메인이 아니므로 <your-domain>/<your-email> 플레이스홀더로 남긴다
 
 ### Pending Todos
 
@@ -251,6 +254,6 @@ BE-CHANGE-REQUESTS.md의 "해소되면 할 일" 열에 항목별로 적혀 있�
 
 ## Session Continuity
 
-Last session: 2026-09-08T14:33:27.173Z
-Stopped at: Completed 07-03-PLAN.md
+Last session: 2026-09-09T00:48:55.398Z
+Stopped at: Completed 07-04-PLAN.md
 Resume file: None
