@@ -67,3 +67,19 @@ jobs:
       # build는 ktlint 플러그인이 check에 배선한 ktlintCheck를 이미 포함하지만,
       # 포맷 위반을 컴파일·테스트보다 먼저 빠르게 떨어뜨리도록 명시적으로 앞세운다.
       - run: ./gradlew ktlintCheck build
+
+  # deploy/ 아래 bash 스크립트(서버 초기 세팅 등)는 Gradle 빌드가 전혀 보지 않는다. 문법(bash -n)과
+  # 정적 분석(shellcheck — ubuntu-latest 기본 탑재)을 여기서 건다. 스크립트가 실서버에서 set -e로 멈추면
+  # 사람이 SSH로 들어가 디버깅해야 하므로, 잡을 수 있는 오류는 PR 단계에서 떨어뜨린다 (PR #35 리뷰 반영).
+  # build job과 독립이라 병렬로 돌고, required status check 등록 대상은 여전히 "CI / build" 하나다.
+  shell-lint:
+    name: shell-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: bash -n deploy/*.sh
+      # 기본 심각도(style까지)로 돈다 — 억제가 필요한 항목은 스크립트 안에 shellcheck 지시어로 사유와 함께 남긴다.
+      - run: shellcheck deploy/*.sh

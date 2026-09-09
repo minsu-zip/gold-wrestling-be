@@ -24,7 +24,7 @@
 - [x] **INFRA-03**: 운영자가 운영용 compose 파일 하나로 app+postgres+Caddy 세 컨테이너를 올릴 수 있다 — postgres 데이터는 named volume, app은 postgres healthcheck 통과 후 기동, 전부 `restart: unless-stopped`. 로컬 개발용 `docker-compose.yml`은 그대로 둔다
 - [x] **INFRA-04**: `https://api.goldwrestling.com`이 Caddy 자동 HTTPS(Let's Encrypt)로 서비스된다 — 80→443 리다이렉트, app 컨테이너로 리버스 프록시, 인증서 저장소 볼륨 영속(재시작해도 재발급 안 함)
 - [x] **INFRA-05**: RAM 1GB 서버에서 세 컨테이너가 기동·부하 중 OOM kill 없이 동작한다 — JVM 힙 상한 명시, postgres 메모리 파라미터 조정, 컨테이너별 메모리 제한, 스왑 2GB 전제. 메모리 예산표를 문서에 남긴다
-- [ ] **INFRA-06**: 운영자가 빈 Ubuntu 서버에 멱등 초기 세팅 스크립트를 실행하면 배포 가능 상태가 된다 — Docker(compose 플러그인) 설치, 스왑 2GB, 타임존 Asia/Seoul, 배포 디렉토리·`.env` 자리 생성. **두 번 실행해도 결과가 같다**
+- [x] **INFRA-06**: 운영자가 빈 Ubuntu 서버에 멱등 초기 세팅 스크립트를 실행하면 배포 가능 상태가 된다 — Docker(compose 플러그인) 설치, 스왑 2GB, 타임존 Asia/Seoul, 배포 디렉토리·`.env` 자리 생성. **두 번 실행해도 결과가 같다**
 - [x] **INFRA-07**: 운영 환경변수의 키 목록·의미·예시가 레포에 문서화된다(실값 없음) — 운영 필수값(`KAKAO_REDIRECT_URI=https://app.goldwrestling.com/login/callback`, `CORS_ALLOWED_ORIGINS=https://app.goldwrestling.com`, `ADMIN_SEED_*`, JWT 등) 포함. 운영 `.env`는 서버에만 존재하고 레포 밖이다
 
 ### 배포 파이프라인 — DEPLOY
@@ -97,7 +97,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INFRA-03 | Phase 7 | Complete |
 | INFRA-04 | Phase 7 | Complete |
 | INFRA-05 | Phase 7 | Complete |
-| INFRA-06 | Phase 7 | Pending |
+| INFRA-06 | Phase 7 | Complete |
 | INFRA-07 | Phase 7 | Complete |
 | DEPLOY-01 | Phase 8 | Pending |
 | DEPLOY-02 | Phase 8 | Pending |

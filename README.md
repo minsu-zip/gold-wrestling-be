@@ -128,3 +128,5 @@ curl -s http://localhost:8080/v3/api-docs.yaml -o docs/api/openapi.yaml
 - 기획·정책: [`docs/requirements.md`](docs/requirements.md), [`docs/policies.md`](docs/policies.md)
 - 용어: [`docs/glossary.md`](docs/glossary.md) · 결정 기록: [`docs/decisions.md`](docs/decisions.md)
 - API 계약: [`docs/api/openapi.yaml`](docs/api/openapi.yaml)
+- 운영 배포·환경변수·메모리 예산의 정본: [`docs/operations.md`](docs/operations.md)
+- 이미지 빌드 관련 실측 수치(레이어드 이미지 절감·멀티 아키텍처 빌드): [`docs/metrics.md`](docs/metrics.md)
