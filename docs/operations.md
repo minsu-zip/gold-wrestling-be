@@ -4,6 +4,7 @@
 > 값의 "왜"는 `docs/decisions.md` D-169~D-177에 있다 — 여기서는 값 자체와 절차만 다룬다.
 > 운영 `.env`는 서버(`/opt/gold-wrestling/.env`)에만 존재하고 이 레포 밖이다. 이 문서 어디에도
 > 실제 시크릿 값·도메인·이메일은 쓰지 않는다 — 키 이름과 생성 방법, 플레이스홀더만 남긴다.
+> 표기: `D-1xx` = `docs/decisions.md` 전역 결정 / `07-CONTEXT D-xx` = `.planning/phases/07-container-server-setup/07-CONTEXT.md` 로컬 결정(실행 맥락, 스펙 아님).
 
 ## 1. 운영 환경변수 (INFRA-07)
 
@@ -40,7 +41,7 @@
 | `DB_HIKARI_MAX_POOL_SIZE` | Hikari 커넥션 풀 최대 크기 | `5` | D-170 — 1GB 서버·배치 `REQUIRES_NEW`가 최대 커넥션 2개 쓰는 패턴 기준 |
 | `SERVER_TOMCAT_THREADS_MAX` | Tomcat 최대 스레드 수 | `50` | D-170 — 스레드 하나마다 스택 메모리가 550M 힙 예산을 잠식 |
 | `JAVA_TOOL_OPTIONS` | 운영 compose가 JVM 메모리 플래그를 주입하는 통로 | 비우면 compose 내장 기본값(§2 참조) 사용 | D-173 — 재빌드 없이 힙 비율 조정 가능. 실측 후 재조정 시 이 키에 전체 플래그를 채운다 |
-| `APP_IMAGE` | 운영 compose가 pull할 이미지 태그 | 비우면 `:latest` | Phase 8 SHA 태그 배포 대비(D-02) |
+| `APP_IMAGE` | 운영 compose가 pull할 이미지 태그 | 비우면 `:latest` | Phase 8 SHA 태그 배포 대비(07-CONTEXT D-02) |
 
 ## 2. 메모리 예산 (INFRA-05)
 
@@ -58,7 +59,7 @@
 (`deploy/compose.prod.yml` 주석)까지 고려하면 이 여유가 넉넉하지 않다는 뜻이고, 그래서 스왑 2GB가
 전제 조건이다(선택이 아니다).
 
-**JVM 배분과 재조정 기준(D-07/D-173):** `-XX:MaxRAMPercentage=60`은 시작값이다. 힙 330M·비힙 여유
+**JVM 배분과 재조정 기준(D-173):** `-XX:MaxRAMPercentage=60`은 시작값이다. 힙 330M·비힙 여유
 220M이라는 계산은 Boot+Hibernate 애플리케이션의 일반적인 비힙 사용량(150~250M) 범위 안에서 나온
 추정이지 확정 수치가 아니다. 07-06 실서버 배포에서 `docker stats`로 RSS를 실측해 이 비율을 최종
 확정한다 — 필요하면 `JAVA_TOOL_OPTIONS`만 바꿔 재배포 없이 조정한다(이미지 재빌드 불필요).
@@ -106,7 +107,7 @@ ssh ubuntu@<host> 'bash -s' < deploy/server-setup.sh
 다시 접속해야 `sudo` 없이 `docker`·`docker compose` 명령을 쓸 수 있다.
 
 **서버 디렉토리 구조** — `/opt/gold-wrestling/`에는 아래 4가지만 존재한다. **서버에서 버전관리 명령을
-쓰지 않는다(D-18)**:
+쓰지 않는다(07-CONTEXT D-18)**:
 
 ```
 /opt/gold-wrestling/
@@ -124,7 +125,7 @@ ssh ubuntu@<host> 'bash -s' < deploy/server-setup.sh
 스크립트 종료 요약(`docker --version`·`swapon --show`·`timedatectl`·`ls -la /opt/gold-wrestling` 출력)을
 두 번 실행해 비교하는 방식으로 실증한다.
 
-## 4. 수동 배포 절차 (D-04)
+## 4. 수동 배포 절차 (07-CONTEXT D-04)
 
 07-06이 아래 순서를 **그대로 따라 실행**한다. 각 단계는 실행 가능한 명령 + 기대 결과로 적었고, 끝마다
 "실패하면"을 붙였다 — 실패하면 다음 단계로 넘어가지 않는다. 도메인·이메일은 실값을 쓰지 않고
@@ -142,7 +143,7 @@ ssh ubuntu@<host> 'bash -s' < deploy/server-setup.sh
    원인을 해결한 뒤 다시 실행한다.
 
 3. **파일 전달** — `scp deploy/compose.prod.yml deploy/Caddyfile ubuntu@<host>:/opt/gold-wrestling/`
-   (서버에 git이 없다 — D-18).
+   (서버에 git이 없다 — 07-CONTEXT D-18).
    *실패하면:* `scp` 권한 오류는 대개 `.pem` 키 경로·`ubuntu` 소유권 문제다 — 2단계의 `chown`이
    끝났는지 재확인한다.
 
@@ -163,7 +164,7 @@ ssh ubuntu@<host> 'bash -s' < deploy/server-setup.sh
 
 6. **이미지 pull + 기동** — `cd /opt/gold-wrestling && docker compose -f compose.prod.yml pull &&
    docker compose -f compose.prod.yml up -d`. GHCR 이미지가 public이라 `docker login`이 필요 없다
-   (D-03/D-175).
+   (D-175).
    *실패하면:* `up`이 `DOMAIN 필수` 메시지와 함께 즉시 종료되면 4단계로 돌아가 `.env`를 다시 확인한다.
 
 7. **Flyway 적용 확인** — `docker compose -f compose.prod.yml logs app | grep -i flyway`로 `V1`부터
@@ -174,7 +175,7 @@ ssh ubuntu@<host> 'bash -s' < deploy/server-setup.sh
 8. **health·HTTPS 확인** —
    - `curl -I http://<domain>` → `30x`(80→443 리다이렉트)
    - `curl -s https://<domain>/actuator/health` → `{"status":"UP"}`
-   - `curl -o /dev/null -w '%{http_code}' https://<domain>/actuator/info` → `404`(Caddy 차단, D-20)
+   - `curl -o /dev/null -w '%{http_code}' https://<domain>/actuator/info` → `404`(Caddy 차단, D-174)
    *실패하면:* `curl: (60) SSL certificate problem`은 대개 인증서 발급이 아직 끝나지 않은 것이다 —
    `docker compose logs caddy`에서 `certificate obtained`를 기다린 뒤 재시도한다.
 

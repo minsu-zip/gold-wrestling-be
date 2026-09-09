@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 빈 Ubuntu 24.04 EC2를 배포 가능한 상태로 만드는 멱등 초기 세팅 스크립트 (INFRA-06).
-# 근거: docs/decisions.md D-18(서버에는 git 없이 compose·Caddyfile·.env·backups/만 둔다),
+# 근거: 07-CONTEXT D-18(.planning/phases/07-container-server-setup/07-CONTEXT.md 로컬 결정 — 서버에는 git 없이 compose·Caddyfile·.env·backups/만 둔다),
 #       .planning/REQUIREMENTS.md INFRA-06(Docker+compose 플러그인·스왑 2GB·타임존·배포 디렉토리).
 #
 # 실행 방법 (레포 클론 없이 파일 하나만 파이프로 전달):
@@ -52,7 +52,7 @@ sudo timedatectl set-timezone Asia/Seoul
 # docker 명령을 sudo 없이 쓸 수 있다. 아래 종료 메시지에서 다시 안내한다.
 sudo usermod -aG docker ubuntu
 
-# --- 5. 배포 디렉토리 (서버에서 버전관리 명령을 쓰지 않는다 — D-18) ---
+# --- 5. 배포 디렉토리 (서버에서 버전관리 명령을 쓰지 않는다 — 07-CONTEXT D-18) ---
 # backups/는 Phase 9(S3 백업·복구)가 쓸 자리만 미리 만들어 둔다. 이 스크립트는 백업 로직을 구현하지 않는다.
 # .env는 없을 때만 빈 파일로 만든다 — 이미 있으면 절대 손대지 않는다(운영 시크릿 소실 방지).
 sudo mkdir -p /opt/gold-wrestling/backups
