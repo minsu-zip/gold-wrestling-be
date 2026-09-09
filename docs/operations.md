@@ -123,3 +123,75 @@ ssh ubuntu@<host> 'bash -s' < deploy/server-setup.sh
 `/etc/fstab` grep, `.env` 존재 확인)으로 재실행을 안전하게 만든다. 실제 2회 실행 결과 비교는 07-06이
 스크립트 종료 요약(`docker --version`·`swapon --show`·`timedatectl`·`ls -la /opt/gold-wrestling` 출력)을
 두 번 실행해 비교하는 방식으로 실증한다.
+
+## 4. 수동 배포 절차 (D-04)
+
+07-06이 아래 순서를 **그대로 따라 실행**한다. 각 단계는 실행 가능한 명령 + 기대 결과로 적었고, 끝마다
+"실패하면"을 붙였다 — 실패하면 다음 단계로 넘어가지 않는다. 도메인·이메일은 실값을 쓰지 않고
+`<your-domain>`·`<your-email>` 플레이스홀더로 표기한다.
+
+1. **사전 확인** — DNS A 레코드가 서버 Elastic IP를 가리키는지, 보안그룹 인바운드 80/443이 열려
+   있는지 확인한다.
+   *실패하면:* Let's Encrypt HTTP-01 챌린지는 80이 막혀 있으면 인증서 발급 자체가 실패한다 — 다음
+   단계로 넘어가지 않는다.
+
+2. **서버 초기 세팅** — `ssh ubuntu@<host> 'bash -s' < deploy/server-setup.sh` 실행 후 종료 요약에서
+   `docker`·`swapon --show`·`Time zone: Asia/Seoul`·`/opt/gold-wrestling` 4가지가 모두 보이는지 확인한다.
+   완료 후 **재로그인**한다(§3 참조).
+   *실패하면:* 스크립트 중간에 `apt-get`이 실패하면(네트워크·저장소 문제) 재실행해도 안전하다(멱등) —
+   원인을 해결한 뒤 다시 실행한다.
+
+3. **파일 전달** — `scp deploy/compose.prod.yml deploy/Caddyfile ubuntu@<host>:/opt/gold-wrestling/`
+   (서버에 git이 없다 — D-18).
+   *실패하면:* `scp` 권한 오류는 대개 `.pem` 키 경로·`ubuntu` 소유권 문제다 — 2단계의 `chown`이
+   끝났는지 재확인한다.
+
+4. **서버 `.env` 작성** — §1 표를 보고 `/opt/gold-wrestling/.env`를 서버에서 직접 채운다. 운영 전용
+   값(`DOMAIN`, `SWAGGER_ENABLED=false`, `DB_HOST=postgres`, `KAKAO_REDIRECT_URI`,
+   `CORS_ALLOWED_ORIGINS`)을 명시적으로 넣는다. `chmod 600 /opt/gold-wrestling/.env` 권장(소유자 외
+   읽기 차단).
+   *실패하면:* 필수 키(`DOMAIN`·`ACME_EMAIL`) 누락은 6단계의 `up`이 즉시 거부한다(D-177) — 이 자체가
+   "빠뜨린 키가 있다"는 신호다.
+
+5. **관리자 시드(최초 1회)** — `ADMIN_SEED_LOGIN_ID`·`ADMIN_SEED_PASSWORD`·`ADMIN_SEED_NAME`을 채운
+   채로 1회 기동 → 그 계정으로 로그인 성공 확인 → **`.env`에서 세 값을 다시 비운다**. D-038이 멱등
+   생성이라 두 번째 기동에서 시드 로직 자체는 아무 일도 하지 않지만, 목적은 관리자 비밀번호를 서버
+   파일에 상주시키지 않는 것이다 — 비운 뒤에도 재기동은 안전하다.
+   *실패하면:* 로그인 실패 시 세 값을 비우지 말고 오탈자부터 확인한다 — 값을 비운 뒤 재기동하면
+   D-038 멱등 생성이 이미 만든 계정이 있어도 다시 만들지 않는다(비밀번호 재발급 불가, 삭제 후
+   재생성 필요).
+
+6. **이미지 pull + 기동** — `cd /opt/gold-wrestling && docker compose -f compose.prod.yml pull &&
+   docker compose -f compose.prod.yml up -d`. GHCR 이미지가 public이라 `docker login`이 필요 없다
+   (D-03/D-175).
+   *실패하면:* `up`이 `DOMAIN 필수` 메시지와 함께 즉시 종료되면 4단계로 돌아가 `.env`를 다시 확인한다.
+
+7. **Flyway 적용 확인** — `docker compose -f compose.prod.yml logs app | grep -i flyway`로 `V1`부터
+   최신 버전(`V12`)까지 `Successfully applied`가 순서대로 보이는지 확인한다.
+   *실패하면:* 마이그레이션 실패 로그가 보이면 앱이 기동을 거부한 상태다 — DB 접속 정보(`DB_*`)부터
+   재확인한다.
+
+8. **health·HTTPS 확인** —
+   - `curl -I http://<domain>` → `30x`(80→443 리다이렉트)
+   - `curl -s https://<domain>/actuator/health` → `{"status":"UP"}`
+   - `curl -o /dev/null -w '%{http_code}' https://<domain>/actuator/info` → `404`(Caddy 차단, D-20)
+   *실패하면:* `curl: (60) SSL certificate problem`은 대개 인증서 발급이 아직 끝나지 않은 것이다 —
+   `docker compose logs caddy`에서 `certificate obtained`를 기다린 뒤 재시도한다.
+
+9. **인증서 영속 확인** — `docker compose -f compose.prod.yml restart caddy` 후 Caddy 로그에
+   `obtaining`·`certificate obtained` 같은 **새 발급 로그가 없어야** 한다(named volume `caddy_data`가
+   기존 인증서를 보존).
+   *실패하면:* 재시작마다 새로 발급되면 `caddy_data` 볼륨이 실제로 마운트됐는지
+   (`docker volume ls`·`docker inspect gw-prod-caddy`) 확인한다.
+
+10. **메모리 실측** — `docker stats --no-stream`으로 세 컨테이너 RSS를 §2 예산표의 "실측 RSS"·"여유"
+    열에 기입한다. `dmesg | grep -i oom`에 아무 것도 나오지 않아야 한다. **몇 시간 뒤 Caddy를 한 번 더
+    확인**한다(§2 Caddy 주의 참조).
+    *실패하면:* `dmesg`에 OOM kill 로그가 있으면 해당 컨테이너의 limit을 §2 표 기준으로 재검토한다.
+
+11. **롤백** — 이전 이미지로 되돌리려면 `.env`의 `APP_IMAGE`를 이전 태그로 바꾼 뒤
+    `docker compose -f compose.prod.yml up -d`. **Phase 8이 커밋 SHA 태그를 붙이기 전인 현재는
+    `latest` 태그뿐이라, 정확한 이전 버전으로 되돌릴 방법이 아직 없다** — 이 한계는 Phase 8이
+    해소한다.
+    *실패하면:* 되돌릴 이전 태그가 없으면 GHCR 웹 콘솔에서 사용 가능한 다이제스트를 확인해
+    `APP_IMAGE=ghcr.io/minsu-zip/gold-wrestling-be@sha256:<다이제스트>` 형태로 직접 지정한다.
