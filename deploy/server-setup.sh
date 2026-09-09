@@ -21,7 +21,8 @@ if ! command -v docker &>/dev/null; then
   sudo install -m 0755 -d /etc/apt/keyrings
   sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
   sudo chmod a+r /etc/apt/keyrings/docker.asc
-  # shellcheck source=/dev/null — /etc/os-release는 서버에만 있는 파일이라 정적 검사기가 따라갈 수 없다(SC1091). 의도된 소싱이다.
+  # /etc/os-release는 서버에만 있는 파일이라 정적 검사기가 따라갈 수 없다(SC1091) — 의도된 소싱이므로 아래 지시어로 억제한다.
+  # shellcheck source=/dev/null
   echo \
     "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
     $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
