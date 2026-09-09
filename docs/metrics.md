@@ -69,7 +69,17 @@
 | 컨테이너 런타임 `env` 출력 | 위 4건 + `HOME=/home/app`·`HOSTNAME`뿐 |
 | 실행 사용자 `id -u` | `999` (비루트 `app`, 07-02와 동일) |
 
-**public 전환·무인증 pull 확인:** 07-05 Task 3에서 기록한다(아래에 이어 붙인다).
+**public 전환·무인증 pull 확인(D-175, T-07-04):** 2026-09-09 소유자가 GitHub UI에서 패키지 가시성을 Public으로 전환한 뒤 아래를 실측했다.
+
+| 확인 항목 | 결과 |
+|---|---|
+| `docker logout ghcr.io` 후 `~/.docker/config.json`의 `ghcr.io` 인증 엔트리 | 없음 (무인증 상태 확인) |
+| 무인증 `docker manifest inspect ghcr.io/minsu-zip/gold-wrestling-be:latest` | 성공 |
+| 로컬 이미지를 지운 뒤 무인증 `docker pull …:latest` | 성공 — 받은 다이제스트 `sha256:c83a16f2…`(위 인덱스와 일치) |
+| 익명 토큰 발급(`https://ghcr.io/token?scope=repository:minsu-zip/gold-wrestling-be:pull`) | 토큰 발급됨 (레지스트리가 이 패키지를 public으로 취급) |
+| `gh repo view minsu-zip/gold-wrestling-be --json visibility` | `PRIVATE` — **레포 가시성 무변경**, 패키지만 public |
+
+이로써 서버는 `docker login` 없이 `docker compose pull`만으로 이미지를 받는다 — 서버에 장기 PAT를 두지 않는다는 D-175의 보안 이득이 실현됐다. 로컬 push용 PAT는 Phase 7이 끝나면 폐기해도 된다(Phase 8은 GitHub Actions의 `GITHUB_TOKEN`으로 push한다).
 
 ---
 
