@@ -100,7 +100,7 @@ ssh ubuntu@<host> 'bash -s' < deploy/server-setup.sh
 2. 스왑 2GB 생성 + `/etc/fstab` 등록(재부팅 후에도 유지)
 3. 타임존 `Asia/Seoul` 설정
 4. `ubuntu` 사용자를 `docker` 그룹에 가입
-5. `/opt/gold-wrestling/backups` 생성 + 소유권 `ubuntu:ubuntu` + `.env` 자리(없을 때만 빈 파일 생성)
+5. `/opt/gold-wrestling/backups` 생성 + 소유권 `ubuntu:ubuntu` + `.env` 자리(없을 때만 빈 파일을 만들고 즉시 `chmod 600` — 이미 있으면 내용·권한 모두 손대지 않는다)
 
 **재로그인이 필요한 이유:** 리눅스의 그룹 멤버십은 로그인(세션 시작) 시점에 결정된다. 스크립트가
 방금 `ubuntu`를 `docker` 그룹에 추가해도 **지금 열려 있는 SSH 세션에는 반영되지 않는다** — `exit` 후
@@ -149,8 +149,8 @@ ssh ubuntu@<host> 'bash -s' < deploy/server-setup.sh
 
 4. **서버 `.env` 작성** — §1 표를 보고 `/opt/gold-wrestling/.env`를 서버에서 직접 채운다. 운영 전용
    값(`DOMAIN`, `SWAGGER_ENABLED=false`, `DB_HOST=postgres`, `KAKAO_REDIRECT_URI`,
-   `CORS_ALLOWED_ORIGINS`)을 명시적으로 넣는다. `chmod 600 /opt/gold-wrestling/.env` 권장(소유자 외
-   읽기 차단).
+   `CORS_ALLOWED_ORIGINS`)을 명시적으로 넣는다. 파일 권한은 2단계의 스크립트가 생성 시 `600`으로 만들어 두므로
+   `ls -l /opt/gold-wrestling/.env`가 `-rw-------`인지만 확인한다(스크립트를 거치지 않고 직접 만들었다면 `chmod 600`).
    *실패하면:* 필수 키(`DOMAIN`·`ACME_EMAIL`) 누락은 6단계의 `up`이 즉시 거부한다(D-177) — 이 자체가
    "빠뜨린 키가 있다"는 신호다.
 

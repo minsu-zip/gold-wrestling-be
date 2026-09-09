@@ -54,10 +54,12 @@ sudo usermod -aG docker ubuntu
 
 # --- 5. 배포 디렉토리 (서버에서 버전관리 명령을 쓰지 않는다 — 07-CONTEXT D-18) ---
 # backups/는 Phase 9(S3 백업·복구)가 쓸 자리만 미리 만들어 둔다. 이 스크립트는 백업 로직을 구현하지 않는다.
-# .env는 없을 때만 빈 파일로 만든다 — 이미 있으면 절대 손대지 않는다(운영 시크릿 소실 방지).
+# .env는 없을 때만 빈 파일로 만든다 — 이미 있으면 권한까지 포함해 절대 손대지 않는다(운영 시크릿 소실 방지).
+# 생성 직후 chmod 600: 이 파일에는 곧 DB_PASSWORD·JWT_SECRET 같은 실값이 들어간다. touch만 하면 umask 022 기준
+# 644(그룹·기타 읽기 가능)로 남으므로, "소유자만 읽고 쓴다"를 사람의 기억(운영 문서의 권장)이 아니라 스크립트가 보장한다.
 sudo mkdir -p /opt/gold-wrestling/backups
 sudo chown -R ubuntu:ubuntu /opt/gold-wrestling
-[ -f /opt/gold-wrestling/.env ] || touch /opt/gold-wrestling/.env
+[ -f /opt/gold-wrestling/.env ] || { touch /opt/gold-wrestling/.env && chmod 600 /opt/gold-wrestling/.env; }
 
 # --- 종료 요약 ---
 # 07-06이 "2회 실행 결과가 같다"를 판정할 때 비교할 출력이다. 실행 시각 등 매번 달라지는
