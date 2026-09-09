@@ -1946,3 +1946,101 @@
 - 기각 대안: Phase 8에서 즉시 반영 + 재감사(승인본 산출물과 기준이 갈라져 Phase 11 대조 불가), 문서와 코드를
   영구히 분리(D-157 위반 — 임계값의 출처가 둘이 된다), `nav`만 먼저 반영하고 `minGap`은 나중에(델타가 두 번에
   걸쳐 들어가 재감사 결과의 원인 귀속이 어려워진다).
+
+## D-169. 운영 전용 스프링 프로필을 만들지 않고 운영 값을 전부 env 키로 표현한다
+
+- 2026-09-08 / Phase 7(컨테이너화·서버 구성)이 운영 배포용 설정을 준비하면서 `application-prod.yml` 같은
+  별도 프로필을 신설하지 않고, 기존 `.env`/OS 환경변수 동일 키 방식(D-011 계열)을 그대로 확장했다. Hikari
+  풀 크기·Tomcat 스레드 수·Swagger 토글을 전부 `${ENV_KEY:기본값}` 플레이스홀더로 `application.yml`에
+  추가하고, 운영 서버 `.env`에서만 값을 덮어쓴다.
+- 이유: 프로필을 만들면 "어느 프로필에서 어떤 값이 뜨는가"가 코드(프로필 파일)와 문서(`.env.example`) 두
+  곳에 흩어진다. env 키 하나로 통일하면 로컬·운영이 같은 코드 경로를 타고, 값의 차이만 `.env`가 진다.
+- 기각 대안: `application-prod.yml` 신설.
+
+## D-170. Hikari `maximum-pool-size` 5, Tomcat `threads.max` 50으로 축소한다
+
+- 2026-09-08 / `src/main/resources/application.yml`에 `DB_HIKARI_MAX_POOL_SIZE`(기본 5)·
+  `SERVER_TOMCAT_THREADS_MAX`(기본 50) 플레이스홀더를 추가했다. RAM 1GB(t3.micro)·단일 지점 트래픽이
+  전제이고, 배치의 `REQUIRES_NEW`(`BatchExecutionRecorder`)가 한 흐름에서 커넥션 2개를 쓰는 것이 최대
+  소비 패턴이라 5로 충분하다. 스레드 200개(Tomcat 기본값)는 스택 메모리가 힙 밖에서 550M 컨테이너 한도를
+  압박한다. 둘 다 env 플레이스홀더라 재배포 없이 값을 올릴 수 있다.
+- 이유: 1GB 서버에서 기본값(풀 10 / 스레드 200)을 그대로 두면 커넥션·스레드가 실제 트래픽 대비 과잉
+  할당돼 컨테이너 메모리 예산(app 550M)을 잠식한다.
+- 기각 대안: 기본값 유지(풀 10 / 스레드 200).
+
+## D-171. 운영 Swagger 차단은 `springdoc.*.enabled=false`로 하고 `SecurityConfig`는 손대지 않는다
+
+- 2026-09-08 / `springdoc.api-docs.enabled`·`springdoc.swagger-ui.enabled`를 `${SWAGGER_ENABLED:true}`
+  플레이스홀더로 바인딩하고, 운영 `.env`에서 `SWAGGER_ENABLED=false`로 덮어쓴다.
+  `SwaggerDisabledTest`(`src/test/kotlin/com/goldwrestling/config/`)가 이 상태에서 `/v3/api-docs`·
+  `/swagger-ui.html`이 404임을 회귀 테스트로 고정한다.
+- 이유: `SecurityConfig`의 Swagger permitAll 목록은 `generateApiDocs`(D-029)가 로컬에서 401 없이
+  스펙을 받아오기 위한 전제라 손대면 안 된다. springdoc을 비활성화하면 핸들러 자체가 등록되지 않아
+  permitAll 경로여도 매핑된 핸들러가 없어 404가 난다. `env_file`이 점(.) 포함 키를 거부하므로
+  `springdoc.*`을 env 이름으로 직접 쓰지 않고 평평한 `SWAGGER_ENABLED` 키로 간접 바인딩한다.
+- 기각 대안: `SecurityConfig`의 permitAll 목록에서 Swagger 경로 제거(= `generateApiDocs` 파괴).
+
+## D-172. 런타임 베이스 이미지는 `eclipse-temurin:21-jre-noble`로 OS 계열까지 명시 고정한다
+
+- 2026-09-08 / INFRA-01의 "JDK 21 기반 최소 이미지"를 JRE로 충족하는 것으로 해석했다. 접미사 없는
+  `21-jre` 태그는 현재 noble이 아니라 resolute로 매핑돼 있음을 `docker-library/official-images`
+  정의로 직접 확인했다 — 짧은 태그는 배급사가 시간이 지나며 최신 Ubuntu LTS로 조용히 재매핑하므로
+  프로덕션 Dockerfile에는 쓰지 않는다.
+- 이유: 태그 없는 짧은 이름은 재현성을 보장하지 않는다. OS 계열명을 명시하면 재빌드 시점마다 베이스
+  이미지가 조용히 바뀌는 사고를 막는다.
+- 기각 대안: Alpine·distroless(musl 호환성·디버깅 도구 부재가 1인 운영 환경에서 손해가 더 큼).
+
+## D-173. 앱 JVM 힙은 `JAVA_TOOL_OPTIONS`의 `-XX:MaxRAMPercentage=60`으로 시작하고 실측으로 확정한다
+
+- 2026-09-08 / 550M 컨테이너 메모리 한도에서 힙 ≈330M, 비힙(메타스페이스·스레드 스택·코드 캐시·GC
+  구조체) 여유 ≈220M을 확보한다. 초안이던 70%는 여유가 165M뿐이라 Boot+Hibernate의 일반적인 비힙
+  사용량(150~250M) 상단에서 컨테이너 OOM kill 경계에 걸린다. 이미지가 아니라 compose의
+  `JAVA_TOOL_OPTIONS`로 주입해 재빌드 없이 조정 가능하게 한다. 실서버 수동 배포에서 `docker stats`로
+  RSS를 실측해 최종 비율을 확정한다(Phase 7 후속 플랜).
+- 이유: 컨테이너 메모리 인지 힙 사이징(`-XX:+UseContainerSupport` + `-XX:MaxRAMPercentage`)은 limit이
+  바뀔 때마다 재빌드 없이 힙도 비례 조정된다.
+- 기각 대안: 고정 `-Xmx`(컨테이너 limit 변경 때마다 재계산·재빌드 필요), 70%(비힙 여유 부족).
+
+## D-174. `/actuator/*` 외부 차단은 Caddy가 담당하고 `/actuator/health`만 통과시킨다
+
+- 2026-09-08 / 앱 내부 노출 범위(`management.endpoints.web.exposure.include: health,info`)는 이미
+  좁혀져 있으나, Caddyfile에서 `/actuator/health`만 통과시키고 `/actuator/info`를 포함한 나머지는
+  전부 404로 차단한다.
+- 이유: 엣지(Caddy)에서 한 겹 더 막으면 앱 설정 실수가 곧바로 외부 노출로 이어지지 않는 2중 방어가
+  된다. 앱 내부 노출 범위(`show-details: never` 등)의 최종 확정은 Phase 9(OPS-05)가 잇는다.
+- 기각 대안: 앱 설정만으로 차단(엣지 방어선 없이 단일 지점 실패에 노출됨).
+
+## D-175. GHCR 이미지 패키지는 public으로 두어 서버 pull 인증을 없앤다
+
+- 2026-09-08 / 레포(`gold-wrestling-be`)는 private을 유지하되, GHCR에 push하는 컨테이너 이미지
+  패키지(`ghcr.io/minsu-zip/gold-wrestling-be`)는 public으로 둔다. 서버는 별도 인증 없이
+  `docker compose pull`로 이미지를 받는다.
+- 이유: 서버에 장기 PAT(write/read:packages)를 두지 않는 것이 유출 표면을 줄이는 실질적 이득이다.
+  이미지 안에는 시크릿이 없다(전량 env 주입, D-169). 바이트코드 디컴파일로 도메인 로직·마이그레이션·
+  API 표면이 노출되는 것은 소유자가 감수하기로 확정했다.
+- 기각 대안: private 패키지 + 서버 상주 PAT.
+
+## D-176. 레이어 추출 전에 jar를 `application.jar`로 이름 고정한다 — ENTRYPOINT 불일치의 근본 수정은 Dockerfile이 맡는다
+
+- 2026-09-08 / Boot `tools extract --layers`는 application 레이어 안의 jar 파일명을 **입력 jar 이름 그대로** 남긴다.
+  07-02가 `build/libs/*.jar`에 바로 extract를 돌려 레이어 안 파일이 `gold-wrestling-be-0.0.1-SNAPSHOT.jar`가 됐고,
+  `ENTRYPOINT ["java","-jar","application.jar"]`가 기동 시 `Unable to access jarfile`로 실패했다(07-03 로컬 실기동에서 발견).
+  공식 Boot 4.1 파셜 Dockerfile과 같이 빌더 스테이지에서 `cp build/libs/*.jar application.jar` 후 extract하는 형태로 고쳤다.
+- 이유: 실행 명령(ENTRYPOINT)은 이미지의 책임이다. compose가 `find`로 jar를 탐색하는 우회는 Phase 8 배포 워크플로·
+  `docker run` 단독 실행·공식 패턴 모두와 어긋나고, 이미지만 보고는 실행 방법을 알 수 없게 만든다. `cp`는 jar가 둘 이상이면
+  실패하므로 조용히 하나를 고르는 일도 없다.
+- 기각 대안: ① compose `entrypoint`/`command`의 `find` 우회(07-03이 임시 적용했다가 제거) — 실행 계약이 이미지 밖으로 샌다.
+  ② `build.gradle.kts`의 `bootJar { archiveFileName = "application.jar" }` — 동작하지만 CI 아티팩트·로컬 `build/libs` 이름까지
+  바뀌고 D-17("07-02는 build.gradle.kts 무변경")과 어긋난다. 이름 고정은 이미지 빌드 단계에서만 필요하므로 Dockerfile에 둔다.
+
+## D-177. Caddy에 넘기는 `DOMAIN`·`ACME_EMAIL`은 compose의 `${VAR:?메시지}`로 `up` 시점에 필수 검사한다
+
+- 2026-09-09 / 운영 compose의 caddy 서비스에 `DOMAIN: ${DOMAIN:?...}`, `ACME_EMAIL: ${ACME_EMAIL:?...}`를 둔다.
+  Caddyfile의 `{$DOMAIN:localhost}` 콜론 기본값은 변수가 "아예 없을 때"만 적용되고, `.env`에 `DOMAIN=`처럼
+  빈 문자열로 설정되면 적용되지 않아 빈 사이트 블록 파싱 오류가 난다. `email {$ACME_EMAIL}`은 기본값조차 없어
+  빈 값이면 `wrong argument count`로 실패한다(둘 다 `caddy validate`로 실측). 두 경우 모두 Caddy가 재시작 루프에 빠진다.
+- 이유: compose의 `${VAR:?}`는 unset과 빈 문자열을 모두 잡아 컨테이너가 뜨기 전에 사람이 읽을 메시지로 멈춘다.
+  Caddyfile에는 조건문이 없어 파일 안에서 막을 방법이 없고, 가짜 이메일 기본값을 두면 Let's Encrypt 만료 알림이
+  아무에게도 가지 않는 상태로 조용히 배포된다.
+- 기각 대안: ① `{$ACME_EMAIL:admin@example.invalid}` 기본값 — 빈 문자열은 여전히 통과 못 하고 알림 유실 위험.
+  ② 로컬 오버라이드에서만 값 주입(07-03 초안) — 운영 `.env`가 비어 있는 경로가 검증되지 않은 채 남는다.

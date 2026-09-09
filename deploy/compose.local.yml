@@ -1,0 +1,20 @@
+# ============================================================================
+# 로컬 검증용 최소 오버라이드 (07-CONTEXT D-05) — 실서버 없이 운영 compose(compose.prod.yml)를 그대로 띄워
+# healthcheck 게이트·actuator 차단·볼륨 영속을 로컬에서 실증한다. 오버라이드는 작을수록 좋다.
+#
+# 실행: 1) cp -n .env.example deploy/.env (최초 1회) 후 DOMAIN=localhost, ACME_EMAIL=dev@example.invalid,
+#          DB_PASSWORD·JWT_SECRET 등 임시값을 채운다 — DOMAIN/ACME_EMAIL 이 비어 있으면 compose.prod.yml 의
+#          ${VAR:?} 가드(D-177)가 up 을 거부한다
+#       2) docker compose -f deploy/compose.prod.yml -f deploy/compose.local.yml --env-file deploy/.env up -d
+#
+# deploy/.env 인 이유: 서비스 env_file: 은 project directory(첫 -f 파일이 있는 deploy/) 기준으로 해석된다.
+# ============================================================================
+
+services:
+  app:
+    # GHCR에 아직 이미지가 없어(07-CONTEXT D-02, D-175) 07-02가 로컬 빌드한 이미지로 치환한다.
+    image: gw-be:test
+    # 운영에는 없는 설정 — 로컬에서 앱을 직접 찔러볼 수 있도록 호스트 포트 하나만 노출한다.
+    ports:
+      - "18080:8080"
+

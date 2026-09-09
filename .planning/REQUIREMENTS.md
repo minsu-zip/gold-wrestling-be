@@ -19,13 +19,13 @@
 
 ### 컨테이너화·서버 구성 — INFRA
 
-- [ ] **INFRA-01**: 운영자가 `docker build` 한 번으로 실행 가능한 앱 이미지를 만들 수 있다 — 멀티스테이지 Dockerfile(빌더 스테이지가 jar 생성, 런타임 스테이지는 JDK 21 기반 최소 이미지, 비루트 실행). 테스트는 CI가 담당하므로 이미지 빌드에서는 생략
-- [ ] **INFRA-02**: 같은 Dockerfile로 amd64+arm64 멀티 아키텍처 이미지(매니페스트 1개)를 만들 수 있다 — 추후 서버 이전(Graviton 등) 대비. 빌더 스테이지는 빌드 머신 네이티브 플랫폼에서 1회만 컴파일한다(QEMU 위 Gradle 컴파일 회피)
-- [ ] **INFRA-03**: 운영자가 운영용 compose 파일 하나로 app+postgres+Caddy 세 컨테이너를 올릴 수 있다 — postgres 데이터는 named volume, app은 postgres healthcheck 통과 후 기동, 전부 `restart: unless-stopped`. 로컬 개발용 `docker-compose.yml`은 그대로 둔다
-- [ ] **INFRA-04**: `https://api.goldwrestling.com`이 Caddy 자동 HTTPS(Let's Encrypt)로 서비스된다 — 80→443 리다이렉트, app 컨테이너로 리버스 프록시, 인증서 저장소 볼륨 영속(재시작해도 재발급 안 함)
-- [ ] **INFRA-05**: RAM 1GB 서버에서 세 컨테이너가 기동·부하 중 OOM kill 없이 동작한다 — JVM 힙 상한 명시, postgres 메모리 파라미터 조정, 컨테이너별 메모리 제한, 스왑 2GB 전제. 메모리 예산표를 문서에 남긴다
+- [x] **INFRA-01**: 운영자가 `docker build` 한 번으로 실행 가능한 앱 이미지를 만들 수 있다 — 멀티스테이지 Dockerfile(빌더 스테이지가 jar 생성, 런타임 스테이지는 JDK 21 기반 최소 이미지, 비루트 실행). 테스트는 CI가 담당하므로 이미지 빌드에서는 생략
+- [x] **INFRA-02**: 같은 Dockerfile로 amd64+arm64 멀티 아키텍처 이미지(매니페스트 1개)를 만들 수 있다 — 추후 서버 이전(Graviton 등) 대비. 빌더 스테이지는 빌드 머신 네이티브 플랫폼에서 1회만 컴파일한다(QEMU 위 Gradle 컴파일 회피)
+- [x] **INFRA-03**: 운영자가 운영용 compose 파일 하나로 app+postgres+Caddy 세 컨테이너를 올릴 수 있다 — postgres 데이터는 named volume, app은 postgres healthcheck 통과 후 기동, 전부 `restart: unless-stopped`. 로컬 개발용 `docker-compose.yml`은 그대로 둔다
+- [x] **INFRA-04**: `https://api.goldwrestling.com`이 Caddy 자동 HTTPS(Let's Encrypt)로 서비스된다 — 80→443 리다이렉트, app 컨테이너로 리버스 프록시, 인증서 저장소 볼륨 영속(재시작해도 재발급 안 함)
+- [x] **INFRA-05**: RAM 1GB 서버에서 세 컨테이너가 기동·부하 중 OOM kill 없이 동작한다 — JVM 힙 상한 명시, postgres 메모리 파라미터 조정, 컨테이너별 메모리 제한, 스왑 2GB 전제. 메모리 예산표를 문서에 남긴다
 - [ ] **INFRA-06**: 운영자가 빈 Ubuntu 서버에 멱등 초기 세팅 스크립트를 실행하면 배포 가능 상태가 된다 — Docker(compose 플러그인) 설치, 스왑 2GB, 타임존 Asia/Seoul, 배포 디렉토리·`.env` 자리 생성. **두 번 실행해도 결과가 같다**
-- [ ] **INFRA-07**: 운영 환경변수의 키 목록·의미·예시가 레포에 문서화된다(실값 없음) — 운영 필수값(`KAKAO_REDIRECT_URI=https://app.goldwrestling.com/login/callback`, `CORS_ALLOWED_ORIGINS=https://app.goldwrestling.com`, `ADMIN_SEED_*`, JWT 등) 포함. 운영 `.env`는 서버에만 존재하고 레포 밖이다
+- [x] **INFRA-07**: 운영 환경변수의 키 목록·의미·예시가 레포에 문서화된다(실값 없음) — 운영 필수값(`KAKAO_REDIRECT_URI=https://app.goldwrestling.com/login/callback`, `CORS_ALLOWED_ORIGINS=https://app.goldwrestling.com`, `ADMIN_SEED_*`, JWT 등) 포함. 운영 `.env`는 서버에만 존재하고 레포 밖이다
 
 ### 배포 파이프라인 — DEPLOY
 
@@ -92,13 +92,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | Phase 7 | Pending |
-| INFRA-02 | Phase 7 | Pending |
-| INFRA-03 | Phase 7 | Pending |
-| INFRA-04 | Phase 7 | Pending |
-| INFRA-05 | Phase 7 | Pending |
+| INFRA-01 | Phase 7 | Complete |
+| INFRA-02 | Phase 7 | Complete |
+| INFRA-03 | Phase 7 | Complete |
+| INFRA-04 | Phase 7 | Complete |
+| INFRA-05 | Phase 7 | Complete |
 | INFRA-06 | Phase 7 | Pending |
-| INFRA-07 | Phase 7 | Pending |
+| INFRA-07 | Phase 7 | Complete |
 | DEPLOY-01 | Phase 8 | Pending |
 | DEPLOY-02 | Phase 8 | Pending |
 | DEPLOY-03 | Phase 8 | Pending |

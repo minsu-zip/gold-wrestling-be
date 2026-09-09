@@ -20,6 +20,9 @@ spring:
     password: ${DB_PASSWORD:}
     hikari:
       pool-name: gold-wrestling-pool
+      # RAM 1GB(t3.micro)·단일 지점 트래픽 기준. 배치의 REQUIRES_NEW(BatchExecutionRecorder)가
+      # 한 흐름에서 커넥션 2개를 쓰는 것이 최대 소비 패턴이라 5로 충분하다 (decisions.md D-170).
+      maximum-pool-size: ${DB_HIKARI_MAX_POOL_SIZE:5}
 
   jpa:
     # 스키마는 Flyway 가 유일한 주체. Hibernate 는 매핑 검증만 한다.
@@ -47,6 +50,11 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+  tomcat:
+    threads:
+      # RAM 1GB 기준 축소. 스레드 스택이 힙 밖 메모리를 먹으므로 기본값 200은 550M 컨테이너에서
+      # 과하다 (decisions.md D-170).
+      max: ${SERVER_TOMCAT_THREADS_MAX:50}
   # 에러 응답은 전역 예외 핸들러가 담당한다. 기본 에러 페이지에 내부 정보를 흘리지 않는다.
   error:
     include-message: never
@@ -64,8 +72,13 @@ management:
 
 springdoc:
   api-docs:
+    # 로컬 기본 true, 운영 .env에서 false로 덮어쓴다. springdoc.* 은 점(.) 표기라 env 이름으로 직접
+    # 쓸 수 없어(env_file이 거부) 평평한 SWAGGER_ENABLED 키로 간접 바인딩한다 (decisions.md D-171).
+    enabled: ${SWAGGER_ENABLED:true}
     path: /v3/api-docs
   swagger-ui:
+    # api-docs와 반드시 같은 SWAGGER_ENABLED 키를 읽는다 — 하나만 끄면 다른 하나가 살아남는다.
+    enabled: ${SWAGGER_ENABLED:true}
     path: /swagger-ui.html
     tags-sorter: alpha
     operations-sorter: alpha

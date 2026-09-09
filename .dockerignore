@@ -1,0 +1,28 @@
+# --- 시크릿 (절대 이미지에 포함 금지, T-07-05) ---
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.jks
+secrets/
+credentials*.json
+
+# --- 빌드 산출물 (빌더가 컨테이너 안에서 새로 만든다 — 호스트 산출물을 넣으면 캐시가 매번 무효화됨) ---
+build/
+.gradle/
+.kotlin/
+out/
+
+# --- VCS / IDE / 계획 문서 (이미지 실행에 불필요) ---
+.git/
+.github/
+.idea/
+.vscode/
+.DS_Store
+.planning/
+.claude/
+docs/
+*.md
+
+# gradle/wrapper/ 와 gradlew 는 제외하지 않는다 — 빌더 스테이지가 wrapper로 빌드한다.
