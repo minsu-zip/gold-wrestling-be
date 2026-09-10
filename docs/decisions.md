@@ -2045,6 +2045,34 @@
 - 기각 대안: ① `{$ACME_EMAIL:admin@example.invalid}` 기본값 — 빈 문자열은 여전히 통과 못 하고 알림 유실 위험.
   ② 로컬 오버라이드에서만 값 주입(07-03 초안) — 운영 `.env`가 비어 있는 경로가 검증되지 않은 채 남는다.
 
+## D-178. `ScreenActionBar`를 `components/common/`으로 승격한다 — 근거는 사용처 수가 아니라 RULE-01 정본 스니펫의 단일 구현체 (D-077의 예외)
+
+- 2026-09-09 / FE Phase 9 09-01. 하단 고정 CTA 바의 클래스 조합(`bg-background sticky bottom-0 mt-auto` · `-mx-4 sm:mx-0` · `sm:static` ·
+  조건부 `pb-[env(safe-area-inset-bottom)] sm:pb-0` · 안쪽 `px-4 py-3 sm:p-0`)을 `src/components/common/ScreenActionBar.tsx` 한 파일에만 둔다.
+  실측 사용처는 `/login` 1곳(`src/pages/LoginPage.tsx`)이고 두 번째는 Phase 10 유형 4(셸 안 상세+액션 화면)다.
+  규칙 문서 `design-system/rules/bottom-cta.md` §정본 스니펫은 클래스를 다시 적지 않고 `<ScreenActionBar ownsSafeArea>`를 가리킨다 (09-08)
+- 이유: 규칙 정본 스니펫과 화면 코드가 두 벌이면 반드시 드리프트한다 — Phase 8이 적은 스니펫(`sm:mt-8`·`sm:w-auto`)을 그대로 옮기면
+  데스크탑 버튼 폭 384→내용 폭, 세로 리듬 24→32로 바뀌는 것을 FE 09-RESEARCH §정정 6이 실측했다. D-077("두 번째 사용처가 생기는 시점에
+  만든다")은 실사용 없는 선제작이 어긋난 API를 고정하는 위험을 막는 원칙인데, 이 컴포넌트는 props가 `ownsSafeArea`+`children` 둘뿐이라 그 위험이
+  없고 반대로 두 벌 유지가 더 큰 위험이다. **D-077의 명시적 예외**로 기록한다
+- 기각 대안: ① `LoginPage` 안에 클래스 조합을 두고 Phase 10에 승격 — 그 사이 규칙 문서·페이지·Phase 10 신규 화면 세 벌이 생긴다.
+  ② `AuthShell` 슬롯으로 CTA를 올림 — 페이지 스토리가 CTA를 잃고 `/login` 전용 슬롯이 셸 계약을 오염한다 (FE CONTEXT D-05)
+
+## D-179. `AuthShell`은 optional `variant`로, `ScreenActionBar.ownsSafeArea`는 기본값 없는 필수 prop으로 둔다
+
+- 2026-09-09 / FE 09-01·09-06. `AuthShell({ children, variant = 'centered' })` — `'action-bottom'`은 조기 반환 분기라 기본값 렌더 블록을
+  물리적으로 편집하지 않는다(삭제 diff 0). 라우터 감싸기 9곳 중 `/login` 1곳만 `variant="action-bottom"`, **무변경 8곳**(`/login/callback` ·
+  `/onboarding` · `/pending` · `/rejected` · `/inactive` · `/admin/login` · 404 · `RouteErrorPage`) — 09-07 재감사에서 필수 0건 화면 4개의
+  JSON·PNG 불변이 그 실측이다. 반면 `ScreenActionBar`의 `ownsSafeArea: boolean`은 기본값이 없다 — 호출부마다 `true`(`AuthShell`, 하단 탭 없음) /
+  `false`(셸 안, 하단 탭이 소유)를 선언한다
+- 이유: 두 prop의 위험 방향이 반대다. `variant`는 기존 호출부 8곳이 있어 optional+기본값이 CLAUDE.md 재사용 규칙 그대로다. `ownsSafeArea`는
+  신규 컴포넌트의 최초 계약이라 깨질 호출부가 없고, 잘못된 기본값이 만드는 버그(이중 계상 34px 과다 여백 / 누락으로 홈 인디케이터가 버튼을 문다)는
+  Chromium·WebKit 에뮬레이션이 `env()`를 항상 0으로 계산해 **스토리·E2E·감사 캡처가 전부 초록인 채로** 실기기에서만 드러난다 —
+  자동 검증이 원리적으로 불가능한 곳은 타입이 선언을 강제한다 (CLAUDE.md "새 prop은 optional + 기본값"의 의도된 예외)
+- 기각 대안: ① `ownsSafeArea = true` 기본값 — Phase 10 셸 안 사용처가 빼먹으면 하단 탭과 이중 계상. ② `ownsSafeArea = false` 기본값 —
+  `/login`이 빼먹으면 누락. 둘 다 에뮬레이션에서 잡히지 않는다는 점이 필수 prop의 근거다. ③ `AuthShell.variant`를 필수로 — 8곳 호출부 수정이
+  생겨 "렌더 불변"을 diff로 증명할 수 없게 된다
+
 ## D-180. 카카오 로그인 버튼을 공식 디자인 가이드에 정합시킨다 — 브랜드 계약값 정정 (D-082 부분 supersede)
 
 - 2026-09-09 / FE PR #53. 라벨 `카카오 로그인`(완성형) · 배경 `#FEE500` 유지 · 라벨 색 `#191919` → `rgba(0, 0, 0, 0.85)`(`#000000` 85%, 합성 ≈`#262200` 12.5:1) ·
@@ -2059,6 +2087,55 @@
   (b) `rounded-[12px]`를 `tokens.md` §임의값 예외 표에 등재 — 허용 범위 `/login` 카카오 버튼 1곳, `rounded-xl`(14px) 금지와 충돌 없음
 - 이유: 규칙 문서만 보는 사람이 위반으로 오인하지 않게 예외를 먼저 기록한다("규약에 없는 결정은 문서에 추가한 뒤 사용")
 - 계획된 (c) lucide-only 심볼 예외는 심볼 생략(D-180)으로 발생하지 않는다 — 3건이 아니라 2건
+
+## D-182. `ResponsiveDialog` Sheet 푸터 sticky + safe-area를 Phase 9에서 해소한다 — Phase 10 ADMIN-01은 검증으로 축소
+
+- 2026-09-09 / FE 09-05 (PR #52). `src/components/common/ResponsiveDialog.tsx` Sheet 경로 `Footer`를 바깥 층
+  `bg-popover sticky bottom-0 p-0 pb-[env(safe-area-inset-bottom)]`(D-185로 `border-t` 없음) + 안쪽 층 `flex flex-col gap-2 p-4` 2층 구조로 바꿨다.
+  한 곳 수정으로 승인본 "공통 B" 5건 — #17 `SlotDialog`(회원) · #45 `overlay-roster-panel` · #50 `overlay-register-pass` ·
+  #54 `overlay-member-status` · #57 `overlay-notice-form` — 이 닫혔다. 데스크탑 448px 우측 Sheet에서 sticky는 무해하다(`SheetFooter mt-auto` +
+  `SheetContent flex-col`이라 콘텐츠가 짧으면 옮길 자리가 없다 — `DesktopSheet` 스토리 무수정 통과, Phase 10 ADMIN-03의 전제).
+  `src/components/ui/**` 무수정. ROADMAP Phase 10 Depends on·REQUIREMENTS ADMIN-01은 "구현 → Phase 9 해소분을 관리자 전 오버레이에서 **검증**"으로 정정 (09-08)
+- 이유: 소유자 우선순위 ③(오버레이 자기 소유)의 구현체가 이 컴포넌트 한 곳이라 회원 화면(#17)을 고치는 순간 관리자 4종이 같이 바뀐다 —
+  회원/관리자로 페이즈를 나눠 두 번 손대면 그 사이에 두 상태가 공존한다. 바깥/안쪽 2층으로 나눈 이유는 safe-area 계상과 내부 패딩을 한 요소에
+  합치면 둘을 더하는 `calc()` 임의값이 새로 필요해지기 때문이다
+- 기각 대안: ① `pb-[calc(1rem+env(safe-area-inset-bottom))]` 단층 구조 — `tokens.md` §임의값 예외 표에 없는 표현식이 토큰 계약을 깬다.
+  ② 사용처 5곳에 각각 클래스 — 껍데기가 이미 공용인데 소유권을 흩는다. ③ Phase 10까지 미룸 — 회원 #17만 먼저 고칠 방법이 없다
+- 후속: 09-07 재감사가 안쪽 층이 **Dialog 경로(데스크탑 768·1280)에도** 적용되어 생성물 `DialogFooter`의 `sm:flex-row sm:justify-end` 안에서
+  버튼이 세로로 쌓이고 패딩이 16→32px로 이중 계상되는 회귀 후보를 발견했다 (FE `09-AUDIT-DIFF.md` ⑤-B B3 · `overlay-register-pass` ·
+  `overlay-member-status` · `overlay-notice-form` + `SlotDialog` 데스크탑). Sheet 경로 계약은 유지한 채 Dialog 경로의 안쪽 층만 조정하면
+  되고, 판단은 Phase 10 ADMIN-01 검증에서 한다
+
+## D-183. 승인본 #11 타이포는 역할 기준으로 올린다 — 판정 문구 14px, 보조 캡션·`Badge`는 12px 유지, 래퍼 3곳만 수정
+
+- 2026-09-09 / FE 09-04. 예약 화면의 "행동이 갈리는 판정 문구"(`수업 3/10` · `이용권이 없어 예약할 수 없습니다` · `휴강` · `저녁반` 등
+  `span.tabular-nums`)를 14px로 올리되, 바꾼 것은 래퍼 3곳 — `WeeklyScheduleGrid.tsx` 저녁반 셀 래퍼·누를 수 있는 슬롯 래퍼, `DaySlotList.tsx`
+  문구 `span` — 의 `text-xs → text-sm`뿐이다. `CellStatusText` 내부는 무수정. `Badge`(`예약 완료`)는 자기 cva에 `text-xs`를 갖고 있어 12px 유지,
+  요일 헤더·시각 헤더·요일 선택기·캡션(`예약제 수업` · `1:1 레슨`)도 12px 유지. `SlotDialog` note(#20)는 14px.
+  09-07 재감사: `span.tabular-nums @12px` 36건 → 0건, `span[data-slot=badge] @12px` 불변, 1024px 최악 조건에서 줄 수 2 불변(셀 높이 증가는
+  line-height 16→20 분만 — 76→88 · 80→89 · 92→108 · 40→44)
+- 이유: 승인본 §8 (c)가 `Badge` 12px를 "상태 뱃지 라벨 · 통과"로 판정했다. `CellStatusText` 전체에 `text-sm`을 주면 그 `Badge`까지 14px로
+  끌려 올라가(`h-5` 20px 뱃지에 14px 텍스트) 승인본 판정과 어긋나고, 승인본 59건 목록을 RULE-05 경로 밖에서 바꾸는 셈이 된다.
+  "무엇을 읽고 행동이 갈리는가"로 나누면 판정 문구는 본문(14) · 캡션은 메타(12)라는 타이포 4단계 규칙과도 정합한다
+- 기각 대안: ① `CellStatusText` 전체 `text-sm` — 위 충돌. ② 요일 헤더·캡션까지 14px — 12px는 라벨·메타·캡션의 정식 단계이고 승인본이 위반으로
+  세지 않았다. ③ `Badge`에 `text-xs` 재선언 — 생성물 기본값을 호출부에서 되풀이 선언하는 관례 이탈
+
+## D-184. before/after 재감사는 전수 재실행 후 승인본 JSON을 복원하고 사본과 요소 key로 대조한다 — 라벨 교체는 rename으로 취급
+
+- 2026-09-10 / FE 09-07 (`09-AUDIT-DIFF.md`). 절차: `pnpm audit:capture` 전체 재실행(25화면 × 3뷰포트 + sheet-448 반사실, 60 테스트) →
+  새 JSON을 `.planning/phases/09-member-screens/09-touch-targets.json`으로 **먼저 복사** → `git checkout -- 07-touch-targets.json`으로 승인본
+  복원(diff 0) → 캡처 디렉터리를 `09-<RUN_ID>`로 `mv` → 요소 key(`tag+[data-slot]+[data-size]+accName`) 기준 필드 대조 + `diff -rq` PNG 대조.
+  "무엇이 바뀌어야 하는가"(사전 선언 delta)를 재실행 **전에** 표로 고정하고, 상이 항목을 전부 그 표에 매핑하거나 회귀 후보로 분류한다.
+  이번 결과: 매핑 21건 + 선언 누락 비회귀 2건(`admin-board` 주 이동 32→36 — 공용 `WeekNavigator` 파급 · #11 line-height 파생) +
+  **회귀 후보 1건**(Dialog 경로 푸터, D-182 후속). 필수 0건 화면 4개 JSON·PNG 불변. `viewport-fit=cover`(`index.html:6`, MEMB-03)는 캡처를
+  한 픽셀도 바꾸지 않았다 — Chromium `env()`=0, 실동작 확인은 실기기 게이트 ①
+- 이유: 파이프라인의 지뢰 3개가 실측으로 확인됐다 — (a) `e2e/audit/measure.audit.ts:68-74` `OUTPUT_PATH`가 승인본 경로로 하드코딩돼 재실행이
+  기준선을 같은 자리에 덮어쓴다(복원을 복사보다 먼저 하면 결과가 사라진다 — FE CONTEXT D-17 서술 순서 정정), (b) `capture.audit.ts:49-56`
+  디렉터리 접두 `07-` 하드코딩(도구를 고치지 않고 `mv`), (c) `collect.ts:150-157` `keyOf`가 accName을 포함해 라벨 교체가 "삭제 1 + 추가 1"로
+  보인다. 기준선(D-158-3)은 조용히 갱신하지 않고 사본으로 남긴다 — Phase 11 VERI-01이 같은 절차로 세 번째 점을 찍는다
+- 기각 대안: ① 화면 필터 부분 실행 — MEMB-03이 **전 화면** 여백 회귀 0건을 요구하고, 공용 컴포넌트 파급(이번 `WeekNavigator` → `admin-board`)은
+  부분 실행으로는 보이지 않는다. ② `OUTPUT_PATH`를 페이즈별로 바꾸는 도구 수정 — `audit/**`·`e2e/audit/**` 동결(재감사 시점까지 무변경이
+  대조의 전제, D-168)과 어긋난다. ③ 결과를 보고 delta를 사후 작성 — 판정이 아니라 합리화가 된다
 
 ## D-185. 하단 고정 CTA 바·대화상자 푸터·하단 탭 바의 버튼 위 구분선(`border-t`)을 두지 않는다
 
